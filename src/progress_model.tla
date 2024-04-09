@@ -7,8 +7,8 @@ VARIABLES F, pc
 
 (* Initialization of the variables *)
 Init == 
-    /\ F = {}
-    /\ pc = "start"
+    /\ F = <<>>
+    /\ pc = 0
 
 (* Define the actions *)
 Step(tid, axb) == 
