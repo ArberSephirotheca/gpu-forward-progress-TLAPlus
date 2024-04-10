@@ -13,5 +13,5 @@ tlaplus-image:
     FROM +tlaplusbuild-image
     WORKDIR /workdir
     COPY src src
-    RUN pcal src/progress_model.tla > output.txt 2>&1 || true
+    RUN tlc src/progress_model > output.txt 2>&1 || true
     SAVE ARTIFACT output.txt AS LOCAL ./build/
