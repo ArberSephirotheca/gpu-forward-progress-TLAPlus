@@ -78,8 +78,8 @@ Next ==
     \/ FairStep
     \/ UnfairStep
 
-EventuallyTerminated ==
-    \A t \in Threads: <>[](terminated[t] = TRUE) \* eventually all threads are always terminated, which is not satisfied in this model
+\* EventuallyTerminated ==
+\*     \A t \in Threads: <>[](terminated[t] = TRUE) \* eventually all threads are always terminated, which is not satisfied in this model
 
 
 
@@ -91,5 +91,3 @@ Spec ==
     /\ SF_vars(FairStep) \* Even the Fair Step is not continuously enabled, strong fairness guarnatees that it will be enabled infinitely often
 
 ====
-
-THEOREM 
