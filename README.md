@@ -6,14 +6,7 @@
 - [Earthly](https://earthly.dev/get-earthly)
 ## Get Started
 ```bash
-earthly +tlaplus-image --mode '<mode>' --model '<model>'
+earthly +tlaplus-image 
 ```
-```
-mode :=
-    text <- default
-    graph
+If you want to output the graph instead, checkout the `Earthfile` and see the comment
 
-model :=
-    obe <- default
-    hsa
-```

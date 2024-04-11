@@ -17,17 +17,6 @@ tlaplus-image:
     WORKDIR /workdir
     COPY src src
     RUN echo $out
-    # # default is the text mode
-    # IF [$out == 'text']
-    #     RUN tlc src/progress_model_obe > output.txt 2>&1 || true
-    #     SAVE ARTIFACT output.txt AS LOCAL ./build/
-    # ELSE IF [$out == 'graph']
-    # # output graph for visualization
-    #     RUN tlc src/progress_model_obe -dump dot,actionlabels,colorize output.dot 2>&1 || true 
-    #     SAVE ARTIFACT output.dot AS LOCAL ./build/
-    # ELSE
-    #     RUN echo "Invalid model type"
-    # END
     RUN tlc src/progress_model_obe > output.txt 2>&1 || true
     SAVE ARTIFACT output.txt AS LOCAL ./build/
 

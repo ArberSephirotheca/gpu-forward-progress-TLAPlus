@@ -59,9 +59,15 @@ Step(t) ==
     /\  UNCHANGED instructions
 
 
+\* RECURSIVE FairStepN(_, _)
+\* FairStepN(n, t) ==
+\*     /\  IF n = 0 THEN
+\*             /\  UNCHANGED vars
+\*         ELSE
+\*             Step
 FairStep ==
     /\  \E t \in fairExecutionSet:
-        Step(t)
+        /\ Step(t)
 
 UnfairStep ==
     /\  \E t \in Threads:
@@ -72,18 +78,18 @@ Next ==
     \/ FairStep
     \/ UnfairStep
 
-Liveness ==
-    \A t \in Threads: <>[](terminated[t] = TRUE) \* eventually all threads terminate, which is not satisfied in this model
+EventuallyTerminated ==
+    \A t \in Threads: <>[](terminated[t] = TRUE) \* eventually all threads are always terminated, which is not satisfied in this model
 
-\*  EventuallyScheduled ==
-\*     \A t \in fairExecutionSet:
-\*             <>(Step(t))
 
 
 (* Specification *)
 Spec == 
     /\ Init
     /\ [][Next]_vars
-    /\ WF_vars(FairStep)
-    \* /\ EventuallyScheduled
+    /\ WF_vars(Next) \* Weak fairness guarnatees that the Next action will be enabled continuously
+    /\ SF_vars(FairStep) \* Even the Fair Step is not continuously enabled, strong fairness guarnatees that it will be enabled infinitely often
+
 ====
+
+THEOREM 
