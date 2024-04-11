@@ -21,5 +21,5 @@ tlaplus-image:
     SAVE ARTIFACT output.txt AS LOCAL ./build/
 
     # If you want to use the graphviz to generate the graph, you can use the following command
-    # RUN tlc src/progress_model_obe -dump dot,actionlabels,colorize output.dot 2>&1 || true 
-    # SAVE ARTIFACT output.dot AS LOCAL ./build/
+    #  RUN tlc src/progress_model_obe -dump dot,actionlabels,colorize output.dot 2>&1 || true 
+    #  SAVE ARTIFACT output.dot AS LOCAL ./build/

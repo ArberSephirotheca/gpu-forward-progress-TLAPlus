@@ -3,7 +3,7 @@ EXTENDS Integers, Naturals, Sequences
 
 CONSTANT Threads
 
-Instructions == {"Acquire", "Relese", "Terminate"}
+Instructions == {"Acquire", "Release", "Terminate"}
 
 VARIABLES fairExecutionSet, checkLock, pc, instructions, terminated
 
@@ -12,7 +12,7 @@ vars == <<fairExecutionSet, checkLock, pc, instructions, terminated>>
 
 InitThreadVars ==
     /\  pc = [t \in Threads |-> 1]
-    /\  instructions = [t \in Threads |-> << "Acquire", "Relese", "Terminate">>]
+    /\  instructions = [t \in Threads |-> << "Acquire", "Release", "Terminate">>]
     /\  terminated = [t \in Threads |-> FALSE]
 
  Init == 
@@ -22,14 +22,18 @@ InitThreadVars ==
 
 
 AddToFairExecutionSet(t) ==
-    /\  t \in Threads
-    /\  t \notin fairExecutionSet
-    /\  fairExecutionSet' = fairExecutionSet \union {t}
+    IF t \notin fairExecutionSet THEN
+        /\  fairExecutionSet' = fairExecutionSet \union {t}
+    ELSE
+        /\  UNCHANGED fairExecutionSet
+
 
 RemoveFromFairExecutionSet(t) ==
-    /\  t \in Threads
-    /\  t \in fairExecutionSet
-    /\  fairExecutionSet' = fairExecutionSet \ {t}
+    IF t \in fairExecutionSet THEN
+        /\  fairExecutionSet' = fairExecutionSet \ {t}
+    ELSE
+        /\  UNCHANGED fairExecutionSet
+
 
 
 AtomicExchange(t, checkVal, jumpInst, doExch, exchVal) ==
@@ -45,12 +49,13 @@ Step(t) ==
                 /\  AtomicExchange(t, TRUE, 1, TRUE, TRUE)
                 /\  AddToFairExecutionSet(t)
                 /\  UNCHANGED terminated
-            ELSE IF instructions[t][pc[t]] = "Relese" THEN
+            ELSE IF instructions[t][pc[t]] = "Release" THEN
                 /\  AtomicExchange(t, FALSE, 3, TRUE, FALSE)
                 /\  AddToFairExecutionSet(t)
                 /\  UNCHANGED terminated
             ELSE IF instructions[t][pc[t]] = "Terminate" THEN
                 /\ RemoveFromFairExecutionSet(t)
+                /\ terminated' = [terminated EXCEPT ![t] = TRUE]
                 /\ UNCHANGED <<pc, checkLock>>
             ELSE
                 /\ UNCHANGED vars
@@ -59,19 +64,15 @@ Step(t) ==
     /\  UNCHANGED instructions
 
 
-\* RECURSIVE FairStepN(_, _)
-\* FairStepN(n, t) ==
-\*     /\  IF n = 0 THEN
-\*             /\  UNCHANGED vars
-\*         ELSE
-\*             Step
+
+
+
 FairStep ==
-    /\  \E t \in fairExecutionSet:
+    \E t \in fairExecutionSet:
         /\ Step(t)
 
 UnfairStep ==
     /\  \E t \in Threads:
-        /\ t \notin fairExecutionSet
         /\ Step(t)
 
 Next == 
@@ -90,4 +91,6 @@ Spec ==
     /\ WF_vars(Next) \* Weak fairness guarnatees that the Next action will be enabled continuously
     /\ SF_vars(FairStep) \* Even the Fair Step is not continuously enabled, strong fairness guarnatees that it will be enabled infinitely often
 
+
+\* To sovle :
 ====
