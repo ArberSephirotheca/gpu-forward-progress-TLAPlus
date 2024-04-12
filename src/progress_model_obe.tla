@@ -68,7 +68,7 @@ Step(t) ==
 
 
 FairStep ==
-    \E t \in fairExecutionSet:
+    /\ \E t \in fairExecutionSet:
         /\ Step(t)
 
 UnfairStep ==
