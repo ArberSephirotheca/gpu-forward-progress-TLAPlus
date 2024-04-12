@@ -1,9 +1,10 @@
 ---- MODULE progress_model_obe ----
 EXTENDS Integers, Naturals, Sequences
 
-CONSTANT Threads
+CONSTANTS Threads
 
-Instructions == {"Acquire", "Release", "Terminate"}
+
+Instructions == {"Load", "Store", "Terminate"}
 
 VARIABLES fairExecutionSet, checkLock, pc, instructions, terminated
 
@@ -12,7 +13,7 @@ vars == <<fairExecutionSet, checkLock, pc, instructions, terminated>>
 
 InitThreadVars ==
     /\  pc = [t \in Threads |-> 1]
-    /\  instructions = [t \in Threads |-> << "Acquire", "Release", "Terminate">>]
+    /\  instructions = <<<< "Load", "Terminate">>, <<"Store", "Terminate">>>>
     /\  terminated = [t \in Threads |-> FALSE]
 
  Init == 
@@ -39,18 +40,18 @@ RemoveFromFairExecutionSet(t) ==
 AtomicExchange(t, checkVal, jumpInst, doExch, exchVal) ==
     /\  LET newPc == IF checkLock = checkVal THEN jumpInst ELSE pc[t] + 1
             newCheckLock == IF doExch THEN exchVal ELSE checkLock
-        IN 
+        IN
             /\ pc' = [pc EXCEPT ![t] = newPc]
             /\ checkLock' = newCheckLock
 
 Step(t) ==
     /\  IF terminated[t] = FALSE THEN
-            IF instructions[t][pc[t]] = "Acquire" THEN
-                /\  AtomicExchange(t, TRUE, 1, TRUE, TRUE)
+            IF instructions[t][pc[t]] = "Load" THEN
+                /\  AtomicExchange(t, FALSE, pc[t], FALSE, FALSE)
                 /\  AddToFairExecutionSet(t)
                 /\  UNCHANGED terminated
-            ELSE IF instructions[t][pc[t]] = "Release" THEN
-                /\  AtomicExchange(t, FALSE, 3, TRUE, FALSE)
+            ELSE IF instructions[t][pc[t]] = "Store" THEN
+                /\  AtomicExchange(t, TRUE, pc[t] + 1, TRUE, TRUE)
                 /\  AddToFairExecutionSet(t)
                 /\  UNCHANGED terminated
             ELSE IF instructions[t][pc[t]] = "Terminate" THEN
@@ -68,19 +69,24 @@ Step(t) ==
 
 
 FairStep ==
-    /\ \E t \in fairExecutionSet:
-        /\ Step(t)
+    IF fairExecutionSet = {} THEN
+        /\ \E t \in Threads:
+            /\ Step(t)
+    ELSE
+        /\ \E t \in fairExecutionSet:
+            /\ Step(t)
 
 UnfairStep ==
     /\  \E t \in Threads:
         /\ Step(t)
 
+\* Deadlock means reaching a state in which Next is not enabled.
 Next == 
     \/ FairStep
-    \/ UnfairStep
+    \*\/ UnfairStep
 
-\* EventuallyTerminated ==
-\*     \A t \in Threads: <>[](terminated[t] = TRUE) \* eventually all threads are always terminated, which is not satisfied in this model
+ EventuallyTerminated ==
+     \A t \in Threads: []<>(terminated[t] = TRUE) \* always eventually all threads are terminated, which is not satisfied in this model
 
 
 
@@ -88,9 +94,9 @@ Next ==
 Spec == 
     /\ Init
     /\ [][Next]_vars
-    /\ WF_vars(Next) \* Weak fairness guarnatees that the Next action will be enabled continuously
-    /\ SF_vars(FairStep) \* Even the Fair Step is not continuously enabled, strong fairness guarnatees that it will be enabled infinitely often
-
+    /\ WF_vars(Next) \* Weak fairness guarnatees that if Next action are be enabled continuously(always enable), it would eventually happen 
+    
+Liveness == EventuallyTerminated
 
 \* To sovle :
 ====
