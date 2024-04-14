@@ -18,12 +18,12 @@ tlaplus-image:
     COPY src src
     RUN echo $OUT
     IF [ "$OUT" = "text" ]
-        RUN tlc src/progress_model_obe > output.txt 2>&1 || true
+        RUN tlc src/MCProgressModel > output.txt 2>&1 || true
     ELSE IF [ "$OUT" = "dot" ]
-        RUN tlc src/progress_model_obe -dump dot,actionlabels,colorize output.dot 2>&1 || true 
+        RUN tlc src/MCProgressModel -dump dot,actionlabels,colorize output.dot 2>&1 || true 
     ELSE IF [ "$OUT" = "all" ]
-        RUN tlc src/progress_model_obe -dump dot,actionlabels,colorize output.dot 2>&1 || true 
-        RUN tlc src/progress_model_obe > output.txt 2>&1 || true
+        RUN tlc src/MCProgressModel -dump dot,actionlabels,colorize output.dot 2>&1 || true 
+        RUN tlc src/MCProgressModel > output.txt 2>&1 || true
     ELSE
         RUN echo "Invalid output format"
     END
