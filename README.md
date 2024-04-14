@@ -6,7 +6,8 @@
 - [Earthly](https://earthly.dev/get-earthly)
 ## Get Started
 ```bash
-earthly +tlaplus-image 
+earthly +tlaplus-image --OUT<format>
 ```
-If you want to output the graph instead, checkout the `Earthfile` and see the comment
+## Command Line Option
+- *format*: text, dot, all
 
