@@ -6,7 +6,7 @@ LOCAL INSTANCE Sequences
 VARIABLES checkLock, pc, terminated
 
 (* Thread Configuration *)
-InstructionSet == {"Load", "Store", "Terminate"}
+InstructionSet == {"Load", "Store", "AtomicCAS", "Terminate"}
 
 ThreadInstructions == <<<< "Load", "Terminate">>, <<"Store", "Terminate">>>>
 
@@ -32,6 +32,11 @@ AtomicExchange(t, checkVal, jumpInst, doExch, exchVal) ==
             /\ pc' = [pc EXCEPT ![t] = newPc]
             /\ checkLock' = newCheckLock
 
+AtomicCAS(mem, compare, data) == 
+    /\  IF mem = compare THEN
+            /\  mem' = data
+        ELSE
+            /\  mem' = mem
 
 Load(t) == 
     /\  AtomicExchange(t, FALSE, pc[t], FALSE, FALSE)
