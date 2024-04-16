@@ -37,7 +37,7 @@ Next ==
     /\  FairStep
 
  EventuallyTerminated ==
-     \A t \in Threads: []<>(terminated[t] = TRUE) \* always eventually all threads are terminated, which is not satisfied in this model
+    \A t \in Threads: <>[](terminated[t] = TRUE) \* eventually all threads are always terminated
 
 
 
