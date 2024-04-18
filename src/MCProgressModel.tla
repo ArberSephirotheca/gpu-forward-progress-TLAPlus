@@ -88,9 +88,8 @@ FairStep ==
 Next ==
     /\  FairStep
 
- \* always eventually all threads are terminated
-AlwaysEventuallyTerminated ==
-    \A t \in Threads: []<>(terminated[t] = TRUE)
+ EventuallyTerminated ==
+    \A t \in Threads: <>[](terminated[t] = TRUE) \* eventually all threads are always terminated
 
 (* Specification *)
 Spec == 
