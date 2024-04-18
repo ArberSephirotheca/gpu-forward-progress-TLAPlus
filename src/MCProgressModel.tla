@@ -61,8 +61,8 @@ FairStep ==
     \* threads within the same subgroup that are executing that are not at barrier
     LET lockstepExecThreads == {t \in curExeSubgroupTs : barrier[t] = "NULL"} 
         \* threads in fair execution set that are not at barrier
-        threadNotAtBarrier == {t \in Threads: WorkGroupId(t) = 0 /\ SubgroupId(t) \in fairExecutionSetOne /\ barrier[t] = "NULL"} 
-            \union {t \in Threads: WorkGroupId(t) = 1 /\ SubgroupId(t) \in fairExecutionSetTwo /\ barrier[t] = "NULL"} 
+        threadNotAtBarrier == {t \in Threads: WorkGroupId(t) = 0 /\ SubgroupId(t) \in fairExecutionSetOne /\ barrier[t] = "NULL" /\ pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t))} 
+            \union {t \in Threads: WorkGroupId(t) = 1 /\ SubgroupId(t) \in fairExecutionSetTwo /\ barrier[t] = "NULL" /\ pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t))} 
         IN
         \*  lockstep execution first, then threads in fair execution set that are not at barrier, then any thread
         /\  IF lockstepExecThreads # {} THEN \* Randomly select a thread in lockstep execution that is not at barrier to step
@@ -88,7 +88,7 @@ FairStep ==
 Next ==
     /\  FairStep
 
- EventuallyTerminated ==
+EventuallyAlwaysTerminated ==
     \A t \in Threads: <>[](terminated[t] = TRUE) \* eventually all threads are always terminated
 
 (* Specification *)
@@ -97,5 +97,5 @@ Spec ==
     /\ [][Next]_vars
     /\ WF_vars(Next) \* Weak fairness guarnatees that if Next action are be enabled continuously(always enable), it would eventually happen 
     
-Liveness == AlwaysEventuallyTerminated
+Liveness == EventuallyAlwaysTerminated
 ====
