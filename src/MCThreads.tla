@@ -7,8 +7,8 @@ LOCAL INSTANCE TLC
 VARIABLES checkLock, pc, terminated, barrier
 
 (* Thread Configuration *)
-InstructionSet == {"NOOP", "WhileLoad", "Store", "SpinLock", "Unlock", "WorkgroupBarrier", "AtomicCAS", "Terminate"}
-BarrierSet == {"NULL", "SubgroupBarrier", "WorkgroupBarrier"}
+InstructionSet == {"NOOP", "WhileLoad", "Store", "SpinLock", "Unlock", "Barrier", "AtomicCAS", "Terminate"}
+Scope == {"Workgroup", "Subgroup"}
 ThreadInstructions ==  [t \in 1..NumThreads |-> IF LocalInvocationId(t) = 0 THEN <<"SpinLock", "Unlock", "Terminate">> ELSE <<"SpinLock", "Unlock", "Terminate">>]
 Threads == {tid : tid \in 1..NumThreads}
 
@@ -41,64 +41,64 @@ LowestPcWithinSubgroup(sid, wgid) == Min({pc[tid]: tid \in ThreadsWithinSubgroup
 MinThreadWithinWorkGroup(workgroupId) ==
     Min(ThreadsWithinWorkGroup(workgroupId))
 
-UpdateBarrier(tid, barrierState) ==
-    /\  barrierState \in BarrierSet
-    /\  barrier' = [barrier EXCEPT ![tid] = barrierState]
+\* UpdateBarrier(tid, barrierState) ==
+\*     /\  barrierState \in BarrierSet
+\*     /\  barrier' = [barrier EXCEPT ![tid] = barrierState]
     
-SubgroupBarrier(t) ==
-    /\  IF barrier[t] = "SubgroupBarrier" THEN \* already waiting at a subgroup barrier
-            LET affectedThreadsBarrier == {barrier[affectedThreads]: affectedThreads \in ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))}
-                affectedThreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
-            IN 
-                IF \A affected \in affectedThreadsBarrier : affected = "SubgroupBarrier" THEN \* if all threads in the subgroup are waiting at the barrier, release them
-                    /\  barrier' = [\* release all threads in the subgroup, marking barrier as null
-                            tid \in Threads |->
-                                IF tid \in affectedThreads THEN 
-                                    "NULL" 
-                                ELSE 
-                                    barrier[tid]
-                        ]
-                    /\  pc' = [ \* increment the program counter for all threads in the subgroup
-                            tid \in Threads |->
-                                IF tid \in affectedThreads THEN 
-                                    pc[tid] + 1
-                                ELSE 
-                                    pc[tid]
-                        ]
-                ELSE
-                    /\  UNCHANGED <<barrier, pc>> \* else, do nothing as some threads are still not at the barrier
-        ELSE
-            /\  UpdateBarrier(t, "SubgroupBarrier") \* set the barrier for the thread
-            /\  UNCHANGED <<pc>>
-    /\  UNCHANGED <<checkLock, terminated>>
+\* SubgroupBarrier(t) ==
+\*     /\  IF barrier[t] = "SubgroupBarrier" THEN \* already waiting at a subgroup barrier
+\*             LET affectedThreadsBarrier == {barrier[affectedThreads]: affectedThreads \in ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))}
+\*                 affectedThreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
+\*             IN 
+\*                 IF \A affected \in affectedThreadsBarrier : affected = "SubgroupBarrier" THEN \* if all threads in the subgroup are waiting at the barrier, release them
+\*                     /\  barrier' = [\* release all threads in the subgroup, marking barrier as null
+\*                             tid \in Threads |->
+\*                                 IF tid \in affectedThreads THEN 
+\*                                     "NULL" 
+\*                                 ELSE 
+\*                                     barrier[tid]
+\*                         ]
+\*                     /\  pc' = [ \* increment the program counter for all threads in the subgroup
+\*                             tid \in Threads |->
+\*                                 IF tid \in affectedThreads THEN 
+\*                                     pc[tid] + 1
+\*                                 ELSE 
+\*                                     pc[tid]
+\*                         ]
+\*                 ELSE
+\*                     /\  UNCHANGED <<barrier, pc>> \* else, do nothing as some threads are still not at the barrier
+\*         ELSE
+\*             /\  UpdateBarrier(t, "SubgroupBarrier") \* set the barrier for the thread
+\*             /\  UNCHANGED <<pc>>
+\*     /\  UNCHANGED <<checkLock, terminated>>
 
 
-WorkgroupBarrier(t) ==
-    /\  IF barrier[t] = "WorkgroupBarrier" THEN \* already waiting at a workgroup barrier
-            LET affectedThreadsBarrier == {barrier[affectedThreads]: affectedThreads \in ThreadsWithinWorkGroup(WorkGroupId(t))}
-                affectedThreads == ThreadsWithinWorkGroup(WorkGroupId(t))
-            IN 
-                IF \A affected \in affectedThreadsBarrier : affected = "WorkgroupBarrier" THEN \* if all threads in the workgroup are waiting at the barrier, release them
-                    /\  barrier' = [
-                            tid \in Threads |->
-                                IF tid \in affectedThreads THEN 
-                                    "NULL" 
-                                ELSE 
-                                    barrier[tid]
-                        ]
-                    /\  pc' = [ \* increment the program counter for all threads in the subgroup
-                            tid \in Threads |->
-                                IF tid \in affectedThreads THEN 
-                                    pc[tid] + 1
-                                ELSE 
-                                    pc[tid]
-                        ]
-                ELSE
-                    /\  UNCHANGED <<barrier, pc>> \* else, do nothing as some threads are still not at the barrier
-        ELSE
-            /\  UpdateBarrier(t, "WorkgroupBarrier") \* set the barrier for the thread
-            /\  UNCHANGED <<pc>>
-    /\  UNCHANGED <<checkLock, terminated>>
+\* WorkgroupBarrier(t) ==
+\*     /\  IF barrier[t] = "WorkgroupBarrier" THEN \* already waiting at a workgroup barrier
+\*             LET affectedThreadsBarrier == {barrier[affectedThreads]: affectedThreads \in ThreadsWithinWorkGroup(WorkGroupId(t))}
+\*                 affectedThreads == ThreadsWithinWorkGroup(WorkGroupId(t))
+\*             IN 
+\*                 IF \A affected \in affectedThreadsBarrier : affected = "WorkgroupBarrier" THEN \* if all threads in the workgroup are waiting at the barrier, release them
+\*                     /\  barrier' = [
+\*                             tid \in Threads |->
+\*                                 IF tid \in affectedThreads THEN 
+\*                                     "NULL" 
+\*                                 ELSE 
+\*                                     barrier[tid]
+\*                         ]
+\*                     /\  pc' = [ \* increment the program counter for all threads in the subgroup
+\*                             tid \in Threads |->
+\*                                 IF tid \in affectedThreads THEN 
+\*                                     pc[tid] + 1
+\*                                 ELSE 
+\*                                     pc[tid]
+\*                         ]
+\*                 ELSE
+\*                     /\  UNCHANGED <<barrier, pc>> \* else, do nothing as some threads are still not at the barrier
+\*         ELSE
+\*             /\  UpdateBarrier(t, "WorkgroupBarrier") \* set the barrier for the thread
+\*             /\  UNCHANGED <<pc>>
+\*     /\  UNCHANGED <<checkLock, terminated>>
 
     
 AtomicExchange(t, checkVal, jumpInst, doExch, exchVal) ==
@@ -118,6 +118,9 @@ NOOP(t) ==
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
     /\  UNCHANGED <<checkLock, terminated, barrier>>
 
+OpAtomicLoad(result, pointer, scope) == 
+    /\  result' = pointer
+
 WhileLoad(t) == 
     /\  AtomicExchange(t, FALSE, pc[t], FALSE, FALSE)
     /\  UNCHANGED <<terminated, barrier>>
@@ -127,7 +130,11 @@ Store(t) ==
     /\  UNCHANGED <<terminated, barrier>>
 
 SpinLock(t) == 
-    /\  AtomicExchange(t, TRUE, pc[t], TRUE, TRUE)
+    /\  IF checkLock[WorkGroupId(t)+1] = TRUE THEN 
+            /\ UNCHANGED <<pc, checkLock>>
+        ELSE 
+            checkLock' = [checkLock EXCEPT ![WorkGroupId(t)+1] = TRUE]
+            /\ pc' = [pc EXCEPT ![t] = pc[t] + 1]
     /\  UNCHANGED <<terminated, barrier>>
 
 Unlock(t) == 
@@ -148,10 +155,10 @@ Step(t) ==
             SpinLock(t)
         ELSE IF ThreadInstructions[t][pc[t]] = "Unlock" THEN
             Unlock(t)
-        ELSE IF ThreadInstructions[t][pc[t]] = "WorkgroupBarrier" THEN
-            WorkgroupBarrier(t)
-        ELSE IF ThreadInstructions[t][pc[t]] = "SubgroupBarrier" THEN
-            SubgroupBarrier(t)
+        \* ELSE IF ThreadInstructions[t][pc[t]] = "WorkgroupBarrier" THEN
+        \*     WorkgroupBarrier(t)
+        \* ELSE IF ThreadInstructions[t][pc[t]] = "SubgroupBarrier" THEN
+        \*     SubgroupBarrier(t)
         ELSE IF ThreadInstructions[t][pc[t]] = "Terminate" THEN
             Terminate(t)
         ELSE IF ThreadInstructions[t][pc[t]] = "NOOP" THEN 
@@ -169,9 +176,9 @@ AllInstructionsWithinSet ==
             ThreadInstructions[t][ins] \in InstructionSet
 
 
-(* This property ensures all the barriers in all threads are bounded to the barrier set *)
-AllBarrierWithinSet ==
-    \A t \in Threads:
-        barrier[t] \in BarrierSet
+\* (* This property ensures all the barriers in all threads are bounded to the barrier set *)
+\* AllBarrierWithinSet ==
+\*     \A t \in Threads:
+\*         barrier[t] \in BarrierSet
 
 ====

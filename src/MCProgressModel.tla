@@ -1,24 +1,20 @@
 ---- MODULE MCProgressModel ----
 EXTENDS Integers, Naturals, Sequences, MCThreads, MCLayout
 
-VARIABLES fairExecutionSetOne, fairExecutionSetTwo, curExeSubgroupTsOne, curExeSubgroupTsTwo
+VARIABLES fairExecutionSet, curExeSubgroupTs, selected
 
-vars == <<fairExecutionSetOne, fairExecutionSetTwo, curExeSubgroupTsOne, curExeSubgroupTsTwo, checkLock, pc, terminated, barrier>>
+vars == <<fairExecutionSet, curExeSubgroupTs, checkLock, pc, terminated, barrier, selected>>
 
-\* fairness at workgroup level, assume two workgroups
+
 InitOBE ==
-    /\  fairExecutionSetOne = {} \* fair execution set(subgroup) for workgroup 0, initially empty
-    /\  fairExecutionSetTwo = {} \* fair execution set(subgroup) for workgroup 1, initially empty
-    /\  curExeSubgroupTsOne = {} \* threads in the same subgroup that are currently executing
-    /\  curExeSubgroupTsTwo = {} \* threads in the same subgroup that are currently executing
+    /\  fairExecutionSet = {} \* fair execution set(subgroup) for workgroup 0, initially empty
+    /\  curExeSubgroupTs = [workgroup \in 1..NumWorkGroups |-> {}] \* threads in the same subgroup that are currently executing
+    /\ selected = -1
 
-
-\* fairness at workgroup level, assume two workgroups
 InitHSA ==
-    /\  fairExecutionSetOne = {t \in Threads : t = Min(ThreadsWithinWorkGroup(0))}
-    /\  fairExecutionSetTwo = {t \in Threads : t = Min(ThreadsWithinWorkGroup(1))}
-    /\  curExeSubgroupTsOne = {}
-    /\  curExeSubgroupTsTwo = {}
+    /\  fairExecutionSet = {t \in Threads : t = Min(ThreadsWithinWorkGroup(0))}
+    /\  curExeSubgroupTs = [workgroup \in 1..NumWorkGroups |-> {}]
+    /\  selected = -1
 
 InitScheduler ==
     /\  InitOBE
@@ -29,169 +25,80 @@ Init ==
 
 UpdateFairExecutionSet(t) ==
     \* get the subgroup id of thread t, and update fair execution set based on the subgroup id of t
-    LET subgroupId == SubgroupId(t) IN 
-        \* if t is in workgroup 0 and its subgroup is not in fairExecutionSetOne and there exist one thread in the subgroup that is not terminated, add the subgroup to fairExecutionSetOne
-        IF t \in ThreadsWithinWorkGroup(0) /\ subgroupId \notin fairExecutionSetOne /\ \E st \in ThreadsWithinSubgroup(subgroupId, 0): terminated[st] = FALSE THEN
-            /\  fairExecutionSetOne' = fairExecutionSetOne \union {subgroupId}
-            /\  UNCHANGED fairExecutionSetTwo
-        \* if t is in workgroup 0 and its subgroup is in fairExecutionSetOne and all threads in the subgroup are terminated, remove the subgroup from fairExecutionSetOne
-        ELSE IF t \in ThreadsWithinWorkGroup(0) /\ subgroupId \in fairExecutionSetOne /\ \E st \in ThreadsWithinSubgroup(subgroupId, 0): terminated[st] = TRUE THEN
-            /\  fairExecutionSetOne' = fairExecutionSetOne \ {subgroupId}
-            /\  UNCHANGED fairExecutionSetTwo
-        \* if t is in workgroup 1 and its subgroup is not in fairExecutionSetTwo and there exist one thread in the subgroup that is not terminated, add the subgroup to fairExecutionSetTwo
-        ELSE IF t \in ThreadsWithinWorkGroup(1) /\ subgroupId \notin fairExecutionSetTwo /\ \E st \in ThreadsWithinSubgroup(subgroupId, 1): terminated[st] = FALSE THEN
-            /\  fairExecutionSetTwo' = fairExecutionSetTwo \union {subgroupId}
-            /\  UNCHANGED fairExecutionSetOne
-        \* if t is in workgroup 1 and its subgroup is in fairExecutionSetTwo and all threads in the subgroup are terminated, remove the subgroup from fairExecutionSetTwo
-        ELSE IF t \in ThreadsWithinWorkGroup(1) /\ subgroupId \in fairExecutionSetTwo /\ \E st \in ThreadsWithinSubgroup(subgroupId, 1): terminated[st] = TRUE THEN
-            /\  fairExecutionSetTwo' = fairExecutionSetTwo \ {subgroupId}
-            /\  UNCHANGED fairExecutionSetOne
+    LET workgroupId == WorkGroupId(t) IN 
+        \* if thread t's workgroup is not in fairExecutionSet and there exist one thread in the workgroup that is not terminated, add the workgroup to fairExecutionSet
+        IF workgroupId \notin fairExecutionSet /\ \E st \in ThreadsWithinWorkGroup(workgroupId): terminated[st] = FALSE THEN
+            /\  fairExecutionSet' = fairExecutionSet \union {workgroupId}
+        \* if thread t's workgroup is in fairExecutionSet and all threads in the workgroup are terminated, remove the workgroup from fairExecutionSet
+        ELSE IF workgroupId \in fairExecutionSet /\ \A st \in ThreadsWithinWorkGroup(workgroupId): terminated[st] = TRUE THEN
+            /\  fairExecutionSet' = fairExecutionSet \ {workgroupId}
         ELSE
-            /\  UNCHANGED fairExecutionSetOne
-            /\  UNCHANGED fairExecutionSetTwo
+            /\  UNCHANGED fairExecutionSet
 
 \* Update the set of threads in the same subgroup that are currently executing
 UpdatecurExeSubgroupTs(t) == 
-    LET workgroupId == WorkGroupId(t) IN 
-        IF t \in curExeSubgroupTsOne /\ workgroupId = 0 THEN  \* if t is in curExeSubgroupTs and it made a step, remove it
-            /\  curExeSubgroupTsOne' = curExeSubgroupTsOne \ {t}
-            /\ UNCHANGED curExeSubgroupTsTwo
-        ELSE IF curExeSubgroupTsOne = {} /\ workgroupId = 0 THEN  \* if curExeSubgroupTs is empty, add other threads in the same subgroup except t
-            /\  curExeSubgroupTsOne' = ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \{t}
-            /\  UNCHANGED curExeSubgroupTsTwo
-        ELSE IF t \in curExeSubgroupTsTwo /\ workgroupId = 1 THEN  \* if t is in curExeSubgroupTs and it made a step, remove it
-            /\  curExeSubgroupTsTwo' = curExeSubgroupTsTwo \ {t}
-            /\ UNCHANGED curExeSubgroupTsOne
-        ELSE IF curExeSubgroupTsTwo = {} /\ workgroupId = 1 THEN  \* if curExeSubgroupTs is empty, add other threads in the same subgroup except t
-            /\  curExeSubgroupTsTwo' = ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \{t}
-            /\  UNCHANGED curExeSubgroupTsOne
-        ELSE
-            /\  UNCHANGED curExeSubgroupTsOne
-            /\  UNCHANGED curExeSubgroupTsTwo
+    LET workgroupId == WorkGroupId(t)+1 IN 
+        IF t \in curExeSubgroupTs[workgroupId]  THEN  \* if t is in curExeSubgroupTs and it made a step, remove it
+            /\  curExeSubgroupTs'[workgroupId] = [curExeSubgroupTs EXCEPT ![workgroupId] = curExeSubgroupTs[workgroupId] \ {t}]
+        ELSE IF curExeSubgroupTs[workgroupId] = {} THEN  \* if curExeSubgroupTs is empty, add other threads in the same subgroup except t
+            /\  curExeSubgroupTs' = [curExeSubgroupTs EXCEPT ![workgroupId] = ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \{t}]
+        ELSE 
+            /\  UNCHANGED curExeSubgroupTs
+
+Execute(t) == 
+        /\  selected' = t
+        /\  Step(t)
+        /\  UpdateFairExecutionSet(t)
+        /\  UpdatecurExeSubgroupTs(t)
+
 
 FairStep ==
     \* threads within the same subgroup that are executing that are not at barrier
-    LET lockstepExecThreadsOne == {t \in curExeSubgroupTsOne : barrier[t] = "NULL"} 
-        lockstepExecThreadsTwo == {t \in curExeSubgroupTsTwo : barrier[t] = "NULL"}
+    LET lockstepExecThreads == {t \in (UNION {curExeSubgroupTs[i] : i \in DOMAIN curExeSubgroupTs}) : barrier[t] = "NULL" /\  pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t)) } 
         \* threads in fair execution set that are not at barrier
-        GroupOneThreadNotAtBarrier == {t \in Threads: WorkGroupId(t) = 0 /\ SubgroupId(t) \in fairExecutionSetOne /\ barrier[t] = "NULL" /\ pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t))} 
-        GroupTwoThreadNotAtBarrier == {t \in Threads: WorkGroupId(t) = 1 /\ SubgroupId(t) \in fairExecutionSetTwo /\ barrier[t] = "NULL" /\ pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t))} 
+        FairExecutionThreads == {t \in Threads: WorkGroupId(t) \in fairExecutionSet /\ barrier[t] = "NULL" /\ pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t))} 
         IN
         \*  lockstep execution first, then threads in fair execution set that are not at barrier, then any thread
-        /\  IF lockstepExecThreadsOne # {} /\ lockstepExecThreadsTwo # {} THEN \* Randomly select a thread in lockstep execution that is not at barrier to step
-                \/
-                    \E t \in lockstepExecThreadsOne:
-                        /\  pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \* choose the thread with the lowest pc wtihin the subgroup
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-                \/
-                    \E t \in lockstepExecThreadsTwo:
-                        /\  pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \* choose the thread with the lowest pc wtihin the subgroup
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-            ELSE IF GroupOneThreadNotAtBarrier # {} /\ GroupTwoThreadNotAtBarrier # {} THEN \* Randomly select a thread in fair execution set that is not at barrier to step
-                \/
-                    \E t \in GroupOneThreadNotAtBarrier:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-                \/
-                    \E t \in GroupTwoThreadNotAtBarrier:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-            ELSE IF lockstepExecThreadsOne # {} /\ GroupTwoThreadNotAtBarrier # {} THEN 
-                \/
-                    \E t \in lockstepExecThreadsOne:
-                        /\  pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \* choose the thread with the lowest pc wtihin the subgroup
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-                \/
-                    \E t \in GroupTwoThreadNotAtBarrier:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-            ELSE IF lockstepExecThreadsTwo # {} /\ GroupOneThreadNotAtBarrier # {} THEN
-                \/
-                    \E t \in lockstepExecThreadsTwo:
-                        /\  pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \* choose the thread with the lowest pc wtihin the subgroup
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-                \/
-                    \E t \in GroupOneThreadNotAtBarrier:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-            ELSE IF lockstepExecThreadsOne # {} /\ GroupTwoThreadNotAtBarrier = {} THEN
-                \/
-                    \E t \in lockstepExecThreadsOne:
-                        /\  pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \* choose the thread with the lowest pc wtihin the subgroup
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
+        /\  IF lockstepExecThreads # {} THEN 
+                /\
+                    \E t \in lockstepExecThreads:
+                        Execute(t)
+            ELSE IF FairExecutionThreads # {} THEN
+                /\
+                    \E t \in FairExecutionThreads:
+                        Execute(t)
+            ELSE
                 \/
                     \E t \in Threads:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-            ELSE IF lockstepExecThreadsTwo # {} /\ GroupOneThreadNotAtBarrier = {} THEN
-                \/
-                    \E t \in lockstepExecThreadsTwo:
-                        /\  pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \* choose the thread with the lowest pc wtihin the subgroup
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-                \/
-                    \E t \in Threads:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-            ELSE IF GroupOneThreadNotAtBarrier # {} /\ GroupTwoThreadNotAtBarrier = {} THEN
-                \/
-                    \E t \in GroupOneThreadNotAtBarrier:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-                \/
-                    \E t \in Threads:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-            ELSE IF GroupTwoThreadNotAtBarrier # {} /\ GroupOneThreadNotAtBarrier = {} THEN
-                \/
-                    \E t \in GroupTwoThreadNotAtBarrier:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-                \/
-                    \E t \in Threads:
-                        /\  Step(t)
-                        /\  UpdateFairExecutionSet(t)
-                        /\  UpdatecurExeSubgroupTs(t)
-            ELSE   
-                /\ \E t \in Threads:
-                    /\  Step(t)
-                    /\  UpdateFairExecutionSet(t)
-                    /\  UpdatecurExeSubgroupTs(t)
-
+                        Execute(t)
 
 
 \* Deadlock means reaching a state in which Next is not enabled.
 Next ==
     /\  FairStep
 
-EventuallyAlwaysTerminated ==
-    \A t \in Threads: <>[](terminated[t] = TRUE) \* eventually all threads are always terminated
+Fairness ==
+    /\  WF_vars(FairStep)
 
 (* Specification *)
 Spec == 
     /\ Init
     /\ [][Next]_vars
-    /\ WF_vars(Next) \* Weak fairness guarnatees that if Next action are be enabled continuously(always enable), it would eventually happen 
-    
-Liveness == EventuallyAlwaysTerminated
+    /\ Fairness
+
+\* ProgressProperty ensures that the selected thread must make progress
+ProgressProperty == [][\A t \in Threads: (selected' = t) => (terminated'[t] = TRUE \/ pc'[t] > pc[t])]_vars
+
+\* eventually all threads are always terminated
+EventuallyAlwaysTerminated ==
+    \A t \in Threads: <>[](terminated[t] = TRUE)
+
+\* all threads that appears in the fair execution will lead these threads to be terminated at some point
+FairExecutionEventuallyTerminated ==
+    \A t \in Threads: WorkGroupId(t) \in fairExecutionSet ~> (terminated[t] = TRUE) 
+
+Liveness == 
+    /\  FairExecutionEventuallyTerminated
+    /\  ProgressProperty
+
 ====
