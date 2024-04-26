@@ -3,7 +3,7 @@ EXTENDS Integers, Naturals, Sequences, MCThreads, MCLayout
 
 VARIABLES fairExecutionSet, curExeSubgroupTs, selected
 
-vars == <<fairExecutionSet, curExeSubgroupTs, checkLock, pc, terminated, barrier, selected>>
+vars == <<fairExecutionSet, curExeSubgroupTs, pc, terminated, barrier, selected, liveVars>>
 
 
 InitOBE ==
@@ -20,8 +20,9 @@ InitScheduler ==
     /\  InitOBE
     
 Init ==
-    /\  InitScheduler
+    /\  InitProgram
     /\  InitThreads
+    /\  InitScheduler
 
 UpdateFairExecutionSet(t) ==
     \* get the subgroup id of thread t, and update fair execution set based on the subgroup id of t
