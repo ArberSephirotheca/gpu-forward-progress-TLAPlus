@@ -15,7 +15,7 @@ InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicCompa
 VariableScope == {"local", "shared", "literal"}
 ScopeOperand == {"workgroup", "subgroup"}
 ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
-ThreadArguments == [t \in 1..NumThreads |-> <<<<Var("local", Append(ToString(t), "old"), 1)>>, << Var("local", Append(ToString(t), "old"), ""), Var("shared", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>, <<BinaryExpr("NotEqual",  Var("local", Append(ToString(t), "old"), ""), Var("literal", "", 1)), Var("literal", "", 2), Var("literal", "", 4)>>, <<Var("shared", "lock", ""), Var("literal", "", 0)>> >>]
+ThreadArguments == [t \in 1..NumThreads |-> <<<<Var("local", Append(ToString(t), "old"), 1)>>, << Var("local", Append(ToString(t), "old"), ""), Var("shared", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>, <<BinaryExpr("NotEqual",  Var("local", Append(ToString(t), "old"), ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>, <<Var("shared", "lock", ""), Var("literal", "", 0)>> >>]
 Threads == {tid : tid \in 1..NumThreads}
 
 LOCAL INSTANCE ThreadsConf
