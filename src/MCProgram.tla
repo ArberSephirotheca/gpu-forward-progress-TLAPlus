@@ -14,21 +14,34 @@ Min(S) == CHOOSE s \in S : \A t \in S : s <= t
 
 (* Variable *)
 Var(varScope, varName, varValue) == [scope |-> varScope, name |-> varName, value |-> varValue]
-VarExists(workgroupId, var) == \E variable \in liveVars[workgroupId] : variable.name = var.name
-(* todo: resolve scope if duplicate name *)
-GetVar(workgroupId, name) == CHOOSE variable \in liveVars[workgroupId]: variable.name = name
-GetVal(workgroupId, name) == 
-    IF name \in Nat THEN 
-        name
-    ELSE 
-        GetVar(workgroupId, name).value
-
 IsVar(var) ==
     /\ "scope" \in DOMAIN var 
     /\ "name" \in DOMAIN var 
     /\ "value" \in DOMAIN var
 
+IsLiteral(var) ==
+    /\ IsVar(var)
+    /\ var.scope = "literal"
 
+IsLocal(var) ==
+    /\ IsVar(var)
+    /\ var.scope = "local"
+
+IsShared(var) ==
+    /\ IsVar(var)
+    /\ var.scope = "shared"
+
+VarExists(workgroupId, name) == \E variable \in liveVars[workgroupId] : variable.name = name
+(* todo: resolve scope if duplicate name *)
+GetVar(workgroupId, name) == CHOOSE variable \in liveVars[workgroupId]: variable.name = name
+GetVal(workgroupId, var) == 
+    IF IsLiteral(var) THEN
+        var.value
+    ELSE IF VarExists(workgroupId, var.name) THEN
+        GetVar(workgroupId, var.name).value
+    ELSE 
+        FALSE
+    
 (* Binary Expr *)
 LessThan(lhs, rhs) == lhs < rhs
 LessThanOrEqual(lhs, rhs) == lhs <= rhs
@@ -39,15 +52,15 @@ NotEqual(lhs, rhs) == lhs /= rhs
 
 BinarOpSet == {"LessThan", "LessThanOrEqual", "GreaterThan", "GreaterThanOrEqual", "Equal", "NotEqual"}
 
-
-IsString(s) == /\ Len(s) \in Nat
-               /\ \A i \in DOMAIN s : s[i] \in STRING
-
 IsBinaryExpr(expr) ==
-    /\ "operator" \in DOMAIN expr
-    /\ "left" \in DOMAIN expr
-    /\ "right" \in DOMAIN expr
-    /\ expr["operator"] \in BinarOpSet
+        IF IsVar(expr) THEN
+            FALSE
+        ELSE
+            /\ "operator" \in DOMAIN expr
+            /\ "left" \in DOMAIN expr
+            /\ "right" \in DOMAIN expr
+            /\ expr["operator"] \in BinarOpSet
+
 
 \* Mimic Lazy evaluation
 BinaryExpr(Op, lhs, rhs) == [operator |-> Op, left |-> lhs, right |-> rhs]
