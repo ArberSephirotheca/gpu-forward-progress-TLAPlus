@@ -100,6 +100,6 @@ FairExecutionEventuallyTerminated ==
 
 Liveness == 
     /\  FairExecutionEventuallyTerminated
-    \* /\  ProgressProperty
+    /\  ProgressProperty
 
 ====

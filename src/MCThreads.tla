@@ -105,9 +105,11 @@ MinThreadWithinWorkGroup(workgroupId) ==
 
 Assignment(t, vars) == 
     /\  LET workgroupId == WorkGroupId(t)+1
-            eliminatedVars == {var \in vars: VarExists(workgroupId, var.name)}
+            currLiveVars == liveVars[WorkGroupId(t)+1]
         IN
-            /\  liveVars' =  [liveVars EXCEPT ![workgroupId] = (liveVars[workgroupId] \eliminatedVars) \union vars]
+            LET eliminatedVars == {currVar \in currLiveVars : \E var \in vars: currVar.name = var.name}
+            IN
+                /\  liveVars' =  [liveVars EXCEPT ![workgroupId] = (liveVars[workgroupId] \ eliminatedVars) \union vars]
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
     /\  UNCHANGED <<terminated, barrier>>
 
@@ -135,7 +137,7 @@ OpAtomicStore(t, pointer, value) ==
     /\  IsLiteral(value)
     /\  LET pointerVar == GetVar(WorkGroupId(t)+1, pointer.name)
         IN
-            /\  Assignment(t, Var(pointerVar.scope, pointerVar.name, value.value))
+            /\  Assignment(t, {Var(pointerVar.scope, pointerVar.name, value.value)})
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
     /\  UNCHANGED <<terminated, barrier>>
 
