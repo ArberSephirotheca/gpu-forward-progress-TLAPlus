@@ -43,6 +43,10 @@ GetVal(workgroupId, var) ==
         FALSE
     
 (* Binary Expr *)
+
+\* Mimic Lazy evaluation
+BinaryExpr(Op, lhs, rhs) == [operator |-> Op, left |-> lhs, right |-> rhs]
+
 LessThan(lhs, rhs) == lhs < rhs
 LessThanOrEqual(lhs, rhs) == lhs <= rhs
 GreaterThan(lhs, rhs) == lhs > rhs
@@ -62,15 +66,41 @@ IsBinaryExpr(expr) ==
             /\ expr["operator"] \in BinarOpSet
 
 
-\* Mimic Lazy evaluation
-BinaryExpr(Op, lhs, rhs) == [operator |-> Op, left |-> lhs, right |-> rhs]
+
+(* Unary Expr *)
+UnaryExpr(Op, rhs) == [operator |-> Op, right |-> rhs]
+
+Not(rhs) == 
+    IF rhs = FALSE THEN 
+        TRUE
+    ELSE
+        FALSE 
+Neg(rhs) == -rhs
+
+UnaryOpSet == {"Not", "Neg"}
+
+IsUnaryExpr(expr) ==
+    IF IsVar(expr) THEN 
+        FALSE
+    ELSE
+        /\  "operator" \in DOMAIN expr
+        /\  "right" \in DOMAIN expr
+        /\  expr["operator"] \in UnaryOpSet
+
+
+(* Built-in Function *)
+Function(expr) ==
+    
 
 \* We have to delcare the recursive function before we can use it for mutual recursion
 RECURSIVE ApplyBinaryExpr(_, _)
+RECURSIVE APplyUnaryExpr(_, _)
 
 EvalExpr(workgroupId, expr) == 
     IF IsBinaryExpr(expr) THEN
         ApplyBinaryExpr(workgroupId, expr)
+    IF IsUnaryExpr(expr) THEN 
+        ApplyUnaryExpr(workgroupId, expr)
     ELSE
         GetVal(workgroupId, expr)
 
@@ -93,6 +123,16 @@ ApplyBinaryExpr(workgroupId, expr) ==
         ELSE
             FALSE
 
+ApplyUnaryExpr(workgroupId, expr) == 
+    LET rhsValue == EvalExpr(workgroupId, expr["right"])
+    IN
+        IF expr["operator"] = "Not" THEN
+            Not(rhsValue)
+        ELSE IF expr["operator"] = "Neg" THEN
+            Neg(rhsValue)
+
+        ELSE
+            FALSE
 
 InitProgram ==
     /\  liveVars = [t \in 1..NumWorkGroups |-> {Var("shared", "lock", 0)}]
