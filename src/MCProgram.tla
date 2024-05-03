@@ -31,9 +31,20 @@ IsShared(var) ==
     /\ IsVar(var)
     /\ var.scope = "shared"
 
+IsIntermediate(var) ==
+    /\ IsVar(var)
+    /\ var.scope = "intermediate"
 VarExists(workgroupId, name) == \E variable \in liveVars[workgroupId] : variable.name = name
 (* todo: resolve scope if duplicate name *)
 GetVar(workgroupId, name) == CHOOSE variable \in liveVars[workgroupId]: variable.name = name
+
+\* only mangling local and intermediate variables
+Mangle(t, var) ==
+    IF var.scope = "local" \/ var.scope = "intermediate" THEN
+        Var(var.scope, Append(ToString(t), Append(var.scope, var.name)), var.value)
+    ELSE
+        var
+    
 GetVal(workgroupId, var) == 
     IF IsLiteral(var) THEN
         var.value
@@ -87,26 +98,21 @@ IsUnaryExpr(expr) ==
         /\  "right" \in DOMAIN expr
         /\  expr["operator"] \in UnaryOpSet
 
-
-(* Built-in Function *)
-Function(expr) ==
-    
-
 \* We have to delcare the recursive function before we can use it for mutual recursion
-RECURSIVE ApplyBinaryExpr(_, _)
-RECURSIVE APplyUnaryExpr(_, _)
+RECURSIVE ApplyBinaryExpr(_, _, _)
+RECURSIVE ApplyUnaryExpr(_, _, _)
 
-EvalExpr(workgroupId, expr) == 
+EvalExpr(t, workgroupId, expr) == 
     IF IsBinaryExpr(expr) THEN
-        ApplyBinaryExpr(workgroupId, expr)
-    IF IsUnaryExpr(expr) THEN 
-        ApplyUnaryExpr(workgroupId, expr)
+        ApplyBinaryExpr(t, workgroupId, expr)
+    ELSE IF IsUnaryExpr(expr) THEN 
+        ApplyUnaryExpr(t, workgroupId, expr)
     ELSE
-        GetVal(workgroupId, expr)
+        GetVal(workgroupId, Mangle(t, expr))
 
-ApplyBinaryExpr(workgroupId, expr) ==
-    LET lhsValue == EvalExpr(workgroupId, expr["left"])
-        rhsValue == EvalExpr(workgroupId, expr["right"])
+ApplyBinaryExpr(t, workgroupId, expr) ==
+    LET lhsValue == EvalExpr(t, workgroupId, expr["left"])
+        rhsValue == EvalExpr(t, workgroupId, expr["right"])
     IN
         IF expr["operator"] = "LessThan" THEN
             LessThan(lhsValue, rhsValue)
@@ -123,8 +129,8 @@ ApplyBinaryExpr(workgroupId, expr) ==
         ELSE
             FALSE
 
-ApplyUnaryExpr(workgroupId, expr) == 
-    LET rhsValue == EvalExpr(workgroupId, expr["right"])
+ApplyUnaryExpr(t, workgroupId, expr) == 
+    LET rhsValue == EvalExpr(t, workgroupId, expr["right"])
     IN
         IF expr["operator"] = "Not" THEN
             Not(rhsValue)
@@ -136,4 +142,7 @@ ApplyUnaryExpr(workgroupId, expr) ==
 
 InitProgram ==
     /\  liveVars = [t \in 1..NumWorkGroups |-> {Var("shared", "lock", 0)}]
+
 ====
+
+

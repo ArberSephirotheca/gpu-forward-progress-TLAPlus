@@ -87,7 +87,7 @@ FairStep ==
     \* threads within the same subgroup that are executing that are not at barrier
     \* LET lockstepExecThreads == {t \in (UNION {curExeSubgroupTs[i] : i \in DOMAIN curExeSubgroupTs}) : barrier[t] = "NULL" /\  pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t)) } 
         \* threads in fair execution set that are not at barrier
-    LET FairExecutionThreads == {t \in Threads: WorkGroupId(t) \in fairExecutionSet /\ barrier[t] = "NULL" /\ pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t))} 
+    LET FairExecutionThreads == {t \in Threads: WorkGroupId(t) \in fairExecutionSet /\ barrier[t] = "NULL"} 
         IN
         \*  lockstep execution first, then threads in fair execution set that are not at barrier, then any thread
         \* /\  IF lockstepExecThreads # {} THEN 

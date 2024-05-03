@@ -6,158 +6,29 @@ LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
 VARIABLES pc, terminated, barrier, liveVars
-
-(* Helper Functions *)
-Range(f) == { f[x] : x \in DOMAIN f }
-Min(S) == CHOOSE s \in S : \A t \in S : s <= t
-
-(* Variable *)
-Var(varScope, varName, varValue) == [scope |-> varScope, name |-> varName, value |-> varValue]
-IsVar(var) ==
-    /\ "scope" \in DOMAIN var 
-    /\ "name" \in DOMAIN var 
-    /\ "value" \in DOMAIN var
-
-IsLiteral(var) ==
-    /\ IsVar(var)
-    /\ var.scope = "literal"
-
-IsLocal(var) ==
-    /\ IsVar(var)
-    /\ var.scope = "local"
-
-IsShared(var) ==
-    /\ IsVar(var)
-    /\ var.scope = "shared"
-
-IsIntermediate(var) ==
-    /\ IsVar(var)
-    /\ var.scope = "intermediate"
-VarExists(workgroupId, name) == \E variable \in liveVars[workgroupId] : variable.name = name
-(* todo: resolve scope if duplicate name *)
-GetVar(workgroupId, name) == CHOOSE variable \in liveVars[workgroupId]: variable.name = name
-
-Mangle(t, var) == 
-    Var(var.scope, Append(t, Append(var.scope, var.name)), var.value)
-    
-GetVal(workgroupId, var) == 
-    IF IsLiteral(var) THEN
-        var.value
-    ELSE IF VarExists(workgroupId, var.name) THEN
-        GetVar(workgroupId, var.name).value
-    ELSE 
-        FALSE
-    
-(* Binary Expr *)
-
-\* Mimic Lazy evaluation
-BinaryExpr(Op, lhs, rhs) == [operator |-> Op, left |-> lhs, right |-> rhs]
-
-LessThan(lhs, rhs) == lhs < rhs
-LessThanOrEqual(lhs, rhs) == lhs <= rhs
-GreaterThan(lhs, rhs) == lhs > rhs
-GreaterThanOrEqual(lhs, rhs) == lhs >= rhs
-Equal(lhs, rhs) == lhs = rhs
-NotEqual(lhs, rhs) == lhs /= rhs
-
-BinarOpSet == {"LessThan", "LessThanOrEqual", "GreaterThan", "GreaterThanOrEqual", "Equal", "NotEqual"}
-
-IsBinaryExpr(expr) ==
-        IF IsVar(expr) THEN
-            FALSE
-        ELSE
-            /\ "operator" \in DOMAIN expr
-            /\ "left" \in DOMAIN expr
-            /\ "right" \in DOMAIN expr
-            /\ expr["operator"] \in BinarOpSet
-
-
-
-(* Unary Expr *)
-UnaryExpr(Op, rhs) == [operator |-> Op, right |-> rhs]
-
-Not(rhs) == 
-    IF rhs = FALSE THEN 
-        TRUE
-    ELSE
-        FALSE 
-Neg(rhs) == -rhs
-
-UnaryOpSet == {"Not", "Neg"}
-
-IsUnaryExpr(expr) ==
-    IF IsVar(expr) THEN 
-        FALSE
-    ELSE
-        /\  "operator" \in DOMAIN expr
-        /\  "right" \in DOMAIN expr
-        /\  expr["operator"] \in UnaryOpSet
-
-\* We have to delcare the recursive function before we can use it for mutual recursion
-RECURSIVE ApplyBinaryExpr(_, _, _)
-RECURSIVE APplyUnaryExpr(_, _, _)
-
-EvalExpr(t, workgroupId, expr) == 
-    IF IsBinaryExpr(expr) THEN
-        ApplyBinaryExpr(t, workgroupId, expr)
-    IF IsUnaryExpr(expr) THEN 
-        ApplyUnaryExpr(t, workgroupId, expr)
-    ELSE
-        GetVal(workgroupId, Mangle(t, expr))
-
-ApplyBinaryExpr(t, workgroupId, expr) ==
-    LET lhsValue == EvalExpr(t, workgroupId, expr["left"])
-        rhsValue == EvalExpr(t, workgroupId, expr["right"])
-    IN
-        IF expr["operator"] = "LessThan" THEN
-            LessThan(lhsValue, rhsValue)
-        ELSE IF expr["operator"] = "LessThanOrEqual" THEN
-            LessThanOrEqual(lhsValue, rhsValue)
-        ELSE IF expr["operator"] = "GreaterThan" THEN
-            GreaterThan(lhsValue, rhsValue)
-        ELSE IF expr["operator"] = "GreaterThanOrEqual" THEN
-            GreaterThanOrEqual(lhsValue, rhsValue)
-        ELSE IF expr["operator"] = "Equal" THEN
-            Equal(lhsValue, rhsValue)
-        ELSE IF expr["operator"] = "NotEqual" THEN
-            NotEqual(lhsValue, rhsValue)
-        ELSE
-            FALSE
-
-ApplyUnaryExpr(t, workgroupId, expr) == 
-    LET rhsValue == EvalExpr(t, workgroupId, expr["right"])
-    IN
-        IF expr["operator"] = "Not" THEN
-            Not(rhsValue)
-        ELSE IF expr["operator"] = "Neg" THEN
-            Neg(rhsValue)
-
-        ELSE
-            FALSE
-
-InitProgram ==
-    /\  liveVars = [t \in 1..NumWorkGroups |-> {Var("shared", "lock", 0)}]
-
+INSTANCE  MCProgram
 
 
 (* Thread Configuration *)
-InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranchConditional", "OpControlBarrier", "Terminate"}
+InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpGroupAll", "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranchConditional", "OpControlBarrier", "Terminate"}
 VariableScope == {"local", "shared", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup"}
 (* mutex test*)
 \* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
 \* ThreadArguments == [t \in 1..NumThreads |-> <<<<Var("local", "old", 1)>>, << Var("local", "old", ""), Var("shared", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>, <<BinaryExpr("NotEqual",  Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>, <<Var("shared", "lock", ""), Var("literal", "", 0)>> >>]
 
-ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpBranchConditional", "Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "Assignment", "OpAtomicStore", "OpBranchConditional", "Terminate" >> ]
+ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpBranchConditional", "Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "Assignment", "OpAtomicStore", "OpGroupAll", "OpBranchConditional", "Terminate" >> ]
 ThreadArguments == [t \in 1..NumThreads |-> <<
 <<Var("local",  "done", FALSE)>>,
 <<UnaryExpr("Not",  Var("local", "done", "")), Var("literal", "", 3), Var("literal", "", 8)>>,
 <<Var("local", "old", 0)>>,
 <<Var("local", "old", ""), Var("shared", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
-<<BinaryExpr("Equal", Var("local", "old", ""), Var("literal", "", 0))>>,
+<<BinaryExpr("Equal", Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 6), Var("literal", "", 8)>>,
 <<Var("local", "done", TRUE)>>,
 <<Var("shared", "lock", ""), Var("literal", "", 0)>>,
-<<Unary("Not", )>>
+<<Var("intermediate", "groupall", ""), Var("local", "done", TRUE) ,"subgroup">>,
+<<UnaryExpr("Not", Var("intermediate", "groupall", TRUE)), Var("literal", "", 10),Var("literal", "", 2) >>,
+<< >>
 >>]
 Threads == {tid : tid \in 1..NumThreads}
 Scheduler == "OBE"
@@ -192,13 +63,13 @@ cleanIntermediateVar(t) ==
     /\  LET workgroupId == WorkGroupId(t)+1
             currLiveVars == liveVars[WorkGroupId(t)+1]
         IN
-            LET eliminatedVars = {currVar \in currLiveVars : currVar.scope = "intermediate"}
+            LET eliminatedVars == {currVar \in currLiveVars : currVar.scope = "intermediate"}
             IN
-                /\  liveVars' =  [liveVars EXCEPT ![workgroupId] = (liveVars[workgroupId] \ eliminatedVars) \union vars]
+                /\  liveVars' =  [liveVars EXCEPT ![workgroupId] = liveVars[workgroupId] \ eliminatedVars]
 
 
  UpdateBarrier(tid, barrierState) ==
-     /\  barrierState \in BarrierSet
+     /\  barrierState \in ScopeOperand
      /\  barrier' = [barrier EXCEPT ![tid] = barrierState]
     
  SubgroupBarrier(t) ==
@@ -270,13 +141,13 @@ Assignment(t, vars) ==
             \* try to eliminated var with old value and intermediate var
             LET eliminatedVars == {currVar \in currLiveVars : currVar.scope ="intermediate" \/ \E mangledVar \in mangledVars: currVar.name = mangledVar.name}
             IN
-                /\  liveVars' =  [liveVars EXCEPT ![workgroupId] = (liveVars[workgroupId] \ eliminatedVars) \union vars]
+                /\  liveVars' =  [liveVars EXCEPT ![workgroupId] = (liveVars[workgroupId] \ eliminatedVars) \union mangledVars]
 
 
 \* todo: fix the logic so the result could be used argument when it is intermediate variable
 OpAtomicLoad(t, result, pointer) ==
-    LET mangledResult = Mangle(t, result)
-        mangledPointer = Mangle(t, pointer)
+    LET mangledResult == Mangle(t, result)
+        mangledPointer == Mangle(t, pointer)
     IN
         /\
             \/  
@@ -303,7 +174,7 @@ OpAtomicLoad(t, result, pointer) ==
         /\  UNCHANGED <<terminated, barrier>>
 
 OpAtomicStore(t, pointer, value) == 
-    LET mangledPointer = Mangle(t, pointer)
+    LET mangledPointer == Mangle(t, pointer)
     IN
         /\  
             \/  IsLocal(mangledPointer)
@@ -319,7 +190,7 @@ OpAtomicStore(t, pointer, value) ==
 \* todo: logic is incorrect
 \* result should be either true or false
 OpGroupAll(t, result, predicate, scope) ==
-    LET mangledResult = Mangle(t, result)
+    LET mangledResult == Mangle(t, result)
     IN
         /\  
             \/  
@@ -331,15 +202,14 @@ OpGroupAll(t, result, predicate, scope) ==
             \/  IsIntermediate(mangledResult)
         /\  scope \in ScopeOperand
         /\  IF scope = "subgroup" THEN
-                /\  LET sthreads = {ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))}
+                /\  LET sthreads == {ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))}
                     IN
-                        /\  IF \A sthread \in sthreads: EvalExpr(355521552wfkmfkjfjmdsfjdsflerkf
-                        sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                        /\  IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, TRUE)})
                             ELSE 
                                 /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
             ELSE IF scope = "workgroup" THEN 
-                /\  LET wthreads = {ThreadsWithinWorkGroup(WorkGroupId(t))}
+                /\  LET wthreads == {ThreadsWithinWorkGroup(WorkGroupId(t))}
                     IN
                         /\  IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, TRUE)})
@@ -353,8 +223,8 @@ OpGroupAll(t, result, predicate, scope) ==
 
 (* result and pointer are variable, value is literal *)
 OpAtomicExchange(t, result, pointer, value) ==
-    LET mangledResult = Mangle(t, result)
-        mangledPointer = Mangle(t, pointer)
+    LET mangledResult == Mangle(t, result)
+        mangledPointer == Mangle(t, pointer)
     IN
         /\  
             \/  IsLocal(mangledResult)
@@ -374,8 +244,8 @@ OpAtomicExchange(t, result, pointer, value) ==
 
 (* result and pointer are variable, compare and value are literal *)
 OpAtomicCompareExchange(t, result, pointer, compare, value) ==
-    LET mangledResult = Mangle(t, result)
-        mangledPointer = Mangle(t, pointer)
+    LET mangledResult == Mangle(t, result)
+        mangledPointer == Mangle(t, pointer)
     IN
         /\  
             \/  IsLocal(mangledResult)
@@ -405,7 +275,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
             /\  pc' = [pc EXCEPT ![t] = trueLabel.value]
         ELSE
             /\  pc' = [pc EXCEPT ![t] = falseLabel.value]
-    /\  UNCHANGED <<terminated, barrier>>
+    /\  UNCHANGED <<terminated, barrier, liveVars>>
 
 
 Terminate(t) ==
@@ -432,6 +302,8 @@ Step(t) ==
                 OpAtomicStore(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpBranchConditional" THEN
                 OpBranchConditional(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpGroupAll" THEN
+                OpGroupAll(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE
                 /\ UNCHANGED <<threadVars, liveVars>>
         ELSE 
