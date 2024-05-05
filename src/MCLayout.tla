@@ -1,7 +1,7 @@
 ---- MODULE MCLayout ----
 LOCAL INSTANCE Integers
 (* Layout Configuration *)
-SubgroupSize == 1
+SubgroupSize == 2
 WorkGroupSize == 2
 NumWorkGroups == 2
 NumThreads == WorkGroupSize * NumWorkGroups

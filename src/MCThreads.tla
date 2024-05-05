@@ -13,10 +13,16 @@ INSTANCE  MCProgram
 InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpGroupAll", "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranchConditional", "OpControlBarrier", "Terminate"}
 VariableScope == {"local", "shared", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup"}
-(* mutex test*)
+(* spinlock test *)
 \* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
-\* ThreadArguments == [t \in 1..NumThreads |-> <<<<Var("local", "old", 1)>>, << Var("local", "old", ""), Var("shared", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>, <<BinaryExpr("NotEqual",  Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>, <<Var("shared", "lock", ""), Var("literal", "", 0)>> >>]
+\* ThreadArguments == [t \in 1..NumThreads |-> <<
+\* <<Var("local", "old", 1)>>,
+\* << Var("local", "old", ""), Var("shared", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
+\* <<BinaryExpr("NotEqual",  Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>,
+\* <<Var("shared", "lock", ""), Var("literal", "", 0)>>
+\* >>]
 
+(* spinlock test with subgroupall *)
 ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpBranchConditional", "Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "Assignment", "OpAtomicStore", "OpGroupAll", "OpBranchConditional", "Terminate" >> ]
 ThreadArguments == [t \in 1..NumThreads |-> <<
 <<Var("local",  "done", FALSE)>>,
@@ -30,8 +36,20 @@ ThreadArguments == [t \in 1..NumThreads |-> <<
 <<UnaryExpr("Not", Var("intermediate", "groupall", TRUE)), Var("literal", "", 10),Var("literal", "", 2) >>,
 << >>
 >>]
+
+(* producer-consumer *)
+\* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"GLobalInvocationId", "Assignment", "OpAtomicLoad", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
+\* ThreadArguments == [t \in 1..NumThreads |-> < <
+\* <<Var("local", "old", 1)>>,
+\* << Var("local", "old", ""), Var("shared", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
+\* <<BinaryExpr("NotEqual",  Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>,
+\* <<Var("shared", "lock", ""), Var("literal", "", 0)>>
+\* >>]
+
+(* producer-consumer with subgroupall *)
+
 Threads == {tid : tid \in 1..NumThreads}
-Scheduler == "OBE"
+Scheduler == "HSA"
 
 LOCAL INSTANCE ThreadsConf
 

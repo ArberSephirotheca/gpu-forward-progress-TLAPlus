@@ -94,14 +94,20 @@ FairStep ==
         \*         /\
         \*             \E t \in lockstepExecThreads:
         \*                 Execute(t)
-        IF FairExecutionThreads # {} THEN
-            /\
-                \E t \in FairExecutionThreads:
-                    Execute(t)
-        ELSE
-            \/
+        \* IF FairExecutionThreads # {} THEN
+        \*     /\
+        \*         \E t \in FairExecutionThreads:
+        \*             Execute(t)
+        \* ELSE
+        /\  IF FairExecutionThreads # {} THEN 
+            \/  \E t \in FairExecutionThreads:
+                /\  Execute(t)
+            \/  \E t \in Threads:
+                /\  Execute(t)
+
+            ELSE 
                 \E t \in Threads:
-                    Execute(t)
+                    /\  Execute(t)
 
 
 \* Deadlock means reaching a state in which Next is not enabled.
