@@ -5,7 +5,7 @@ LOCAL INSTANCE Sequences
 LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES pc, terminated, barrier, liveVars, globalVars, lastTimeExecuted
+VARIABLES pc, terminated, barrier, liveVars, globalVars
 
 (* Thread Configuration *)
 INSTANCE  MCProgram
@@ -16,28 +16,28 @@ InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpGroupAll", 
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup"}
 (* spinlock test *)
-ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
-ThreadArguments == [t \in 1..NumThreads |-> <<
-<<Var("local", "old", 1)>>,
-<< Var("local", "old", ""), Var("global", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
-<<BinaryExpr("NotEqual",  Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>,
-<<Var("global", "lock", ""), Var("literal", "", 0)>>
->>]
+\* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
+\* ThreadArguments == [t \in 1..NumThreads |-> <<
+\* <<Var("local", "old", 1)>>,
+\* << Var("local", "old", ""), Var("global", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
+\* <<BinaryExpr("NotEqual",  Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>,
+\* <<Var("global", "lock", ""), Var("literal", "", 0)>>
+\* >>]
 
 (* spinlock test with subgroupall *)
-\* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpBranchConditional", "Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "Assignment", "OpAtomicStore", "OpGroupAll", "OpBranchConditional", "Terminate" >> ]
-\* ThreadArguments == [t \in 1..NumThreads |-> <<
-\* <<Var("local",  "done", FALSE)>>,
-\* <<UnaryExpr("Not",  Var("local", "done", "")), Var("literal", "", 3), Var("literal", "", 8)>>,
-\* <<Var("local", "old", 0)>>,
-\* <<Var("local", "old", ""), Var("global", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
-\* <<BinaryExpr("Equal", Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 6), Var("literal", "", 8)>>,
-\* <<Var("local", "done", TRUE)>>,
-\* <<Var("global", "lock", ""), Var("literal", "", 0)>>,
-\* <<Var("intermediate", "groupall", ""), Var("local", "done", TRUE) ,"subgroup">>,
-\* <<UnaryExpr("Not", Var("intermediate", "groupall", "")), Var("literal", "", 2),Var("literal", "", 10) >>,
-\* << >>
-\* >>]
+ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpBranchConditional", "Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "Assignment", "OpAtomicStore", "OpGroupAll", "OpBranchConditional", "Terminate" >> ]
+ThreadArguments == [t \in 1..NumThreads |-> <<
+<<Var("local",  "done", FALSE)>>,
+<<UnaryExpr("Not",  Var("local", "done", "")), Var("literal", "", 3), Var("literal", "", 8)>>,
+<<Var("local", "old", 0)>>,
+<<Var("local", "old", ""), Var("global", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
+<<BinaryExpr("Equal", Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 6), Var("literal", "", 8)>>,
+<<Var("local", "done", TRUE)>>,
+<<Var("global", "lock", ""), Var("literal", "", 0)>>,
+<<Var("intermediate", "groupall", ""), Var("local", "done", TRUE) ,"subgroup">>,
+<<UnaryExpr("Not", Var("intermediate", "groupall", "")), Var("literal", "", 2),Var("literal", "", 10) >>,
+<< >>
+>>]
 
 (* producer-consumer *)
 \* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"GLobalInvocationId", "Assignment", "OpAtomicLoad", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
@@ -64,7 +64,7 @@ InitThreadVars ==
     /\  pc = [t \in Threads |-> 1]
     /\  terminated = [t \in Threads |-> FALSE]
     /\  barrier = [t \in Threads |-> "NULL"]
-    /\  lastTimeExecuted = [t \in Threads |-> 0]
+    \* /\  lastTimeExecuted = [t \in Threads |-> 0]
 
     
 InitThreads == 
@@ -219,13 +219,13 @@ OpGroupAll(t, result, predicate, scope) ==
                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
                     IN
                         \* if there is a thread that has not reached the opgroupAll, do nothing and but wait
-                        /\  IF \E sthread \in sthreads: pc[sthread] < pc[t] THEN
+                        /\  IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                                 \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
                                 /\  barrier' = [barrier EXCEPT ![t] = "subgroup"]
                                 /\  UNCHANGED <<pc, liveVars, globalVars>>
                             ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                                 \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, TRUE)})
-                                /\  \A sthread \in sthreads: Assignment(sthread, {Var(mangledResult.scope, mangledResult.name, TRUE)})
+                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE): sthread \in sthreads})
                                 /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
                                         tid \in Threads |->
                                             IF tid \in sthreads THEN 
@@ -233,9 +233,15 @@ OpGroupAll(t, result, predicate, scope) ==
                                             ELSE 
                                                 barrier[tid]
                                     ]
-                                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                                /\  pc' = [
+                                        tid \in Threads |->
+                                            IF tid \in sthreads THEN 
+                                                pc[tid] + 1
+                                            ELSE 
+                                                pc[tid]
+                                    ]
                             ELSE 
-                                /\  \A sthread \in sthreads: Assignment(sthread, {Var(mangledResult.scope, mangledResult.name, FALSE)})
+                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE): sthread \in sthreads })
                                 \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
                                 /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
                                         tid \in Threads |->
@@ -244,7 +250,13 @@ OpGroupAll(t, result, predicate, scope) ==
                                             ELSE 
                                                 barrier[tid]
                                     ]
-                                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                                /\  pc' = [
+                                        tid \in Threads |->
+                                            IF tid \in sthreads THEN 
+                                                pc[tid] + 1
+                                            ELSE 
+                                                pc[tid]
+                                    ]
             ELSE IF scope = "workgroup" THEN 
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
                     IN      \* if there is a thread that has not reached the opgroupAll, return false

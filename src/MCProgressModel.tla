@@ -3,7 +3,7 @@ EXTENDS Integers, Naturals, Sequences, MCThreads, MCLayout, TLC
 
 VARIABLES fairExecutionSet, selected\*,curExeSubgroupTs*\
 
-vars == <<fairExecutionSet, pc, terminated, barrier, selected, lastTimeExecuted, liveVars, globalVars>>
+vars == <<fairExecutionSet, pc, terminated, barrier, selected, liveVars, globalVars>>
 
 
 InitOBE ==
@@ -75,6 +75,14 @@ UpdateFairExecutionSet(t) ==
         ELSE
         /\  Print("Uknown Scheduler", FALSE)
 
+\* This combine with strong fairness makes sure that every workgroup in 
+\* the fair execution set will be scheduled at some point indefinitely
+PickAnyWorkGroup ==
+    IF fairExecutionSet # {} THEN
+        \E wg \in fairExecutionSet: 
+            \E t \in Threads: WorkGroupId(t) = wg /\ selected' = wg
+    ELSE 
+        /\ UNCHANGED selected               
 \* \* Update the set of threads in the same subgroup that are currently executing
 \* UpdatecurExeSubgroupTs(t) == 
 \*     LET workgroupId == WorkGroupId(t)+1 IN 
@@ -86,10 +94,12 @@ UpdateFairExecutionSet(t) ==
 \*             /\  UNCHANGED curExeSubgroupTs
 
 Execute(t) == 
-        /\  selected' = t
-        /\  lastTimeExecuted' = [tid \in Threads |-> IF tid = t THEN 0 ELSE lastTimeExecuted[tid] - 1]
+        \* /\  lastTimeExecuted' = [tid \in Threads |-> IF tid = t THEN 0 ELSE lastTimeExecuted[tid] - 1]
         /\  Step(t)
         /\  UpdateFairExecutionSet(t)
+        /\  selected' = WorkGroupId(t)
+        \* /\  PickAnyWorkGroup
+
         \* /\  UpdatecurExeSubgroupTs(t)
 
 
@@ -134,13 +144,15 @@ FairStep ==
             \* ELSE
             \*     \E t \in ThreadsNotTerminated:
             \*         /\  Execute(t)
-            IF FairExecutionThreads \intersect MinIndices(lastTimeExecuted , FairExecutionThreads) # {} THEN 
-                \E t \in FairExecutionThreads \intersect MinIndices(lastTimeExecuted , FairExecutionThreads):
+            \* IF FairExecutionThreads \intersect MinIndices(lastTimeExecuted , FairExecutionThreads) # {} THEN 
+            \*     \E t \in FairExecutionThreads \intersect MinIndices(lastTimeExecuted , FairExecutionThreads):
+            \*         /\  Execute(t)
+            IF FairExecutionThreads \ {t\in Threads: WorkGroupId(t) = selected} # {} THEN
+                \E t \in FairExecutionThreads \ {t\in Threads: WorkGroupId(t) = selected}:
                     /\  Execute(t)
             ELSE IF FairExecutionThreads # {} THEN
                 \E t \in FairExecutionThreads:
                     /\  Execute(t)
-
             ELSE IF ThreadsNotTerminated # {} THEN
                 \E t \in ThreadsNotTerminated:
                     /\  Execute(t)
@@ -163,7 +175,9 @@ Next ==
     \/  UnfairStep
 
 Fairness ==
-    /\  SF_vars(FairStep)
+    /\  WF_vars(FairStep)
+    \* /\  SF_selected(PickAnyWorkGroup)
+
 
 (* Specification *)
 Spec == 
@@ -184,9 +198,10 @@ EventuallyAlwaysTerminated ==
 FairExecutionEventuallyTerminated ==
     \A t \in Threads: WorkGroupId(t) \in fairExecutionSet ~> (pc[t] = Len(ThreadInstructions[t])) 
 
-\* For all threads within the fair execution set, it will be scheduled at some point
+\* For all workgroup within the fair execution set, it will be scheduled at some point
 FairExecutionEventuallyChoosen ==
-    \A t \in Threads: WorkGroupId(t) \in fairExecutionSet ~> (selected = t)
+    \* \A t \in Threads: WorkGroupId(t) \in fairExecutionSet ~> (selected = WorkGroupId(t))
+   \A t \in Threads: []<>(WorkGroupId(t) \in fairExecutionSet => <> (selected = WorkGroupId(t)))
 Liveness == 
     /\  EventuallyAlwaysTerminated
     /\  FairExecutionEventuallyChoosen
