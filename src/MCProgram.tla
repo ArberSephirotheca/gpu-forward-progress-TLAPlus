@@ -14,7 +14,8 @@ NumWorkGroups == 2
 NumThreads == WorkGroupSize * NumWorkGroups
 
 Threads == {tid : tid \in 1..NumThreads}
-Scheduler == "OBE"
+
+Scheduler == "HSA"
 
 
 (* Variable *)
@@ -182,8 +183,7 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
                 ELSE
                     FALSE
 
-InitProgram ==
-    /\  threadLocals = [t \in 1..NumWorkGroups |-> {}]
+InitGPU ==
     /\  globalVars = {Var("global", "lock", 0)}
 
 
@@ -201,8 +201,23 @@ ScopeOperand == {"workgroup", "subgroup"}
 \* >>]
 
 (* spinlock test with subgroupall *)
-ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpBranchConditional", "OpAtomicCompareExchange", "OpBranchConditional", "Assignment", "OpAtomicStore", "OpGroupAll", "OpBranchConditional", "Terminate" >> ]
-ThreadArguments == [t \in 1..NumThreads |-> <<
+
+ThreadInstructions ==  [t \in 1..NumThreads |-> 
+<<
+"Assignment", 
+"OpBranchConditional", 
+"OpAtomicCompareExchange", 
+"OpBranchConditional", 
+"Assignment", 
+"OpAtomicStore", 
+"OpGroupAll", 
+"OpBranchConditional", 
+"Terminate"
+>> ]
+
+
+ThreadArguments == [t \in 1..NumThreads |-> 
+<<
 <<Var("local",  "done", FALSE)>>,
 <<UnaryExpr("Not",  Var("local", "done", "")), Var("literal", "", 3), Var("literal", "", 7)>>,
 <<Var("local", "old", ""), Var("global", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,

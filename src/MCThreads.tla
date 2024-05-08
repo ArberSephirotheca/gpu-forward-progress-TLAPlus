@@ -21,7 +21,7 @@ InitThreadVars ==
     /\  pc = [t \in Threads |-> 1]
     /\  terminated = [t \in Threads |-> FALSE]
     /\  barrier = [t \in Threads |-> "NULL"]
-    \* /\  threadLocals = [t \in Threads |-> {}]
+    /\  threadLocals = [t \in Threads |-> {}]
     \* /\  lastTimeExecuted = [t \in Threads |-> 0]
 
     
@@ -258,15 +258,44 @@ OpGroupAll(t, result, predicate, scope) ==
             ELSE IF scope = "workgroup" THEN 
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
                     IN      \* if there is a thread that has not reached the opgroupAll, return false
-                        /\  IF \E wthread \in wthreads: pc[wthread] < pc[t] THEN
-                                /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
+                        /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
+                                \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
                                 /\  barrier' = [barrier EXCEPT ![t] = "workgroup"]
+                                /\  UNCHANGED <<pc, threadLocals, globalVars>>
                             ELSE IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
-                                /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, TRUE)})
-                                /\  barrier' = [barrier EXCEPT ![t] = "NULL"]
+                                \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, TRUE)})
+                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE): wthread \in wthreads})
+                                /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
+                                        tid \in Threads |->
+                                            IF tid \in wthreads THEN 
+                                                "NULL" 
+                                            ELSE 
+                                                barrier[tid]
+                                    ]
+                                /\  pc' = [
+                                        tid \in Threads |->
+                                            IF tid \in wthreads THEN 
+                                                pc[tid] + 1
+                                            ELSE 
+                                                pc[tid]
+                                    ]
                             ELSE 
-                                /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
-                                /\  barrier' = [barrier EXCEPT ![t] = "workgroup"]
+                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE): wthread \in wthreads })
+                                \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
+                                /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
+                                        tid \in Threads |->
+                                            IF tid \in wthreads THEN 
+                                                "NULL" 
+                                            ELSE 
+                                                barrier[tid]
+                                    ]
+                                /\  pc' = [
+                                        tid \in Threads |->
+                                            IF tid \in wthreads THEN 
+                                                pc[tid] + 1
+                                            ELSE 
+                                                pc[tid]
+                                    ]
             ELSE
                 /\  FALSE
         \* /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
@@ -274,6 +303,7 @@ OpGroupAll(t, result, predicate, scope) ==
 
 
 (* result and pointer are variable, value is literal *)
+
 OpAtomicExchange(t, result, pointer, value) ==
     LET mangledResult == Mangle(t, result)
         mangledPointer == Mangle(t, pointer)
@@ -291,12 +321,12 @@ OpAtomicExchange(t, result, pointer, value) ==
         /\  UNCHANGED <<terminated, barrier>>
 
 (* result and pointer are variable, compare and value are literal *)
+
 OpAtomicCompareExchange(t, result, pointer, compare, value) ==
     LET mangledResult == Mangle(t, result)
         mangledPointer == Mangle(t, pointer)
     IN
         /\  IsVariable(mangledResult)
-        \* /\  VarExists(WorkGroupId(t)+1, mangledResult)
         /\  IsVariable(mangledPointer)
         /\  VarExists(WorkGroupId(t)+1, mangledPointer)
         /\  IsLiteral(compare)
@@ -304,7 +334,8 @@ OpAtomicCompareExchange(t, result, pointer, compare, value) ==
         /\  LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
             IN 
                 IF pointerVar.value = compare.value THEN
-                    /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, pointerVar.value), Var(pointerVar.scope, pointerVar.name, value.value)})
+                    /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, pointerVar.value), 
+                            Var(pointerVar.scope, pointerVar.name, value.value)})
                 ELSE
                     /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, pointerVar.value)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]

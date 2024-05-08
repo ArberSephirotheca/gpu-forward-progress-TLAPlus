@@ -1,14 +1,14 @@
 ---- MODULE MCProgressModel ----
 EXTENDS Integers, Naturals, Sequences, MCThreads, TLC
 
-VARIABLES fairExecutionSet, selected\*,curExeSubgroupTs*\
+VARIABLES fairExecutionSet, selected
 
 vars == <<fairExecutionSet, pc, terminated, barrier, selected, threadLocals, globalVars>>
 
 
 InitOBE ==
     /\  fairExecutionSet = {} 
-    /\ selected = -1
+    /\  selected = -1
 
 InitHSA ==
     /\  fairExecutionSet = {0}
@@ -17,15 +17,13 @@ InitHSA ==
 InitScheduler ==
     /\  IF Scheduler = "OBE" THEN
             /\  InitOBE
-            /\  Print("OBE Scheduler", TRUE)
         ELSE IF Scheduler = "HSA" THEN 
             /\  InitHSA
-            /\  Print("HSA Scheduler", TRUE)
         ELSE
             /\  FALSE
     
 Init ==
-    /\  InitProgram
+    /\  InitGPU
     /\  InitThreads
     /\  InitScheduler
 
@@ -78,11 +76,7 @@ UpdateFairExecutionSet(t) ==
 \* This combine with strong fairness makes sure that every workgroup in 
 \* the fair execution set will be scheduled at some point indefinitely
 PickAnyWorkGroup ==
-    IF fairExecutionSet # {} THEN
-        \E wg \in fairExecutionSet: 
-            \E t \in Threads: WorkGroupId(t) = wg /\ selected' = wg
-    ELSE 
-        /\ UNCHANGED selected               
+            []<>(\A wg \in fairExecutionSet: selected = wg)          
 \* \* Update the set of threads in the same subgroup that are currently executing
 \* UpdatecurExeSubgroupTs(t) == 
 \*     LET workgroupId == WorkGroupId(t)+1 IN 
@@ -147,10 +141,10 @@ FairStep ==
             \* IF FairExecutionThreads \intersect MinIndices(lastTimeExecuted , FairExecutionThreads) # {} THEN 
             \*     \E t \in FairExecutionThreads \intersect MinIndices(lastTimeExecuted , FairExecutionThreads):
             \*         /\  Execute(t)
-            IF FairExecutionThreads \ {t\in Threads: WorkGroupId(t) = selected} # {} THEN
-                \E t \in FairExecutionThreads \ {t\in Threads: WorkGroupId(t) = selected}:
-                    /\  Execute(t)
-            ELSE IF FairExecutionThreads # {} THEN
+            \* IF FairExecutionThreads \ {t\in Threads: WorkGroupId(t) = selected} # {} THEN
+            \*     \E t \in FairExecutionThreads \ {t\in Threads: WorkGroupId(t) = selected}:
+            \*         /\  Execute(t)
+            IF FairExecutionThreads # {} THEN
                 \E t \in FairExecutionThreads:
                     /\  Execute(t)
             ELSE IF ThreadsNotTerminated # {} THEN
@@ -176,7 +170,7 @@ Next ==
 
 Fairness ==
     /\  WF_vars(FairStep)
-    \* /\  SF_selected(PickAnyWorkGroup)
+    /\  PickAnyWorkGroup
 
 
 (* Specification *)
