@@ -2,20 +2,20 @@
 LOCAL INSTANCE Integers
 LOCAL INSTANCE Naturals
 LOCAL INSTANCE Sequences
-LOCAL INSTANCE MCLayout
+\* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES liveVars, globalVars
+VARIABLES globalVars, threadLocals
 
+(* Layout Configuration *)
+SubgroupSize == 2
+WorkGroupSize == 2
+NumWorkGroups == 2
+NumThreads == WorkGroupSize * NumWorkGroups
 
-(* Helper Functions *)
-Range(f) == { f[x] : x \in DOMAIN f }
-Min(S) == CHOOSE s \in S : \A t \in S : s <= t
-MinIndices(s, allowedIndices) ==
-    LET allowedValues == {s[i] : i \in DOMAIN s \cap allowedIndices}
-        minVal == IF allowedValues = {} THEN 1000
-                  ELSE Min(allowedValues)
-    IN {i \in DOMAIN s \cap allowedIndices : s[i] = minVal}
+Threads == {tid : tid \in 1..NumThreads}
+Scheduler == "OBE"
+
 
 (* Variable *)
 Var(varScope, varName, varValue) == 
@@ -52,17 +52,26 @@ IsIntermediate(var) ==
     /\ IsVar(var)
     /\ var.scope = "intermediate"
 
+
+Range(f) == { f[x] : x \in DOMAIN f }
+Min(S) == CHOOSE s \in S : \A t \in S : s <= t
+MinIndices(s, allowedIndices) ==
+    LET allowedValues == {s[i] : i \in DOMAIN s \cap allowedIndices}
+        minVal == IF allowedValues = {} THEN 1000
+                  ELSE Min(allowedValues)
+    IN {i \in DOMAIN s \cap allowedIndices : s[i] = minVal}
+
 VarExists(workgroupId, var) == 
     IF var.scope = "global" THEN 
         \E variable \in globalVars : variable.name = var.name 
     ELSE 
-        \E variable \in liveVars[workgroupId] : (variable.name = var.name /\ variable.scope = var.scope)
+        \E variable \in threadLocals[workgroupId] : (variable.name = var.name /\ variable.scope = var.scope)
 (* todo: resolve scope if duplicate name *)
 GetVar(workgroupId, var) == 
     IF var.scope = "global" THEN 
         CHOOSE variable \in globalVars : variable.name = var.name 
     ELSE 
-        CHOOSE variable \in liveVars[workgroupId]: (variable.name = var.name /\ variable.scope = var.scope)
+        CHOOSE variable \in threadLocals[workgroupId]: (variable.name = var.name /\ variable.scope = var.scope)
 
 \* only mangling local and intermediate variables
 Mangle(t, var) ==
@@ -81,6 +90,8 @@ GetVal(workgroupId, var) ==
     ELSE 
         /\  Print("Don't has such variable", var)
         /\  FALSE
+    
+
     
 (* Binary Expr *)
 
@@ -172,8 +183,60 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
                     FALSE
 
 InitProgram ==
-    /\  liveVars = [t \in 1..NumWorkGroups |-> {}]
+    /\  threadLocals = [t \in 1..NumWorkGroups |-> {}]
     /\  globalVars = {Var("global", "lock", 0)}
+
+
+(* Thread Configuration *)
+InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpGroupAll", "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranchConditional", "OpControlBarrier", "Terminate"}
+VariableScope == {"global", "shared", "local", "literal", "intermediate"}
+ScopeOperand == {"workgroup", "subgroup"}
+(* spinlock test *)
+\* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
+\* ThreadArguments == [t \in 1..NumThreads |-> <<
+\* <<Var("local", "old", 1)>>,
+\* << Var("local", "old", ""), Var("global", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
+\* <<BinaryExpr("NotEqual",  Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>,
+\* <<Var("global", "lock", ""), Var("literal", "", 0)>>
+\* >>]
+
+(* spinlock test with subgroupall *)
+ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpBranchConditional", "OpAtomicCompareExchange", "OpBranchConditional", "Assignment", "OpAtomicStore", "OpGroupAll", "OpBranchConditional", "Terminate" >> ]
+ThreadArguments == [t \in 1..NumThreads |-> <<
+<<Var("local",  "done", FALSE)>>,
+<<UnaryExpr("Not",  Var("local", "done", "")), Var("literal", "", 3), Var("literal", "", 7)>>,
+<<Var("local", "old", ""), Var("global", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
+<<BinaryExpr("Equal", Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 5), Var("literal", "", 7)>>,
+<<Var("local", "done", TRUE)>>,
+<<Var("global", "lock", ""), Var("literal", "", 0)>>,
+<<Var("intermediate", "groupall", ""), Var("local", "done", TRUE) ,"subgroup">>,
+<<UnaryExpr("Not", Var("intermediate", "groupall", "")), Var("literal", "", 2),Var("literal", "", 9) >>,
+<< >>
+>>]
+
+(* producer-consumer *)
+\* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"GLobalInvocationId", "Assignment", "OpAtomicLoad", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
+\* ThreadArguments == [t \in 1..NumThreads |-> < <
+\* <<Var("local", "old", 1)>>,
+\* << Var("local", "old", ""), Var("shared", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
+\* <<BinaryExpr("NotEqual",  Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>,
+\* <<Var("shared", "lock", ""), Var("literal", "", 0)>>
+\* >>]
+
+(* producer-consumer with subgroupall *)
+
+INSTANCE ProgramConf
+
+
+GlobalInvocationId(tid) == tid-1
+
+LocalInvocationId(tid) == GlobalInvocationId(tid) % WorkGroupSize
+
+WorkGroupId(tid) == GlobalInvocationId(tid) \div WorkGroupSize
+    
+SubgroupId(tid) == LocalInvocationId(tid) \div SubgroupSize
+
+SubgroupInovcationId(tid) == LocalInvocationId(tid) % SubgroupSize
 
 ====
 

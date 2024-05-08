@@ -1,9 +1,9 @@
 ---- MODULE MCProgressModel ----
-EXTENDS Integers, Naturals, Sequences, MCThreads, MCLayout, TLC
+EXTENDS Integers, Naturals, Sequences, MCThreads, TLC
 
 VARIABLES fairExecutionSet, selected\*,curExeSubgroupTs*\
 
-vars == <<fairExecutionSet, pc, terminated, barrier, selected, liveVars, globalVars>>
+vars == <<fairExecutionSet, pc, terminated, barrier, selected, threadLocals, globalVars>>
 
 
 InitOBE ==
