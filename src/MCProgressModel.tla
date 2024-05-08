@@ -41,7 +41,7 @@ OBEUpdateFairExecutionSet(t) ==
 
 
 HSAUpdateFairExecutionSet(t) ==
-    \* get the workgroup id of thread t, and form a set of threads that does not terminate yet
+    \* get the workgroup id that has lowest id and contains non-terminated thread
     LET elimiantedWorkgroup == {workgroupId \in fairExecutionSet: \A st \in ThreadsWithinWorkGroup(workgroupId): pc[st] = Len(ThreadInstructions[st])}
         threadsNotTerminated == {tid \in Threads : pc[tid] < Len(ThreadInstructions[tid])} IN
             IF threadsNotTerminated # {} THEN 
@@ -73,10 +73,11 @@ UpdateFairExecutionSet(t) ==
         ELSE
         /\  Print("Uknown Scheduler", FALSE)
 
-\* This combine with strong fairness makes sure that every workgroup in 
-\* the fair execution set will be scheduled at some point indefinitely
-PickAnyWorkGroup ==
-            []<>(\A wg \in fairExecutionSet: selected = wg)          
+\* This fairness property ensures that every workgroup in the fair execution set will be scheduled at some point indefinitely
+\* So we don't have a unfairness problem where some workgroup in the fair execution set is never scheduled/only scheduled once
+PickAnyWorkGroupInFairExecutionSet ==
+            <>[](\A wg \in fairExecutionSet: selected = wg)      
+    
 \* \* Update the set of threads in the same subgroup that are currently executing
 \* UpdatecurExeSubgroupTs(t) == 
 \*     LET workgroupId == WorkGroupId(t)+1 IN 
@@ -88,62 +89,22 @@ PickAnyWorkGroup ==
 \*             /\  UNCHANGED curExeSubgroupTs
 
 Execute(t) == 
-        \* /\  lastTimeExecuted' = [tid \in Threads |-> IF tid = t THEN 0 ELSE lastTimeExecuted[tid] - 1]
         /\  Step(t)
         /\  UpdateFairExecutionSet(t)
         /\  selected' = WorkGroupId(t)
-        \* /\  PickAnyWorkGroup
 
         \* /\  UpdatecurExeSubgroupTs(t)
 
 
 FairStep ==
-    \* threads within the same subgroup that are executing that are not at barrier
-    \* LET lockstepExecThreads == {t \in (UNION {curExeSubgroupTs[i] : i \in DOMAIN curExeSubgroupTs}) : barrier[t] = "NULL" /\  pc[t] = LowestPcWithinSubgroup(SubgroupId(t), WorkGroupId(t)) } 
-        \* threads in fair execution set that are not at barrier or threads that all workgroup threads are at barrier
-    LET FairExecutionThreads == {t \in Threads: WorkGroupId(t) \in fairExecutionSet /\ (barrier[t] = "NULL" \/ (\A st \in ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) : barrier[st] # "NULL")) /\ terminated[t] = FALSE}
-        FairExecutionStuckThreads == {t \in Threads:  WorkGroupId(t) \in fairExecutionSet /\ barrier[t] # "NULL" /\ terminated[t] = FALSE}
-        \* ThreadsNotTerminated == {t \in Threads : terminated[t] = FALSE /\ barrier[t] = "NULL"}
-        ThreadsNotTerminated == {t \in Threads: barrier[t] = "NULL" /\ terminated[t] = FALSE /\  WorkGroupId(t) \notin fairExecutionSet }
+        \* threads in fair execution set that are not at barrier and not terminated
+    LET FairExecutionThreads == {t \in Threads: WorkGroupId(t) \in fairExecutionSet 
+            /\ barrier[t] = "NULL" 
+            /\ terminated[t] = FALSE}
+        ThreadsNotTerminated == {t \in Threads: barrier[t] = "NULL" 
+            /\ terminated[t] = FALSE 
+            /\  WorkGroupId(t) \notin fairExecutionSet }
         IN
-        \*  lockstep execution first, then threads in fair execution set that are not at barrier, then any thread
-        \* /\  IF lockstepExecThreads # {} THEN 
-        \*         /\
-        \*             \E t \in lockstepExecThreads:
-        \*                 Execute(t)
-        \* IF FairExecutionThreads # {} THEN
-        \*     /\
-        \*         \E t \in FairExecutionThreads:
-        \*             Execute(t)
-        \* ELSE
-        \* /\  IF FairExecutionThreads # {} THEN 
-        \*     \/  \E t \in FairExecutionThreads:
-        \*         /\  Execute(t)
-        \*     \/  \E t \in ThreadsNotTerminated:
-        \*         /\  Execute(t)
-
-        \*     ELSE IF ThreadsNotTerminated # {} THEN
-        \*         \E t \in ThreadsNotTerminated:
-        \*             /\  Execute(t)
-        \*     ELSE
-        \*         /\  TRUE
-        \*         /\  UNCHANGED vars
-            \* Make sure to always pick thread in fair execution set that will make progress
-            \* IF (FairExecutionThreads \ FairExecutionStuckThreads) # {} THEN
-            \*     \E t \in (FairExecutionThreads \ FairExecutionStuckThreads):
-            \*         /\  Execute(t)
-            \* ELSE IF FairExecutionStuckThreads # {} THEN
-            \*     \E t \in FairExecutionStuckThreads:
-            \*         /\  Execute(t)
-            \* ELSE
-            \*     \E t \in ThreadsNotTerminated:
-            \*         /\  Execute(t)
-            \* IF FairExecutionThreads \intersect MinIndices(lastTimeExecuted , FairExecutionThreads) # {} THEN 
-            \*     \E t \in FairExecutionThreads \intersect MinIndices(lastTimeExecuted , FairExecutionThreads):
-            \*         /\  Execute(t)
-            \* IF FairExecutionThreads \ {t\in Threads: WorkGroupId(t) = selected} # {} THEN
-            \*     \E t \in FairExecutionThreads \ {t\in Threads: WorkGroupId(t) = selected}:
-            \*         /\  Execute(t)
             IF FairExecutionThreads # {} THEN
                 \E t \in FairExecutionThreads:
                     /\  Execute(t)
@@ -170,7 +131,7 @@ Next ==
 
 Fairness ==
     /\  WF_vars(FairStep)
-    /\  PickAnyWorkGroup
+    /\  PickAnyWorkGroupInFairExecutionSet
 
 
 (* Specification *)
