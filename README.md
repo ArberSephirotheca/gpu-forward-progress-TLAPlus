@@ -9,7 +9,7 @@ Make sure you've started the docker service
 ```bash
 systemctl service docker start
 ```
-And run earthly bootstrap(only need in first time)
+And run earthly bootstrap (this step is only necessary the first time)
 ```bash
 earthly bootstrap
 ```
