@@ -4,7 +4,6 @@ LOCAL INSTANCE Naturals
 LOCAL INSTANCE Sequences
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
-
 VARIABLES pc, terminated, barrier, threadLocals, globalVars
 
 (* Thread Configuration *)
@@ -22,8 +21,6 @@ InitThreadVars ==
     /\  terminated = [t \in Threads |-> FALSE]
     /\  barrier = [t \in Threads |-> "NULL"]
     /\  threadLocals = [t \in Threads |-> {}]
-    \* /\  lastTimeExecuted = [t \in Threads |-> 0]
-
     
 InitThreads == 
     /\  InitThreadVars
@@ -36,48 +33,6 @@ LowestPcWithinSubgroup(sid, wgid) == Min({pc[tid]: tid \in ThreadsWithinSubgroup
 
 MinThreadWithinWorkGroup(workgroupId) ==
     Min(ThreadsWithinWorkGroup(workgroupId))
-
-(* Helper Functions *)
-\* Range(f) == { f[x] : x \in DOMAIN f }
-\* Min(S) == CHOOSE s \in S : \A t \in S : s <= t
-\* MinIndices(s, allowedIndices) ==
-\*     LET allowedValues == {s[i] : i \in DOMAIN s \cap allowedIndices}
-\*         minVal == IF allowedValues = {} THEN 1000
-\*                   ELSE Min(allowedValues)
-\*     IN {i \in DOMAIN s \cap allowedIndices : s[i] = minVal}
-
-\* VarExists(workgroupId, var) == 
-\*     IF var.scope = "global" THEN 
-\*         \E variable \in globalVars : variable.name = var.name 
-\*     ELSE 
-\*         \E variable \in threadLocals[workgroupId] : (variable.name = var.name /\ variable.scope = var.scope)
-\* (* todo: resolve scope if duplicate name *)
-\* GetVar(workgroupId, var) == 
-\*     IF var.scope = "global" THEN 
-\*         CHOOSE variable \in globalVars : variable.name = var.name 
-\*     ELSE 
-\*         CHOOSE variable \in threadLocals[workgroupId]: (variable.name = var.name /\ variable.scope = var.scope)
-
-\* \* only mangling local and intermediate variables
-\* Mangle(t, var) ==
-\*     IF var.scope = "local" THEN
-\*         Var(var.scope, Append(ToString(t), Append(var.scope, var.name)), var.value)
-\*     ELSE IF var.scope = "intermediate" THEN
-\*         Var(var.scope, Append(ToString(t), Append(var.scope, var.name)), var.value)
-\*     ELSE
-\*         var
-    
-\* GetVal(workgroupId, var) == 
-\*     IF IsLiteral(var) THEN
-\*         var.value
-\*     ELSE IF VarExists(workgroupId, var) THEN
-\*         GetVar(workgroupId, var).value
-\*     ELSE 
-\*         /\  Print("Don't has such variable", var)
-\*         /\  FALSE
-    
-
-
 
 cleanIntermediateVar(t) == 
     /\  LET workgroupId == WorkGroupId(t)+1
@@ -160,7 +115,6 @@ Assignment(t, vars) ==
             currthreadLocals == threadLocals[WorkGroupId(t)+1]
         IN
             \* try to eliminated var with old value and intermediate var
-            \* LET eliminatedthreadLocals == {currVar \in currthreadLocals : currVar.scope ="intermediate" \/ \E var \in vars: (currVar.name = var.name /\ currVar.scope = var.scope)}
             LET eliminatedthreadLocals == {currVar \in currthreadLocals : \E var \in vars: (currVar.name = var.name /\ currVar.scope = var.scope)}
                 eliminatedGlobalVars == {currVar \in globalVars : \E var \in vars: (currVar.name = var.name /\ currVar.scope = var.scope)}
             IN
@@ -168,7 +122,6 @@ Assignment(t, vars) ==
                 /\  globalVars' = (globalVars \ eliminatedGlobalVars) \union AssGlobalVars
 
 
-\* todo: fix the logic so the result could be used argument when it is intermediate variable
 OpAtomicLoad(t, result, pointer) ==
     LET mangledResult == Mangle(t, result)
         mangledPointer == Mangle(t, pointer)
@@ -216,13 +169,11 @@ OpGroupAll(t, result, predicate, scope) ==
         /\  IF scope = "subgroup" THEN
                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
                     IN
-                        \* if there is a thread that has not reached the opgroupAll, do nothing and but wait
+                        \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
                         /\  IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
-                                \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
                                 /\  barrier' = [barrier EXCEPT ![t] = "subgroup"]
                                 /\  UNCHANGED <<pc, threadLocals, globalVars>>
                             ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
-                                \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, TRUE)})
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE): sthread \in sthreads})
                                 /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
                                         tid \in Threads |->
@@ -240,7 +191,6 @@ OpGroupAll(t, result, predicate, scope) ==
                                     ]
                             ELSE 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE): sthread \in sthreads })
-                                \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
                                 /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
                                         tid \in Threads |->
                                             IF tid \in sthreads THEN 
@@ -259,11 +209,9 @@ OpGroupAll(t, result, predicate, scope) ==
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
                     IN      \* if there is a thread that has not reached the opgroupAll, return false
                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
-                                \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
                                 /\  barrier' = [barrier EXCEPT ![t] = "workgroup"]
                                 /\  UNCHANGED <<pc, threadLocals, globalVars>>
                             ELSE IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
-                                \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, TRUE)})
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE): wthread \in wthreads})
                                 /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
                                         tid \in Threads |->
@@ -281,7 +229,6 @@ OpGroupAll(t, result, predicate, scope) ==
                                     ]
                             ELSE 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE): wthread \in wthreads })
-                                \* /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, FALSE)})
                                 /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
                                         tid \in Threads |->
                                             IF tid \in wthreads THEN 
@@ -298,7 +245,6 @@ OpGroupAll(t, result, predicate, scope) ==
                                     ]
             ELSE
                 /\  FALSE
-        \* /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<terminated>>
 
 
@@ -321,7 +267,6 @@ OpAtomicExchange(t, result, pointer, value) ==
         /\  UNCHANGED <<terminated, barrier>>
 
 (* result and pointer are variable, compare and value are literal *)
-
 OpAtomicCompareExchange(t, result, pointer, compare, value) ==
     LET mangledResult == Mangle(t, result)
         mangledPointer == Mangle(t, pointer)

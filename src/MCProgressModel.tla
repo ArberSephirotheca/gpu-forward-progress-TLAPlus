@@ -42,28 +42,11 @@ OBEUpdateFairExecutionSet(t) ==
 
 HSAUpdateFairExecutionSet(t) ==
     \* get the workgroup id that has lowest id and contains non-terminated thread
-    LET elimiantedWorkgroup == {workgroupId \in fairExecutionSet: \A st \in ThreadsWithinWorkGroup(workgroupId): pc[st] = Len(ThreadInstructions[st])}
-        threadsNotTerminated == {tid \in Threads : pc[tid] < Len(ThreadInstructions[tid])} IN
+    LET threadsNotTerminated == {tid \in Threads : pc[tid] < Len(ThreadInstructions[tid])} IN
             IF threadsNotTerminated # {} THEN 
                 /\  fairExecutionSet' = {WorkGroupId(Min(threadsNotTerminated))}
             ELSE 
                 /\  fairExecutionSet' = {}
-            \* IF elimiantedWorkgroup # {} /\ threadsNotTerminated # {} THEN 
-            \*     /\  fairExecutionSet' = (fairExecutionSet \ elimiantedWorkgroup) \union {WorkGroupId(Min(threadsNotTerminated))}
-            \* ELSE IF elimiantedWorkgroup # {} THEN 
-            \*     /\  fairExecutionSet' = fairExecutionSet \ elimiantedWorkgroup
-        \* if thread t's workgroup is in fairExecutionSet and all threads in the workgroup are terminated, remove the workgroup from fairExecutionSet
-        \* IF workgroupId \in fairExecutionSet /\ \A st \in ThreadsWithinWorkGroup(workgroupId): terminated[st] = TRUE THEN
-        \*         \* if all threads are terminated, just remove the current workgroup from set 
-        \*     /\  IF threadsNotTerminated = {} THEN 
-        \*             /\  fairExecutionSet' = fairExecutionSet \ {workgroupId}
-        \*         \*  else remove the current workgroup from set and add the workgroup that live thread with lowest id belongs to
-        \*         ELSE 
-        \*             /\  fairExecutionSet' = (fairExecutionSet \ {workgroupId}) \union {WorkGroupId(Min(threadsNotTerminated))}
-        \* \* else, no dothing
-        \* ELSE
-        \*     \* /\  Print(ThreadsWithinWorkGroup(workgroupId), TRUE)
-        \*     /\  UNCHANGED fairExecutionSet
     
 UpdateFairExecutionSet(t) == 
     /\  IF Scheduler = "OBE" THEN
@@ -78,23 +61,10 @@ UpdateFairExecutionSet(t) ==
 PickAnyWorkGroupInFairExecutionSet ==
             <>[](\A wg \in fairExecutionSet: selected = wg)      
     
-\* \* Update the set of threads in the same subgroup that are currently executing
-\* UpdatecurExeSubgroupTs(t) == 
-\*     LET workgroupId == WorkGroupId(t)+1 IN 
-\*         IF t \in curExeSubgroupTs[workgroupId]  THEN  \* if t is in curExeSubgroupTs and it made a step, remove it
-\*             /\  curExeSubgroupTs'[workgroupId] = [curExeSubgroupTs EXCEPT ![workgroupId] = curExeSubgroupTs[workgroupId] \ {t}]
-\*         ELSE IF curExeSubgroupTs[workgroupId] = {} THEN  \* if curExeSubgroupTs is empty, add other threads in the same subgroup except t
-\*             /\  curExeSubgroupTs' = [curExeSubgroupTs EXCEPT ![workgroupId] = ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \{t}]
-\*         ELSE 
-\*             /\  UNCHANGED curExeSubgroupTs
-
 Execute(t) == 
         /\  Step(t)
         /\  UpdateFairExecutionSet(t)
         /\  selected' = WorkGroupId(t)
-
-        \* /\  UpdatecurExeSubgroupTs(t)
-
 
 FairStep ==
         \* threads in fair execution set that are not at barrier and not terminated
@@ -140,27 +110,11 @@ Spec ==
     /\ [][Next]_vars
     /\ Fairness
 
-\* ProgressProperty ensures that the selected thread must make progress
-ProgressProperty == 
-    \* [][\A t \in Threads: (selected' = t) => (pc'[t] = Len(ThreadInstructions[t]) \/ pc'[t] > pc[t])]_vars
-    [][\A t \in Threads: (selected' = t) => (vars' # vars)]_vars
-
 \* eventually all threads are always terminated
 EventuallyAlwaysTerminated ==
     \A t \in Threads: <>[](pc[t] = Len(ThreadInstructions[t]))
 
-\* all threads that appears in the fair execution will lead these threads to be terminated at some point
-FairExecutionEventuallyTerminated ==
-    \A t \in Threads: WorkGroupId(t) \in fairExecutionSet ~> (pc[t] = Len(ThreadInstructions[t])) 
-
-\* For all workgroup within the fair execution set, it will be scheduled at some point
-FairExecutionEventuallyChoosen ==
-    \* \A t \in Threads: WorkGroupId(t) \in fairExecutionSet ~> (selected = WorkGroupId(t))
-   \A t \in Threads: []<>(WorkGroupId(t) \in fairExecutionSet => <> (selected = WorkGroupId(t)))
 Liveness == 
     /\  EventuallyAlwaysTerminated
-    /\  FairExecutionEventuallyChoosen
-    \* /\  ProgressProperty
-    \* /\  EventuallyAlwaysTerminated
 
 ====
