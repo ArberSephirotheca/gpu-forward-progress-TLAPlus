@@ -34,7 +34,7 @@ OBEUpdateFairExecutionSet(t) ==
         IF workgroupId \notin fairExecutionSet /\ \E st \in ThreadsWithinWorkGroup(workgroupId): pc[st] < Len(ThreadInstructions[st]) THEN
             /\  fairExecutionSet' = fairExecutionSet \union {workgroupId}
         \* if thread t's workgroup is in fairExecutionSet and all threads in the workgroup are terminated, remove the workgroup from fairExecutionSet
-        ELSE IF workgroupId \in fairExecutionSet /\ \A st \in ThreadsWithinWorkGroup(workgroupId): pc[st] = Len(ThreadInstructions[st]) THEN
+        ELSE IF workgroupId \in fairExecutionSet /\ \A st \in ThreadsWithinWorkGroup(workgroupId): terminated[st] = TRUE THEN
             /\  fairExecutionSet' = fairExecutionSet \ {workgroupId}
         ELSE
             /\  UNCHANGED fairExecutionSet
@@ -42,7 +42,7 @@ OBEUpdateFairExecutionSet(t) ==
 
 HSAUpdateFairExecutionSet(t) ==
     \* get the workgroup id that has lowest id and contains non-terminated thread
-    LET threadsNotTerminated == {tid \in Threads : pc[tid] < Len(ThreadInstructions[tid])} IN
+    LET threadsNotTerminated == {tid \in Threads : terminated[tid] = FALSE} IN
             IF threadsNotTerminated # {} THEN 
                 /\  fairExecutionSet' = {WorkGroupId(Min(threadsNotTerminated))}
             ELSE 
