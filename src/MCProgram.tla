@@ -108,8 +108,10 @@ GreaterThan(lhs, rhs) == lhs > rhs
 GreaterThanOrEqual(lhs, rhs) == lhs >= rhs
 Equal(lhs, rhs) == lhs = rhs
 NotEqual(lhs, rhs) == lhs /= rhs
+Plus(lhs, rhs) == lhs + rhs
+Minus(lhs, rhs) == lhs - rhs
 
-BinarOpSet == {"LessThan", "LessThanOrEqual", "GreaterThan", "GreaterThanOrEqual", "Equal", "NotEqual"}
+BinarOpSet == {"LessThan", "LessThanOrEqual", "GreaterThan", "GreaterThanOrEqual", "Equal", "NotEqual", "Plus"}
 
 IsBinaryExpr(expr) ==
     IF IsVar(expr) = TRUE THEN
@@ -141,6 +143,11 @@ IsUnaryExpr(expr) ==
         /\  "right" \in DOMAIN expr
         /\  expr["operator"] \in UnaryOpSet
 
+    
+IsExpression(var) ==
+    \/ IsBinaryExpr(var)
+    \/ IsUnaryExpr(var)
+
 \* We have to delcare the recursive function before we can use it for mutual recursion
 RECURSIVE ApplyBinaryExpr(_, _, _)
 RECURSIVE ApplyUnaryExpr(_, _, _)
@@ -169,6 +176,10 @@ ApplyBinaryExpr(t, workgroupId, expr) ==
             Equal(lhsValue, rhsValue)
         ELSE IF expr["operator"] = "NotEqual" THEN
             NotEqual(lhsValue, rhsValue)
+        ELSE IF expr["operator"] = "Plus" THEN
+            Plus(lhsValue, rhsValue)
+        ELSE IF expr["operator"] = "Minus" THEN
+            Minus(lhsValue, rhsValue)
         ELSE
             FALSE
 
@@ -184,11 +195,13 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
                     FALSE
 
 InitGPU ==
+    \* for mutex
     /\  globalVars = {Var("global", "lock", 0)}
-
+    \* for producer-consumer
+    \* /\  globalVars = {Var("global", "msg", 0)}
 
 (* Thread Configuration *)
-InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpGroupAll", "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranchConditional", "OpControlBarrier", "Terminate"}
+InstructionSet == {"Assignment", "GetGlobalId", "OpAtomicLoad", "OpAtomicStore", "OpGroupAll", "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranchConditional", "OpControlBarrier", "Terminate"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup"}
 (* spinlock test *)
@@ -230,15 +243,52 @@ ThreadArguments == [t \in 1..NumThreads |->
 >>]
 
 (* producer-consumer *)
-\* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"GLobalInvocationId", "Assignment", "OpAtomicLoad", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
-\* ThreadArguments == [t \in 1..NumThreads |-> < <
-\* <<Var("local", "old", 1)>>,
-\* << Var("local", "old", ""), Var("shared", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
-\* <<BinaryExpr("NotEqual",  Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 2), Var("literal", "", 4)>>,
-\* <<Var("shared", "lock", ""), Var("literal", "", 0)>>
+\* ThreadInstructions ==  [t \in 1..NumThreads |-> 
+\* <<
+\* "Assignment",
+\* "OpAtomicLoad",
+\* "OpBranchConditional",
+\* "OpAtomicStore",
+\* "Terminate"
+\* >>]
+\* ThreadArguments == [t \in 1..NumThreads |-> 
+\* <<
+\* <<Var("local", "gid", t-1)>>,
+\* <<Var("intermediate", "load", ""), Var("global", "msg", "")>>,
+\* <<BinaryExpr("NotEqual", Var("local", "gid", ""), Var("intermediate", "load", "")), Var("literal", "", 2), Var("literal", "", 4)>>,
+\* <<Var("global", "msg", ""), BinaryExpr("Plus", Var("local", "gid", ""), Var("literal", "", 1))>>,
+\* << >>
 \* >>]
 
 (* producer-consumer with subgroupall *)
+\* ThreadInstructions ==  [t \in 1..NumThreads |-> 
+\* <<
+\* "Assignment", 
+\* "Assignment",
+\* "OpBranchConditional",
+\* "OpAtomicLoad",
+\* "OpBranchConditional", 
+\* "OpAtomicStore", 
+\* "Assignment", 
+\* "OpGroupAll", 
+\* "OpBranchConditional", 
+\* "Terminate"
+\* >> ]
+
+
+\* ThreadArguments == [t \in 1..NumThreads |-> 
+\* <<
+\* <<Var("local", "gid", t-1)>>,
+\* <<Var("local", "done", FALSE)>>,
+\* <<UnaryExpr("Not",  Var("local", "done", "")), Var("literal", "", 4), Var("literal", "", 8)>>,
+\* <<Var("intermediate", "load", ""), Var("global", "msg", "")>>,
+\* <<BinaryExpr("Equal", Var("local", "gid", ""), Var("intermediate", "load", "")), Var("literal", "", 6), Var("literal", "", 8)>>,
+\* <<Var("global", "msg", ""), BinaryExpr("Plus", Var("local", "gid", ""), Var("literal", "", 1))>>,
+\* <<Var("local", "done", TRUE)>>,
+\* <<Var("intermediate", "groupall", ""), Var("local", "done", TRUE) ,"subgroup">>,
+\* <<UnaryExpr("Not", Var("intermediate", "groupall", "")), Var("literal", "", 3),Var("literal", "", 10) >>,
+\* << >>
+\* >>]
 
 INSTANCE ProgramConf
 

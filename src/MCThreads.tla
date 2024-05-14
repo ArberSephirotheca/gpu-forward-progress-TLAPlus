@@ -10,9 +10,6 @@ VARIABLES pc, terminated, barrier, threadLocals, globalVars
 INSTANCE  MCProgram
 
 
-
-
-
 (* Thread variables and functions start here *)
 threadVars == <<pc, terminated, barrier>>
 
@@ -121,6 +118,18 @@ Assignment(t, vars) ==
                 /\  threadLocals' =  [threadLocals EXCEPT ![workgroupId] = (threadLocals[workgroupId] \ eliminatedthreadLocals) \union AssthreadLocals]
                 /\  globalVars' = (globalVars \ eliminatedGlobalVars) \union AssGlobalVars
 
+GetGlobalId(t, result) ==
+    LET mangledResult == Mangle(t, result)
+    IN
+        /\
+            \/  
+                /\  IsVariable(mangledResult)
+                /\  VarExists(WorkGroupId(t)+1, mangledResult)
+            \/  IsIntermediate(mangledResult)
+        /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, GlobalInvocationId(t))})
+        /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+        /\  UNCHANGED <<terminated, barrier>>
+
 
 OpAtomicLoad(t, result, pointer) ==
     LET mangledResult == Mangle(t, result)
@@ -136,12 +145,12 @@ OpAtomicLoad(t, result, pointer) ==
         /\  IF IsIntermediate(mangledResult) THEN 
                 LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                 IN 
-                    /\  Assignment(t, Var("intermediate", mangledResult.name, pointerVar.value))
+                    /\  Assignment(t, {Var("intermediate", mangledResult.name, pointerVar.value)})
             ELSE
                 LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                     resultVar == GetVar(WorkGroupId(t)+1, mangledResult)
                 IN
-                    /\  Assignment(t, Var(resultVar.scope, resultVar.name, pointerVar.value))
+                    /\  Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<terminated, barrier>>
 
@@ -150,10 +159,12 @@ OpAtomicStore(t, pointer, value) ==
     IN
         /\  IsVariable(mangledPointer)
         /\  VarExists(WorkGroupId(t)+1, mangledPointer)
-        /\  IsLiteral(value)
+        /\  
+            \/  IsLiteral(value)
+            \/  IsExpression(value)
         /\  LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
             IN
-                /\  Assignment(t, {Var(pointerVar.scope, pointerVar.name, value.value)})
+                /\  Assignment(t, {Var(pointerVar.scope, pointerVar.name, EvalExpr(t, WorkGroupId(t)+1, value))})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<terminated, barrier>>
 
@@ -311,6 +322,8 @@ Step(t) ==
                 /\  Assignment(t, {Mangle(t, ThreadArguments[t][pc[t]][1])})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<terminated, barrier>>
+            ELSE IF ThreadInstructions[t][pc[t]] = "GetGlobalId" THEN
+                GetGlobalId(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicExchange" THEN
                 OpAtomicExchange(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicCompareExchange" THEN
