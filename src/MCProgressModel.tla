@@ -3,7 +3,7 @@ EXTENDS Integers, Naturals, Sequences, MCThreads, TLC
 
 VARIABLES fairExecutionSet, selected
 
-vars == <<fairExecutionSet, pc, terminated, barrier, selected, threadLocals, globalVars>>
+vars == <<fairExecutionSet, pc, state, selected, threadLocals, globalVars>>
 
 
 InitOBE ==
@@ -34,7 +34,7 @@ OBEUpdateFairExecutionSet(t) ==
         IF workgroupId \notin fairExecutionSet /\ \E st \in ThreadsWithinWorkGroup(workgroupId): pc[st] < Len(ThreadInstructions[st]) THEN
             /\  fairExecutionSet' = fairExecutionSet \union {workgroupId}
         \* if thread t's workgroup is in fairExecutionSet and all threads in the workgroup are terminated, remove the workgroup from fairExecutionSet
-        ELSE IF workgroupId \in fairExecutionSet /\ \A st \in ThreadsWithinWorkGroup(workgroupId): terminated[st] = TRUE THEN
+        ELSE IF workgroupId \in fairExecutionSet /\ \A st \in ThreadsWithinWorkGroup(workgroupId): state[st] = "terminated" THEN
             /\  fairExecutionSet' = fairExecutionSet \ {workgroupId}
         ELSE
             /\  UNCHANGED fairExecutionSet
@@ -42,7 +42,7 @@ OBEUpdateFairExecutionSet(t) ==
 
 HSAUpdateFairExecutionSet(t) ==
     \* get the workgroup id that has lowest id and contains non-terminated thread
-    LET threadsNotTerminated == {tid \in Threads : terminated[tid] = FALSE} IN
+    LET threadsNotTerminated == {tid \in Threads : state[tid] # "terminated"} IN
             IF threadsNotTerminated # {} THEN 
                 /\  fairExecutionSet' = {WorkGroupId(Min(threadsNotTerminated))}
             ELSE 
@@ -69,12 +69,10 @@ Execute(t) ==
 FairStep ==
         \* threads in fair execution set that are not at barrier and not terminated
     LET FairExecutionThreads == {t \in Threads: WorkGroupId(t) \in fairExecutionSet 
-            /\ barrier[t] = "NULL" 
-            /\ terminated[t] = FALSE}
-        ThreadsNotTerminated == {t \in Threads: barrier[t] = "NULL" 
-            /\ terminated[t] = FALSE 
-            /\  WorkGroupId(t) \notin fairExecutionSet }
-        IN
+            /\ state[t] = "ready"}
+        ThreadsNotTerminated == {t \in Threads: WorkGroupId(t) \notin fairExecutionSet 
+            /\ state[t] = "ready"} 
+    IN
             IF FairExecutionThreads # {} THEN
                 \E t \in FairExecutionThreads:
                     /\  Execute(t)
@@ -85,9 +83,9 @@ FairStep ==
                 /\  UNCHANGED vars
 
 UnfairStep == 
-    LET ThreadsNotTerminated == {t \in Threads: barrier[t] = "NULL" 
-        /\ terminated[t] = FALSE 
-        /\  WorkGroupId(t) \notin fairExecutionSet } IN
+    LET ThreadsNotTerminated == {t \in Threads: WorkGroupId(t) \notin fairExecutionSet
+            /\ state[t] = "ready"} 
+    IN
         \*  if there is any thread that is not terminated, execute it
         IF ThreadsNotTerminated # {} THEN
             \E t \in ThreadsNotTerminated:
