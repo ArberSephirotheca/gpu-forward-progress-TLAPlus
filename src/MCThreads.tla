@@ -4,19 +4,19 @@ LOCAL INSTANCE Naturals
 LOCAL INSTANCE Sequences
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
-VARIABLES pc, terminated, barrier, threadLocals, globalVars
+VARIABLES pc, state, threadLocals, globalVars
 
 (* Thread Configuration *)
 INSTANCE  MCProgram
 
+ThreadState == {"ready", "workgroup", "subgroup", "terminated"}
 
 (* Thread variables and functions start here *)
-threadVars == <<pc, terminated, barrier>>
+threadVars == <<pc, state>>
 
 InitThreadVars ==
     /\  pc = [t \in Threads |-> 1]
-    /\  terminated = [t \in Threads |-> FALSE]
-    /\  barrier = [t \in Threads |-> "NULL"]
+    /\  state = [t \in Threads |-> "ready"]
     /\  threadLocals = [t \in Threads |-> {}]
     
 InitThreads == 
@@ -40,25 +40,24 @@ cleanIntermediateVar(t) ==
                 /\  threadLocals' =  [threadLocals EXCEPT ![workgroupId] = threadLocals[workgroupId] \ eliminatedVars]
 
 
- UpdateBarrier(tid, barrierState) ==
-     /\  barrierState \in ScopeOperand
-     /\  barrier' = [barrier EXCEPT ![tid] = barrierState]
+ UpdateState(tid, State) ==
+     /\  state' = [state EXCEPT ![tid] = State]
     
  SubgroupBarrier(t) ==
-     /\ IF barrier[t] = "subgroup" THEN \* already waiting at a subgroup barrier
+     /\ IF state[t] = "subgroup" THEN \* already waiting at a subgroup barrier
             \* find all threads and their corresponding barrier state within the same subgroup
-            LET affectedThreadsBarrier == {barrier[affectedThreads]: affectedThreads \in ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))}
+            LET affectedThreadsBarrier == {state[affectedThreads]: affectedThreads \in ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))}
                 affectedThreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
             IN
                 \* if all threads in the subgroup are waiting at the barrier, release them
                 IF \A affected \in affectedThreadsBarrier : affected = "subgroup" THEN
-                    \* release all barrier in the subgroup, marking barrier as null
-                    /\  barrier' = [
+                    \* release all barrier in the subgroup, marking state as ready
+                    /\  state' = [
                             tid \in Threads |->
                                 IF tid \in affectedThreads THEN 
-                                    "NULL" 
+                                    "ready" 
                                 ELSE 
-                                    barrier[tid]
+                                    state[tid]
                         ]
                     \* increment the program counter for all threads in the subgroup
                     /\  pc' = [
@@ -70,26 +69,26 @@ cleanIntermediateVar(t) ==
                         ]
                 ELSE
                     \* else, do nothing as some threads are still not at the barrier
-                    /\  UNCHANGED <<barrier, pc>> 
+                    /\  UNCHANGED <<state, pc>> 
         ELSE
             \* set the barrier for the thread
-            /\  UpdateBarrier(t, "subgroup") 
+            /\  UpdateState(t, "subgroup") 
             /\  UNCHANGED <<pc>>
-    /\  UNCHANGED <<threadLocals, globalVars, terminated>>
+    /\  UNCHANGED <<threadLocals, globalVars>>
 
 
 WorkgroupBarrier(t) ==
-    /\  IF barrier[t] = "workgroup" THEN \* already waiting at a workgroup barrier
-            LET affectedThreadsBarrier == {barrier[affectedThreads]: affectedThreads \in ThreadsWithinWorkGroup(WorkGroupId(t))}
+    /\  IF state[t] = "workgroup" THEN \* already waiting at a workgroup barrier
+            LET affectedThreadsBarrier == {state[affectedThreads]: affectedThreads \in ThreadsWithinWorkGroup(WorkGroupId(t))}
                 affectedThreads == ThreadsWithinWorkGroup(WorkGroupId(t))
             IN 
                 IF \A affected \in affectedThreadsBarrier : affected = "workgroup" THEN \* if all threads in the workgroup are waiting at the barrier, release them
-                    /\  barrier' = [
+                    /\  state' = [
                             tid \in Threads |->
                                 IF tid \in affectedThreads THEN 
-                                    "NULL" 
+                                    "ready" 
                                 ELSE 
-                                    barrier[tid]
+                                    state[tid]
                         ]
                     /\  pc' = [ \* increment the program counter for all threads in the subgroup
                             tid \in Threads |->
@@ -99,11 +98,11 @@ WorkgroupBarrier(t) ==
                                     pc[tid]
                         ]
                 ELSE
-                    /\  UNCHANGED <<barrier, pc>> \* else, do nothing as some threads are still not at the barrier
+                    /\  UNCHANGED <<state, pc>> \* else, do nothing as some threads are still not at the barrier
         ELSE
-            /\  UpdateBarrier(t, "workgroup") \* set the barrier for the thread
+            /\  UpdateState(t, "workgroup") \* set the barrier for the thread
             /\  UNCHANGED <<pc>>
-    /\  UNCHANGED <<threadLocals, globalVars, terminated>>
+    /\  UNCHANGED <<threadLocals, globalVars>>
 
 Assignment(t, vars) == 
     /\  LET workgroupId == WorkGroupId(t)+1
@@ -128,7 +127,7 @@ GetGlobalId(t, result) ==
             \/  IsIntermediate(mangledResult)
         /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, GlobalInvocationId(t))})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<terminated, barrier>>
+        /\  UNCHANGED <<state>>
 
 
 OpAtomicLoad(t, result, pointer) ==
@@ -152,7 +151,7 @@ OpAtomicLoad(t, result, pointer) ==
                 IN
                     /\  Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<terminated, barrier>>
+        /\  UNCHANGED <<state>>
 
 OpAtomicStore(t, pointer, value) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -166,7 +165,7 @@ OpAtomicStore(t, pointer, value) ==
             IN
                 /\  Assignment(t, {Var(pointerVar.scope, pointerVar.name, EvalExpr(t, WorkGroupId(t)+1, value))})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<terminated, barrier>>
+        /\  UNCHANGED <<state>>
 
 
 OpGroupAll(t, result, predicate, scope) ==
@@ -182,16 +181,16 @@ OpGroupAll(t, result, predicate, scope) ==
                     IN
                         \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
                         /\  IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
-                                /\  barrier' = [barrier EXCEPT ![t] = "subgroup"]
+                                /\  state' = [state EXCEPT ![t] = "subgroup"]
                                 /\  UNCHANGED <<pc, threadLocals, globalVars>>
                             ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE): sthread \in sthreads})
-                                /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
+                                /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                         tid \in Threads |->
                                             IF tid \in sthreads THEN 
-                                                "NULL" 
+                                                "ready" 
                                             ELSE 
-                                                barrier[tid]
+                                                state[tid]
                                     ]
                                 /\  pc' = [
                                         tid \in Threads |->
@@ -202,12 +201,12 @@ OpGroupAll(t, result, predicate, scope) ==
                                     ]
                             ELSE 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE): sthread \in sthreads })
-                                /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
+                                /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                         tid \in Threads |->
                                             IF tid \in sthreads THEN 
-                                                "NULL" 
+                                                "ready" 
                                             ELSE 
-                                                barrier[tid]
+                                                state[tid]
                                     ]
                                 /\  pc' = [
                                         tid \in Threads |->
@@ -220,16 +219,16 @@ OpGroupAll(t, result, predicate, scope) ==
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
                     IN      \* if there is a thread that has not reached the opgroupAll, return false
                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
-                                /\  barrier' = [barrier EXCEPT ![t] = "workgroup"]
+                                /\  state' = [state EXCEPT ![t] = "workgroup"]
                                 /\  UNCHANGED <<pc, threadLocals, globalVars>>
                             ELSE IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE): wthread \in wthreads})
-                                /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
+                                /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                         tid \in Threads |->
                                             IF tid \in wthreads THEN 
-                                                "NULL" 
+                                                "ready" 
                                             ELSE 
-                                                barrier[tid]
+                                                state[tid]
                                     ]
                                 /\  pc' = [
                                         tid \in Threads |->
@@ -240,12 +239,12 @@ OpGroupAll(t, result, predicate, scope) ==
                                     ]
                             ELSE 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE): wthread \in wthreads })
-                                /\  barrier' = [\* release all barrier in the subgroup, marking barrier as null
+                                /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                         tid \in Threads |->
                                             IF tid \in wthreads THEN 
-                                                "NULL" 
+                                                "ready" 
                                             ELSE 
-                                                barrier[tid]
+                                                state[tid]
                                     ]
                                 /\  pc' = [
                                         tid \in Threads |->
@@ -256,7 +255,6 @@ OpGroupAll(t, result, predicate, scope) ==
                                     ]
             ELSE
                 /\  FALSE
-        /\  UNCHANGED <<terminated>>
 
 
 (* result and pointer are variable, value is literal *)
@@ -275,7 +273,7 @@ OpAtomicExchange(t, result, pointer, value) ==
             IN
                 /\  Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value), Var(pointerVar.scope, pointerVar.name, value.value)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<terminated, barrier>>
+        /\  UNCHANGED <<state>>
 
 (* result and pointer are variable, compare and value are literal *)
 OpAtomicCompareExchange(t, result, pointer, compare, value) ==
@@ -295,7 +293,7 @@ OpAtomicCompareExchange(t, result, pointer, compare, value) ==
                 ELSE
                     /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, pointerVar.value)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<terminated, barrier>>
+        /\  UNCHANGED <<state>>
 
 (* condition is an expression, trueLabel and falseLabel are integer representing pc *)
 OpBranchConditional(t, condition, trueLabel, falseLabel) ==
@@ -305,23 +303,23 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
             /\  pc' = [pc EXCEPT ![t] = trueLabel.value]
         ELSE
             /\  pc' = [pc EXCEPT ![t] = falseLabel.value]
-    /\  UNCHANGED <<terminated, barrier, threadLocals, globalVars>>
+    /\  UNCHANGED <<state, threadLocals, globalVars>>
 
 
 Terminate(t) ==
-    /\  terminated' = [terminated EXCEPT ![t] = TRUE]
-    /\  UNCHANGED <<pc, barrier, threadLocals, globalVars>>
+    /\  state' = [state EXCEPT ![t] = "terminated"]
+    /\  UNCHANGED <<pc, threadLocals, globalVars>>
 
 Step(t) ==
     LET workgroupId == WorkGroupId(t)+1
     IN
-        IF terminated[t] = FALSE THEN
+        IF state[t] # "terminated" THEN
             IF  ThreadInstructions[t][pc[t]] = "Terminate" THEN
                 Terminate(t)
             ELSE IF ThreadInstructions[t][pc[t]] = "Assignment" THEN
                 /\  Assignment(t, {Mangle(t, ThreadArguments[t][pc[t]][1])})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<terminated, barrier>>
+                /\  UNCHANGED <<state>>
             ELSE IF ThreadInstructions[t][pc[t]] = "GetGlobalId" THEN
                 GetGlobalId(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicExchange" THEN
@@ -347,5 +345,11 @@ AllInstructionsWithinSet ==
     \A t \in Threads:
         \A ins \in DOMAIN ThreadInstructions[t]:
             ThreadInstructions[t][ins] \in InstructionSet
+
+AllThreadStatesAreBounded ==
+    \A t \in Threads:
+        state[t] \in ThreadState
+
+(* This property ensures that the program counter of all threads are bounded *)
 
 ====
