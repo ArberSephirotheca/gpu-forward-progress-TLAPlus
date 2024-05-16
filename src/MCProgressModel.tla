@@ -97,18 +97,17 @@ Next ==
     \/  FairStep
     \/  UnfairStep
 
+
 Fairness ==
-    /\  WF_vars(FairStep)
-    /\  PickAnyWorkGroupInFairExecutionSet
-
-
+    /\  <>[](ENABLED <<FairStep>>_vars) => ([]<><<FairStep>>_vars /\ PickAnyWorkGroupInFairExecutionSet)
+    
 (* Specification *)
 Spec == 
     /\ Init
     /\ [][Next]_vars
     /\ Fairness
 
-\* eventually all threads are always terminated
+\* eventually all threads are always terminatedac
 EventuallyAlwaysTerminated ==
     \A t \in Threads: <>[](pc[t] = Len(ThreadInstructions[t]))
 
