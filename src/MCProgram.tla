@@ -8,14 +8,14 @@ LOCAL INSTANCE TLC
 VARIABLES globalVars, threadLocals
 
 (* Layout Configuration *)
-SubgroupSize == 2
-WorkGroupSize == 2
+SubgroupSize == 1
+WorkGroupSize == 1
 NumWorkGroups == 2
 NumThreads == WorkGroupSize * NumWorkGroups
 
 Threads == {tid : tid \in 1..NumThreads}
 
-Scheduler == "HSA"
+Scheduler == "OBE"
 
 
 (* Variable *)
@@ -195,10 +195,10 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
                     FALSE
 
 InitGPU ==
-    \* for mutex
-    /\  globalVars = {Var("global", "lock", 0)}
+    \* for spinlock
+    \* /\  globalVars = {Var("global", "lock", 0)}
     \* for producer-consumer
-    \* /\  globalVars = {Var("global", "msg", 0)}
+    /\  globalVars = {Var("global", "msg", 0)}
 
 (* Thread Configuration *)
 InstructionSet == {"Assignment", "GetGlobalId", "OpAtomicLoad", "OpAtomicStore", "OpGroupAll", "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranchConditional", "OpControlBarrier", "Terminate"}
@@ -214,51 +214,50 @@ ScopeOperand == {"workgroup", "subgroup"}
 \* >>]
 
 (* spinlock test with subgroupall *)
-
-ThreadInstructions ==  [t \in 1..NumThreads |-> 
-<<
-"Assignment", 
-"OpBranchConditional", 
-"OpAtomicCompareExchange", 
-"OpBranchConditional", 
-"Assignment", 
-"OpAtomicStore", 
-"OpGroupAll", 
-"OpBranchConditional", 
-"Terminate"
->> ]
-
-
-ThreadArguments == [t \in 1..NumThreads |-> 
-<<
-<<Var("local",  "done", FALSE)>>,
-<<UnaryExpr("Not",  Var("local", "done", "")), Var("literal", "", 3), Var("literal", "", 7)>>,
-<<Var("local", "old", ""), Var("global", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
-<<BinaryExpr("Equal", Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 5), Var("literal", "", 7)>>,
-<<Var("local", "done", TRUE)>>,
-<<Var("global", "lock", ""), Var("literal", "", 0)>>,
-<<Var("intermediate", "groupall", ""), Var("local", "done", TRUE) ,"subgroup">>,
-<<UnaryExpr("Not", Var("intermediate", "groupall", "")), Var("literal", "", 2),Var("literal", "", 9) >>,
-<< >>
->>]
-
-(* producer-consumer *)
 \* ThreadInstructions ==  [t \in 1..NumThreads |-> 
 \* <<
-\* "Assignment",
-\* "OpAtomicLoad",
-\* "OpBranchConditional",
-\* "OpAtomicStore",
+\* "Assignment", 
+\* "OpBranchConditional", 
+\* "OpAtomicCompareExchange", 
+\* "OpBranchConditional", 
+\* "Assignment", 
+\* "OpAtomicStore", 
+\* "OpGroupAll", 
+\* "OpBranchConditional", 
 \* "Terminate"
-\* >>]
+\* >> ]
+
+
 \* ThreadArguments == [t \in 1..NumThreads |-> 
 \* <<
-\* <<Var("local", "gid", t-1)>>,
-\* <<Var("intermediate", "load", ""), Var("global", "msg", "")>>,
-\* <<BinaryExpr("NotEqual", Var("local", "gid", ""), Var("intermediate", "load", "")), Var("literal", "", 2), Var("literal", "", 4)>>,
-\* <<Var("global", "msg", ""), BinaryExpr("Plus", Var("local", "gid", ""), Var("literal", "", 1))>>,
+\* <<Var("local",  "done", FALSE)>>,
+\* <<UnaryExpr("Not",  Var("local", "done", "")), Var("literal", "", 3), Var("literal", "", 7)>>,
+\* <<Var("local", "old", ""), Var("global", "lock", ""), Var("literal", "", 0), Var("literal", "", 1)>>,
+\* <<BinaryExpr("Equal", Var("local", "old", ""), Var("literal", "", 0)), Var("literal", "", 5), Var("literal", "", 7)>>,
+\* <<Var("local", "done", TRUE)>>,
+\* <<Var("global", "lock", ""), Var("literal", "", 0)>>,
+\* <<Var("intermediate", "groupall", ""), Var("local", "done", TRUE) ,"subgroup">>,
+\* <<UnaryExpr("Not", Var("intermediate", "groupall", "")), Var("literal", "", 2),Var("literal", "", 9) >>,
 \* << >>
 \* >>]
+
+(* producer-consumer *)
+ThreadInstructions ==  [t \in 1..NumThreads |-> 
+<<
+"Assignment",
+"OpAtomicLoad",
+"OpBranchConditional",
+"OpAtomicStore",
+"Terminate"
+>>]
+ThreadArguments == [t \in 1..NumThreads |-> 
+<<
+<<Var("local", "gid", t-1)>>,
+<<Var("intermediate", "load", ""), Var("global", "msg", "")>>,
+<<BinaryExpr("NotEqual", Var("local", "gid", ""), Var("intermediate", "load", "")), Var("literal", "", 2), Var("literal", "", 4)>>,
+<<Var("global", "msg", ""), BinaryExpr("Plus", Var("local", "gid", ""), Var("literal", "", 1))>>,
+<< >>
+>>]
 
 (* producer-consumer with subgroupall *)
 \* ThreadInstructions ==  [t \in 1..NumThreads |-> 
