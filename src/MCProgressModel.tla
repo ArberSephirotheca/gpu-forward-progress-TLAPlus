@@ -66,36 +66,19 @@ Execute(t) ==
         /\  UpdateFairExecutionSet(t)
         /\  selected' = WorkGroupId(t)
 
-FairStep ==
-        \* threads in fair execution set that are not at barrier and not terminated
-    LET FairExecutionThreads == {t \in Threads: WorkGroupId(t) \in fairExecutionSet 
-            /\ state[t] = "ready"}
-        ThreadsNotTerminated == {t \in Threads: WorkGroupId(t) \notin fairExecutionSet 
-            /\ state[t] = "ready"} 
-    IN
-            IF FairExecutionThreads # {} THEN
-                \E t \in FairExecutionThreads:
-                    /\  Execute(t)
-            ELSE IF ThreadsNotTerminated # {} THEN
-                \E t \in ThreadsNotTerminated:
-                    /\  Execute(t)
-            ELSE 
-                /\  UNCHANGED vars
 
-UnfairStep == 
-    LET ThreadsNotTerminated == {t \in Threads: WorkGroupId(t) \notin fairExecutionSet
-            /\ state[t] = "ready"} 
+FairStep ==
+    LET ThreadsReady == {t \in Threads: state[t] = "ready"}
     IN
         \*  if there is any thread that is not terminated, execute it
-        IF ThreadsNotTerminated # {} THEN
-            \E t \in ThreadsNotTerminated:
+        IF ThreadsReady # {} THEN
+            \E t \in ThreadsReady:
                 /\  Execute(t)
         ELSE
             /\ UNCHANGED vars
 \* Deadlock means reaching a state in which Next is not enabled.
 Next ==
-    \/  FairStep
-    \/  UnfairStep
+    FairStep
 
 
 Fairness ==
