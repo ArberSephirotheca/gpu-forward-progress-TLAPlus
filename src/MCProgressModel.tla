@@ -59,18 +59,18 @@ UpdateFairExecutionSet(t) ==
 \* This fairness property ensures that every workgroup in the fair execution set will be scheduled at some point indefinitely
 \* So we don't have a unfairness problem where some workgroup in the fair execution set is never scheduled/only scheduled once
 PickAnyWorkGroupInFairExecutionSet ==
-            <>[](\A wg \in fairExecutionSet: selected = wg)      
+            <>[](\A wg \in fairExecutionSet: selected = wg)
     
 Execute(t) == 
-        /\  Step(t)
+        /\  ExecuteInstruction(t)
         /\  UpdateFairExecutionSet(t)
         /\  selected' = WorkGroupId(t)
 
 
-FairStep ==
+Step ==
     LET ThreadsReady == {t \in Threads: state[t] = "ready"}
     IN
-        \*  if there is any thread that is not terminated, execute it
+         \*  if there is any thread that is not terminated, execute it
         IF ThreadsReady # {} THEN
             \E t \in ThreadsReady:
                 /\  Execute(t)
@@ -78,11 +78,11 @@ FairStep ==
             /\ UNCHANGED vars
 \* Deadlock means reaching a state in which Next is not enabled.
 Next ==
-    FairStep
+    Step
 
 
 Fairness ==
-    /\  <>[](ENABLED <<FairStep>>_vars) => ([]<><<FairStep>>_vars /\ PickAnyWorkGroupInFairExecutionSet)
+    /\  <>[](ENABLED <<Step>>_vars) => ([]<><<Step>>_vars /\ PickAnyWorkGroupInFairExecutionSet)
     
 (* Specification *)
 Spec == 
