@@ -247,40 +247,40 @@ OpGroupAll(t, result, predicate, scope) ==
                                 Print("UB: All threads within subgroup must converge at current block", FALSE)
                         \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
-                                /\  state' = [state EXCEPT ![t] = "subgroup"]
-                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
-                            ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
-                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
-                                /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
-                                        tid \in Threads |->
-                                            IF tid \in sthreads THEN 
-                                                "ready" 
-                                            ELSE 
-                                                state[tid]
-                                    ]
-                                /\  pc' = [
-                                        tid \in Threads |->
-                                            IF tid \in sthreads THEN 
-                                                pc[tid] + 1
-                                            ELSE 
-                                                pc[tid]
-                                    ]
-                            ELSE 
-                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
-                                /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
-                                        tid \in Threads |->
-                                            IF tid \in sthreads THEN 
-                                                "ready" 
-                                            ELSE 
-                                                state[tid]
-                                    ]
-                                /\  pc' = [
-                                        tid \in Threads |->
-                                            IF tid \in sthreads THEN 
-                                                pc[tid] + 1
-                                            ELSE 
-                                                pc[tid]
-                                    ]
+                            /\  state' = [state EXCEPT ![t] = "subgroup"]
+                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
+                        ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                            /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
+                            /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+                                    tid \in Threads |->
+                                        IF tid \in sthreads THEN 
+                                            "ready" 
+                                        ELSE 
+                                            state[tid]
+                                ]
+                            /\  pc' = [
+                                    tid \in Threads |->
+                                        IF tid \in sthreads THEN 
+                                            pc[tid] + 1
+                                        ELSE 
+                                            pc[tid]
+                                ]
+                        ELSE 
+                            /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
+                            /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+                                    tid \in Threads |->
+                                        IF tid \in sthreads THEN 
+                                            "ready" 
+                                        ELSE 
+                                            state[tid]
+                                ]
+                            /\  pc' = [
+                                    tid \in Threads |->
+                                        IF tid \in sthreads THEN 
+                                            pc[tid] + 1
+                                        ELSE 
+                                            pc[tid]
+                                ]
             ELSE IF scope = "workgroup" THEN 
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
                     IN      \* if there is a thread that has not reached the opgroupAll, return false
