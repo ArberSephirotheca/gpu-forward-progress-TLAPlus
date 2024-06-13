@@ -3,7 +3,7 @@ EXTENDS Integers, Naturals, Sequences, MCThreads, TLC
 
 VARIABLES fairExecutionSet, selected
 
-vars == <<fairExecutionSet, pc, state, selected, threadLocals, globalVars>>
+vars == <<fairExecutionSet, pc, state, selected, threadLocals, globalVars, CFG>>
 
 
 InitOBE ==
@@ -23,7 +23,7 @@ InitScheduler ==
             /\  FALSE
     
 Init ==
-    /\  InitGPU
+    /\  InitProgram
     /\  InitThreads
     /\  InitScheduler
 

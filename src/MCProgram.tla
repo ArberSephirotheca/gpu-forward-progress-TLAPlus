@@ -5,7 +5,7 @@ LOCAL INSTANCE Sequences
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES globalVars, threadLocals
+VARIABLES globalVars, threadLocals, CFG
 
 (* Layout Configuration *)
 SubgroupSize == 1
@@ -24,6 +24,7 @@ Var(varScope, varName, varValue, index) ==
      name  |-> varName, 
      value |-> varValue,
      index |-> index]
+
 
 Index(idx) == 
     [realIndex |-> idx]
@@ -109,8 +110,6 @@ GetVal(workgroupId, var) ==
     ELSE 
         /\  Print("Don't has such variable", var)
         /\  FALSE
-    
-
     
 (* Binary Expr *)
 
@@ -220,18 +219,12 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
                 ELSE
                     FALSE
 
-InitGPU ==
-    \* for spinlock
-    \* /\  globalVars = {Var("global", "lock", 0, Index(-1))}
-    \* for producer-consumer
-    \* /\  globalVars = {Var("global", "msg", 0, Index(-1))}
-    \* decoupled lookback
-    /\ globalVars = {Var("global", "partition", 0, Index(-1)), Var("global", "result", [t \in 1..NumThreads |-> 0], Index(0)), Var("global", "workgroupPartition", [wg \in 1..NumWorkGroups |-> 0], Index(0))}
-
 (* Thread Configuration *)
-InstructionSet == {"Assignment", "GetGlobalId", "OpAtomicLoad", "OpAtomicStore", "OpAtomicAdd" , "OpAtomicSub", "OpGroupAll", "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpControlBarrier", "Terminate"}
+InstructionSet == {"Assignment", "GetGlobalId", "OpAtomicLoad", "OpAtomicStore", "OpAtomicAdd" , "OpAtomicSub", "OpGroupAll", 
+"OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpControlBarrier", "OpLoopMerge",
+"OpSelectionMerge", "OpLabel", "Terminate"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
-ScopeOperand == {"workgroup", "subgroup"}
+ScopeOperand == {"workgroup", "subgroup", "tangle"}
 \* (* spinlock test *)
 \* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
 \* ThreadArguments == [t \in 1..NumThreads |-> <<
@@ -321,51 +314,202 @@ ScopeOperand == {"workgroup", "subgroup"}
 
 
 (* decoupled lookback *)
+\* ThreadInstructions ==  [t \in 1..NumThreads |-> 
+\* <<
+\* "Assignment",     \* Create a local vriable partitionId
+\* "Assignment",    \* Create a local variable localResult
+\* "OpBranchConditional", \* if local thread idx == 0
+\* "OpAtomicExchange",    \* then, increment the global partition index by 1 and atomic store the original partition index to workgroup partition.
+\* "OpControlBarrier",    \* wait for threads within subgroup to reach here
+\* "OpAtomicLoad",     \* load the workgroup partition to local variable partitionId
+\* "OpBranchConditional",  \* True if the partitionId is equal to 0, 
+\* "OpAtomicStore",    \* then store 2 to globalResult, index would be partitionId * WorkGroupSize + tid
+\* "OpAtomicStore",    \* else store 1 to globalResult, index would be partitionId * WorkGroupSize + tid
+\* "OpBranchConditional",  \* For loop, end if the partitionId is equal or less than 0
+\* "OpAtomicLoad",     \* then, load the globalResult from other workgroup to local variable result
+\* "OpBranchConditional",  \* True if the result is 2, meanning we have inclusive result. If False, jump to next OpBranchConditional
+\* "OpAtomicStore",    \* then, atomic store 2 to globalResult
+\* "OpBranchConditional",  \* True if the result is 1, meanning we have aggregated result. If False, jump to the if statement
+\* "OpAtomicSub",    \* then, reduce the local partitionId by 1
+\* "OpBranch",  \* TJump to the for loop
+\* "Terminate"
+\* >> ]
+
+
+\* ThreadArguments == [t \in 1..NumThreads |-> 
+\* <<
+\* <<Var("local", "partitionId", 0, Index(-1))>>,
+\* <<Var("local", "localResult", 0, Index(-1))>>,
+\* <<BinaryExpr("Equal",  Var("literal", "", (t-1) % WorkGroupSize, Index(-1)), Var("literal", "", 0, Index(-1))), Var("literal", "", 4, Index(-1)), Var("literal", "", 5, Index(-1))>>,
+\* <<Var("global", "workgroupPartition", "", Index(((t-1) \div WorkGroupSize)+1)), Var("global", "partition", "", Index(-1)), BinaryExpr("Plus", Var("global", "partition", "", Index(-1)), Var("literal", "", 1, Index(-1)))>>,
+\* <<"subgroup">>,
+\* <<Var("local", "partitionId", "", Index(-1)), Var("global", "workgroupPartition", "", Index(((t-1) \div WorkGroupSize)+1))>>,
+\* <<BinaryExpr("Equal", Var("local", "partitionId", "", Index(-1)), Var("literal", "", 0, Index(-1))), Var("literal", "", 8, Index(-1)), Var("literal", "", 9, Index(-1))>>,
+\* <<Var("global", "result", "", BinaryExpr("Plus", BinaryExpr("Multiply", Var("local", "partitionId", "", Index(-1)), Var("literal", "", WorkGroupSize, Index(-1))), Var("literal", "", t, Index(-1)))), Var("literal", "", 2, Index(-1))>>,
+\* <<Var("global", "result", "", BinaryExpr("Plus", BinaryExpr("Multiply", Var("local", "partitionId", "", Index(-1)), Var("literal", "", WorkGroupSize, Index(-1))), Var("literal", "", t, Index(-1)))), Var("literal", "", 1, Index(-1))>>,
+\* <<BinaryExpr("GreaterThan", Var("local", "partitionId", "", Index(-1)), Var("literal", "", 0, Index(-1))), Var("literal", "", 11, Index(-1)), Var("literal", "", 17, Index(-1))>>,
+\* <<Var("local", "localResult", "", Index(-1)), Var("global", "result", "", BinaryExpr("Plus", BinaryExpr("Multiply", BinaryExpr("Minus", Var("local", "partitionId", "", Index(-1)), Var("literal", "", 1, Index(-1))), Var("literal", "", WorkGroupSize, Index(-1))), Var("literal", "", t, Index(-1))))>>,
+\* <<BinaryExpr("Equal", Var("local", "localResult", "", Index(-1)), Var("literal", "", 2, Index(-1))), Var("literal", "", 13, Index(-1)), Var("literal", "", 15, Index(-1))>>,
+\* <<Var("global", "result", "", BinaryExpr("Plus", BinaryExpr("Multiply", Var("local", "partitionId", "", Index(-1)), Var("literal", "", WorkGroupSize, Index(-1))), Var("literal", "", t, Index(-1)))), Var("literal", "", 2, Index(-1))>>,
+\* <<BinaryExpr("Equal", Var("local", "localResult", "", Index(-1)), Var("literal", "", 1, Index(-1))), Var("literal", "", 16, Index(-1)), Var("literal", "", 10, Index(-1)) >>,
+\* <<Var("local", "partitionId", "", Index(-1))>>,
+\* <<Var("literal", "", 10, Index(-1))>>,
+\* <<>>
+\* >>]
+
+
+(* maximal reconvergence test *)
 ThreadInstructions ==  [t \in 1..NumThreads |-> 
 <<
-"Assignment",     \* Create a local vriable partitionId
-"Assignment",    \* Create a local variable localResult
-"OpBranchConditional", \* if local thread idx == 0
-"OpAtomicExchange",    \* then, increment the global partition index by 1 and atomic store the original partition index to workgroup partition.
-"OpControlBarrier",    \* wait for threads within subgroup to reach here
-"OpAtomicLoad",     \* load the workgroup partition to local variable partitionId
-"OpBranchConditional",  \* True if the partitionId is equal to 0, 
-"OpAtomicStore",    \* then store 2 to globalResult, index would be partitionId * WorkGroupSize + tid
-"OpAtomicStore",    \* else store 1 to globalResult, index would be partitionId * WorkGroupSize + tid
-"OpBranchConditional",  \* For loop, end if the partitionId is equal or less than 0
-"OpAtomicLoad",     \* then, load the globalResult from other workgroup to local variable result
-"OpBranchConditional",  \* True if the result is 2, meanning we have inclusive result. If False, jump to next OpBranchConditional
-"OpAtomicStore",    \* then, atomic store 2 to globalResult
-"OpBranchConditional",  \* True if the result is 1, meanning we have aggregated result. If False, jump to the if statement
-"OpAtomicSub",    \* then, reduce the local partitionId by 1
-"OpBranch",  \* TJump to the for loop
+"OpLabel",
+"OpLoopMerge",
+"OpBranch",
+"OpLabel",
+"OpSelectionMerge",
+"OpBranchConditional",
+"OpLabel",
+"OpBranch",
+"OpLabel",
+"OpBranch",
+"OpLabel",
+"OpBranch",
+"OpLabel",
 "Terminate"
->> ]
-
-
+>>]
 ThreadArguments == [t \in 1..NumThreads |-> 
 <<
-<<Var("local", "partitionId", 0, Index(-1))>>,
-<<Var("local", "localResult", 0, Index(-1))>>,
-<<BinaryExpr("Equal",  Var("literal", "", (t-1) % WorkGroupSize, Index(-1)), Var("literal", "", 0, Index(-1))), Var("literal", "", 4, Index(-1)), Var("literal", "", 5, Index(-1))>>,
-<<Var("global", "workgroupPartition", "", Index(((t-1) \div WorkGroupSize)+1)), Var("global", "partition", "", Index(-1)), BinaryExpr("Plus", Var("global", "partition", "", Index(-1)), Var("literal", "", 1, Index(-1)))>>,
-<<"subgroup">>,
-<<Var("local", "partitionId", "", Index(-1)), Var("global", "workgroupPartition", "", Index(((t-1) \div WorkGroupSize)+1))>>,
-<<BinaryExpr("Equal", Var("local", "partitionId", "", Index(-1)), Var("literal", "", 0, Index(-1))), Var("literal", "", 8, Index(-1)), Var("literal", "", 9, Index(-1))>>,
-<<Var("global", "result", "", BinaryExpr("Plus", BinaryExpr("Multiply", Var("local", "partitionId", "", Index(-1)), Var("literal", "", WorkGroupSize, Index(-1))), Var("literal", "", t, Index(-1)))), Var("literal", "", 2, Index(-1))>>,
-<<Var("global", "result", "", BinaryExpr("Plus", BinaryExpr("Multiply", Var("local", "partitionId", "", Index(-1)), Var("literal", "", WorkGroupSize, Index(-1))), Var("literal", "", t, Index(-1)))), Var("literal", "", 1, Index(-1))>>,
-<<BinaryExpr("GreaterThan", Var("local", "partitionId", "", Index(-1)), Var("literal", "", 0, Index(-1))), Var("literal", "", 11, Index(-1)), Var("literal", "", 17, Index(-1))>>,
-<<Var("local", "localResult", "", Index(-1)), Var("global", "result", "", BinaryExpr("Plus", BinaryExpr("Multiply", BinaryExpr("Minus", Var("local", "partitionId", "", Index(-1)), Var("literal", "", 1, Index(-1))), Var("literal", "", WorkGroupSize, Index(-1))), Var("literal", "", t, Index(-1))))>>,
-<<BinaryExpr("Equal", Var("local", "localResult", "", Index(-1)), Var("literal", "", 2, Index(-1))), Var("literal", "", 13, Index(-1)), Var("literal", "", 15, Index(-1))>>,
-<<Var("global", "result", "", BinaryExpr("Plus", BinaryExpr("Multiply", Var("local", "partitionId", "", Index(-1)), Var("literal", "", WorkGroupSize, Index(-1))), Var("literal", "", t, Index(-1)))), Var("literal", "", 2, Index(-1))>>,
-<<BinaryExpr("Equal", Var("local", "localResult", "", Index(-1)), Var("literal", "", 1, Index(-1))), Var("literal", "", 16, Index(-1)), Var("literal", "", 10, Index(-1)) >>,
-<<Var("local", "partitionId", "", Index(-1))>>,
-<<Var("literal", "", 10, Index(-1))>>,
+<<Var("literal", "", "loop", Index(-1))>>,
+<<Var("literal", "", "D", Index(-1)), Var("literal", "", "continue", Index(-1))>>,
+<<Var("literal", "", "A", Index(-1))>>,
+<<Var("literal", "", "A", Index(-1))>>,
+<<Var("literal", "", "C", Index(-1))>>,
+<<Var("literal", "", TRUE, Index(-1)), Var("literal", "", "B", Index(-1)), Var("literal", "", "C", Index(-1))>>,
+<<Var("literal", "", "B", Index(-1))>>,
+<<Var("literal", "", "D", Index(-1))>>,
+<<Var("literal", "", "C", Index(-1))>>,
+<<Var("literal", "", "continue", Index(-1))>>,
+<<Var("literal", "", "continue", Index(-1))>>,
+<<Var("literal", "", "loop", Index(-1))>>,
+<<Var("literal", "", "D", Index(-1))>>>,
 <<>>
 >>]
 
 INSTANCE ProgramConf
 
+(* Inovactions within a tangle are required to execute tangled instruction concurrently, examples or opGroup operations and opControlBarrier  *)
+TangledInstructionSet == {"OpControlBarrier, OpGroupAll"}
+MergedInstructionSet == {"OpLoopMerge", "OpSelectionMerge"}
+BlockTerminationInstructionSet == {"OpBranch", "OpBranchConditional", "Terminate"}
+BranchInstructionSet == {"OpBranch", "OpBranchConditional"}
+\* Tangle: 
+Tangle(ts) == 
+    [threads |-> ts]
+\* Block: A contiguous sequence of instructions starting with an OpLabel, ending with a block termination instruction. A block has no additional label or block termination instructions.
+\* block termination instruction: OpBranch, OpBranchConditional, Terminate
+Block(opLabel, terminatedInstr, tangle) == 
+    [opLabel |-> opLabel,
+    terminatedInstr |-> terminatedInstr,
+    tangle |-> tangle]
+
+GenerateCFG(blocks, branch) == 
+    [node |-> blocks,
+    edge |-> branch]
+
+
+IsTerminationInstruction(instr) ==
+    instr \in BlockTerminationInstructionSet
+
+IsBranchInstruction(instr) ==
+    instr \in BranchInstructionSet
+
+IsMergedInstruction(instr) ==
+    instr \in MergedInstructionSet
+
+IsOpLabel(instr) ==
+    instr = "OpLabel"
+            
+GenerateBlocks(insts) == 
+  [i \in 1..Len(insts) |-> 
+     IF IsOpLabel(insts[i]) THEN 
+       LET terminationIndex == Min({j \in i+1..Len(insts) : IsTerminationInstruction(insts[j])} \cup {Len(insts)})
+           tangle == IF i = 1 THEN [t \in 1..NumThreads |-> t] ELSE <<>>  (* First OpLabel includes all threads as tangle *)
+       IN Block(i, terminationIndex, tangle)
+     ELSE Block(<<>>, <<>>, <<>>)
+  ]
+
+(* Helper function to find the block that contains the given index *)
+FindCurrentBlock(blocks, index) == 
+    CHOOSE k \in 1..Len(blocks) : blocks[k].opLabel <= index /\ blocks[k].terminatedInstr >= index
+
+(* Helper function to find the block that starts with the given index to OpLabel *)
+FindBlockbyOpLabel(blocks, index) == 
+    CHOOSE k \in 1..Len(blocks) : blocks[k].opLabel = index
+
+(* Helper function to find the block that ends with the given index to termination instruction *)
+FindBlockByTerminationIns(blocks, index) == 
+    CHOOSE k \in 1..Len(blocks) : blocks[k].terminatedInstr = index
+
+\* startIndex is the pc of the instruction(OpLabel) that starts the block
+\* terminationIndex is the pc of the termination instruction that terminates the block
+\* return set of indices to the OpLabel instructions
+\* OpLabel is obtained from the merge instruction and branch instruction
+FindTargetBlocks(startIndex, terminationIndex) == 
+    LET
+        mergeInstr == IF terminationIndex > startIndex THEN ThreadInstructions[1][terminationIndex - 1] ELSE <<>>
+    IN
+        IF mergeInstr = "OpLoopMerge" THEN
+            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1]), GetVal(-1, ThreadArguments[1][terminationIndex - 1][2])} \cup 
+                (IF ThreadInstructions[1][terminationIndex] = "OpBranch" THEN
+                    {GetVal(-1, ThreadArguments[1][terminationIndex][1])}
+                ELSE IF ThreadInstructions[1][terminationIndex] = "OpBranchConditional" THEN
+                    {GetVal(-1, ThreadArguments[1][terminationIndex][2]), GetVal(-1, ThreadArguments[1][terminationIndex][3])}
+                ELSE
+                    {})
+        ELSE IF mergeInstr = "OpSelectionMerge" THEN
+            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1])} \cup 
+                (IF ThreadInstructions[1][terminationIndex] = "OpBranch" THEN
+                    {GetVal(-1, ThreadArguments[1][terminationIndex][1])}
+                ELSE IF ThreadInstructions[1][terminationIndex] = "OpBranchConditional" THEN
+                    {GetVal(-1, ThreadArguments[1][terminationIndex][2]), GetVal(-1, ThreadArguments[1][terminationIndex][3])}
+                ELSE
+                    {})
+        ELSE 
+            IF ThreadInstructions[1][terminationIndex] = "OpBranch" THEN
+                {GetVal(-1, ThreadArguments[1][terminationIndex][1])}
+            ELSE IF ThreadInstructions[1][terminationIndex] = "OpBranchConditional" THEN
+                {GetVal(-1, ThreadArguments[1][terminationIndex][2]), GetVal(-1, ThreadArguments[1][terminationIndex][3])}
+            ELSE
+                {}
+
+UpdateTangle(tangle, opLabelIdxSet) ==
+    CFG.blocks' = [i \in 1..Len(CFG.blocks) |-> 
+        IF CFG.blocks[i].opLabel \in opLabelIdxSet THEN
+            Block(CFG.blocks[i].opLabel, CFG.blocks[i].terminatedInstr, tangle)
+        ELSE
+            CFG.blocks[i]
+    ]
+
+GetLabelPc(label) == 
+    CHOOSE i \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][i] = "OpLabel" /\ GetVal(-1, ThreadArguments[1][i][1]) = GetVal(-1, label)
+    
+InitCFG == 
+    LET blocks == SelectSeq(GenerateBlocks(ThreadInstructions[1]), LAMBDA b: b.opLabel # <<>>) 
+    IN 
+        CFG = GenerateCFG(blocks, 
+                UNION { {<<i, target>> : target \in FindTargetBlocks(blocks[i].opLabel, blocks[i].terminatedInstr)} : i \in DOMAIN blocks }
+                )
+InitGPU ==
+    \* for spinlock
+    \* /\  globalVars = {Var("global", "lock", 0, Index(-1))}
+    \* for producer-consumer
+    /\  globalVars = {Var("global", "msg", 0, Index(-1))}
+    \* decoupled lookback
+    \* /\ globalVars = {Var("global", "partition", 0, Index(-1)), Var("global", "result", [t \in 1..NumThreads |-> 0], Index(0)), Var("global", "workgroupPartition", [wg \in 1..NumWorkGroups |-> 0], Index(0))}
+
+
+InitProgram ==
+    /\ InitCFG
+    /\ InitGPU
 
 GlobalInvocationId(tid) == tid-1
 
