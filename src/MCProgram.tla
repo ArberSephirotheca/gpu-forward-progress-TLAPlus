@@ -5,7 +5,7 @@ LOCAL INSTANCE Sequences
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES globalVars, threadLocals, CFG
+VARIABLES globalVars, threadLocals, CFG, labels
 
 (* Layout Configuration *)
 SubgroupSize == 1
@@ -25,6 +25,9 @@ Var(varScope, varName, varValue, index) ==
      value |-> varValue,
      index |-> index]
 
+Label(name, pc) == 
+    [name |-> name,
+     pc |-> pc]
 
 Index(idx) == 
     [realIndex |-> idx]
@@ -406,10 +409,11 @@ Tangle(ts) ==
     [threads |-> ts]
 \* Block: A contiguous sequence of instructions starting with an OpLabel, ending with a block termination instruction. A block has no additional label or block termination instructions.
 \* block termination instruction: OpBranch, OpBranchConditional, Terminate
-Block(opLabel, terminatedInstr, tangle) == 
+Block(opLabel, terminatedInstr, tangle, type) == 
     [opLabel |-> opLabel,
     terminatedInstr |-> terminatedInstr,
-    tangle |-> tangle]
+    tangle |-> tangle
+    type |-> type]
 
 GenerateCFG(blocks, branch) == 
     [node |-> blocks,
@@ -427,14 +431,17 @@ IsMergedInstruction(instr) ==
 
 IsOpLabel(instr) ==
     instr = "OpLabel"
+
+IsMergeBlcok(block) ==
+    block.type = "Merge"
             
 GenerateBlocks(insts) == 
   [i \in 1..Len(insts) |-> 
      IF IsOpLabel(insts[i]) THEN 
        LET terminationIndex == Min({j \in i+1..Len(insts) : IsTerminationInstruction(insts[j])} \cup {Len(insts)})
            tangle == IF i = 1 THEN [t \in 1..NumThreads |-> t] ELSE <<>>  (* First OpLabel includes all threads as tangle *)
-       IN Block(i, terminationIndex, tangle)
-     ELSE Block(<<>>, <<>>, <<>>)
+       IN Block(i, terminationIndex, tangle, "None")
+     ELSE Block(<<>>, <<>>, <<>>, "None")
   ]
 
 (* Helper function to find the block that contains the given index *)
@@ -481,13 +488,97 @@ FindTargetBlocks(startIndex, terminationIndex) ==
             ELSE
                 {}
 
-UpdateTangle(tangle, opLabelIdxSet) ==
+                    
+                    
+\* startIndex is the pc of the instruction(OpLabel) that starts the block
+\* terminationIndex is the pc of the termination instruction that terminates the block
+\* return set of indices to the OpLabel instructions of the merge block for current header block
+\* OpLabel is obtained from the merge instruction and branch instruction
+FindMergeBlocks(startIndex, terminationIndex) == 
+    LET
+        mergeInstr == IF terminationIndex > startIndex THEN ThreadInstructions[1][terminationIndex - 1] ELSE <<>>
+    IN
+        IF mergeInstr = "OpLoopMerge" THEN
+            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1]), GetVal(-1, ThreadArguments[1][terminationIndex - 1][2])}
+        ELSE IF mergeInstr = "OpSelectionMerge" THEN
+            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1])}
+        ELSE 
+            {}
+
+\* mergeBlock is the current merge block,
+\* return set of header blocks for current merge block
+FindHeaderBlocks(mergeBlock) == 
+    {blcok \in StructuredControlFlowPathsTo(mergeBlock.opLabel) : mergeBlock.opLabel \in FindMergeBlocks(block.opLabel, block.terminatedInstr)}
+        
+\* return a set of all paths in graph G
+StructuredControlFlowPaths(G) == 
+    {p \in Seq(G.node) :
+    /\ p # << >>
+    /\ \A i \in 1..(Len(p)-1) : <<p[i].opLabel, p[i+1].opLabel>> \in G.edge}
+
+\* Return the set of paths from the entry block to block B
+\* B is the index to the opLabel
+StructuredControlFlowPathsTo(B) == {p \in Seq(CFG.node) :
+                  /\ p # << >>
+                  /\ p[1].opLabel = 1
+                  /\ p[Len(p)].opLabel = B
+                  /\ \A i \in 1..(Len(p)-1) : <<p[i].opLabel, p[i+1].opLabel>> \in edges}
+
+
+
+\* A block A structurally dominates a block B if every structured control flow path to B includes A
+\* A and B are the indice to the opLabel
+StructurallyDominates(A, B) == \A p \in StructuredControlFlowPathsTo(B) : \E i \in 1..Len(p) : p[i] = A
+
+\* A block A strictly structurally dominates a block B if A structurally dominates B and A != B
+\* A and B are the indice to the opLabel
+StrictlyStructurallyDominates(A, B) == /\ StructurallyDominates(A, B)
+                           /\ A # B
+
+\* If there exists OpKill in the block, then remove thread itself from the tangle of all merge blocks as well as current block
+\* for every header block that structurally dominates the current block
+TerminateUpdate(t, currentLabelIdx) ==
+    CFG.blocks' = [i \in 1..Len(CFG.blocks) |->
+        IF IsMergeBlcok(CFG.blocks[i]) /\ \E block \in FindHeaderBlocks(CFG.blocks[i]) : StrictlyStructurallyDominates(block.opLabel, currentLabelIdx) THEN
+            Block(CFG.blocks[i].opLabel, CFG.blocks[i].terminatedInstr, CFG.blocks[i].tangle \ {t}, CFG.blocks[i].type)
+        ELSE
+            CFG.blocks[i]
+    ] 
+
+BranchUpdate(t, tangle, opLabelIdxSet, choosenBranchIdx) ==
     CFG.blocks' = [i \in 1..Len(CFG.blocks) |-> 
         IF CFG.blocks[i].opLabel \in opLabelIdxSet THEN
-            Block(CFG.blocks[i].opLabel, CFG.blocks[i].terminatedInstr, tangle)
+            \* rule 2: If a thread reaches a branch instruction and the block it points to has empty tangle, update the tangle of tha block to the tangle of the merge instruction
+            \* And remove the thread itself from the tangle of unchoosen block if that block is not a merge block
+            IF CFG.blocks[i].tangle = <<>> THEN
+                \* unchoosen block and is not a merge block
+                IF CFG.blocks[i].opLabel # choosenBranchIdx /\ CFG.blocks[i].type # "Merge" THEN
+                    Block(CFG.blocks[i].opLabel, CFG.blocks[i].terminatedInstr, tangle \ {t}, CFG.blocks[i].type)
+                ELSE
+                    Block(CFG.blocks[i].opLabel, CFG.blocks[i].terminatedInstr, tangle, CFG.blocks[i].type)
+            \* rule 3: If the unchoosen block has non-empty tangle and is not a merge block, remove the thread from the tangle
+            ELSE IF CFG.blocks[i].opLabel # choosenBranchIdx /\ CFG.blocks[i].type # "Merge" THEN
+                Block(CFG.blocks[i].opLabel, CFG.blocks[i].terminatedInstr, CFG.blocks[i].tangle \ {t}, CFG.blocks[i].type)
+            ELSE 
+                CFG.blocks[i]
+        ELSE 
+            CFG.blocks[i]
+    ]
+
+\* Helper function to update the related blocks regarding the merge instruction
+MergeUpdate(currentLabelIdx, tangle, opLabelIdxSet) ==
+    CFG.blocks' = [i \in 1..Len(CFG.blocks) |-> 
+        IF CFG.blocks[i].opLabel \in opLabelIdxSet THEN
+            \* rule 1: If a thread reaches a merge instruction and the block it points to has empty tangle, update the tangle of tha block to the tangle of the merge instruction
+            IF CFG.blocks[i].tangle = <<>> THEN
+                Block(CFG.blocks[i].opLabel, CFG.blocks[i].terminatedInstr, tangle) 
+            ELSE 
+                CFG.blocks[i]
         ELSE
             CFG.blocks[i]
     ]
+
+
 
 GetLabelPc(label) == 
     CHOOSE i \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][i] = "OpLabel" /\ GetVal(-1, ThreadArguments[1][i][1]) = GetVal(-1, label)
@@ -505,7 +596,7 @@ InitGPU ==
     /\  globalVars = {Var("global", "msg", 0, Index(-1))}
     \* decoupled lookback
     \* /\ globalVars = {Var("global", "partition", 0, Index(-1)), Var("global", "result", [t \in 1..NumThreads |-> 0], Index(0)), Var("global", "workgroupPartition", [wg \in 1..NumWorkGroups |-> 0], Index(0))}
-
+    /\  labels = {}
 
 InitProgram ==
     /\ InitCFG
