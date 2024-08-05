@@ -228,6 +228,7 @@ InstructionSet == {"Assignment", "GetGlobalId", "OpAtomicLoad", "OpAtomicStore",
 "OpSelectionMerge", "OpLabel", "Terminate"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup", "tangle"}
+BlockTypeSet == {"Merge", "None"}
 \* (* spinlock test *)
 \* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
 \* ThreadArguments == [t \in 1..NumThreads |-> <<
@@ -434,27 +435,58 @@ IsOpLabel(instr) ==
 
 IsMergeBlcok(block) ==
     block.type = "Merge"
-            
-GenerateBlocks(insts) == 
-  [i \in 1..Len(insts) |-> 
-     IF IsOpLabel(insts[i]) THEN 
-       LET terminationIndex == Min({j \in i+1..Len(insts) : IsTerminationInstruction(insts[j])} \cup {Len(insts)})
-           tangle == IF i = 1 THEN [t \in 1..NumThreads |-> t] ELSE <<>>  (* First OpLabel includes all threads as tangle *)
-       IN Block(i, terminationIndex, tangle, "None")
-     ELSE Block(<<>>, <<>>, <<>>, "None")
-  ]
 
 (* Helper function to find the block that contains the given index *)
 FindCurrentBlock(blocks, index) == 
     CHOOSE k \in 1..Len(blocks) : blocks[k].opLabel <= index /\ blocks[k].terminatedInstr >= index
 
-(* Helper function to find the block that starts with the given index to OpLabel *)
+(* Helper function to find the block that starts with the given name to OpLabel *)
 FindBlockbyOpLabel(blocks, index) == 
+    CHOOSE k \in 1..Len(blocks) : \E j \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][j] = "OpLabel" /\ blocks[k].opLabel = j
+
+(* Helper function to find the block that starts with the given index to OpLabel *)
+FindBlockbyOpLabelIdx(blocks, index) == 
     CHOOSE k \in 1..Len(blocks) : blocks[k].opLabel = index
 
 (* Helper function to find the block that ends with the given index to termination instruction *)
 FindBlockByTerminationIns(blocks, index) == 
     CHOOSE k \in 1..Len(blocks) : blocks[k].terminatedInstr = index
+
+
+\* function to determine if the merge instruction contains the given label as operand
+\* mergeInsIdx is the pc of the merge instruction
+\* opLabel is the value(label) that we are looking for
+MergeInstContainsLabel(mergeInsIdx, opLabel) == 
+   IF ThreadInstructions[1][mergeInsIdx] = "OpLoopMerge" THEN
+        GetVal(-1, ThreadArguments[1][mergeInsIdx][1]) = opLabel \/ GetVal(-1, ThreadArguments[1][mergeInsIdx][2]) = opLabel
+    ELSE IF ThreadInstructions[1][mergeInsIdx] = "OpSelectionMerge" THEN
+        GetVal(-1, ThreadArguments[1][mergeInsIdx][1]) = opLabel
+    ELSE
+        FALSE
+
+
+
+\* lookback funciton that helps to determine if the current block is a merge block
+\* startIdx is the pc of the instruction(OpLabel) that starts the current block
+DetermineBlockType(startIdx) ==
+    IF \E instIdx \in 1..(startIdx-1):
+        IsMergedInstruction(ThreadInstructions[1][instIdx]) /\ MergeInstContainsLabel(instIdx, GetVal(ThreadInstructions[1][startIdx]))
+    THEN 
+        "Merge"
+    ELSE 
+        "None"
+
+
+GenerateBlocks(insts) == 
+  [i \in 1..Len(insts) |-> 
+     IF IsOpLabel(insts[i]) THEN 
+       LET terminationIndex == Min({j \in i+1..Len(insts) : IsTerminationInstruction(insts[j])} \cup {Len(insts)})
+    
+           tangle == IF i = 1 THEN [t \in 1..NumThreads |-> t] ELSE <<>>  (* First OpLabel includes all threads as tangle *)
+       IN Block(i, terminationIndex, tangle, DetermineBlockType(i))
+     ELSE Block(<<>>, <<>>, <<>>, "None")
+  ]
+
 
 \* startIndex is the pc of the instruction(OpLabel) that starts the block
 \* terminationIndex is the pc of the termination instruction that terminates the block
@@ -535,7 +567,7 @@ StructurallyDominates(A, B) == \A p \in StructuredControlFlowPathsTo(B) : \E i \
 StrictlyStructurallyDominates(A, B) == /\ StructurallyDominates(A, B)
                            /\ A # B
 
-\* If there exists OpKill in the block, then remove thread itself from the tangle of all merge blocks as well as current block
+\* Rule 4: If there exists OpKill in the block, then remove thread itself from the tangle of all merge blocks as well as current block
 \* for every header block that structurally dominates the current block
 TerminateUpdate(t, currentLabelIdx) ==
     CFG.blocks' = [i \in 1..Len(CFG.blocks) |->
