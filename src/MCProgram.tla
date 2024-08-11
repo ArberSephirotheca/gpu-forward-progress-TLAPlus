@@ -538,7 +538,7 @@ DFS(node, cfg, visited, finished, backEdges) ==
 
 IdentifyLoops(cfg) ==
     LET
-        startNode == CHOOSE n \in DOMAIN cfg.node : TRUE  \* Arbitrary start node
+        startNode == 1 \* Start from the entry block
         result == DFS(startNode, cfg, {}, {}, {})
     IN
     result.backEdges
