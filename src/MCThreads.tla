@@ -73,7 +73,7 @@ GetGlobalId(t, result) ==
             \/  IsIntermediate(mangledResult)
         /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, GlobalInvocationId(t), Index(-1))})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, labels>>
+        /\  UNCHANGED <<state>>
 
 
 \* It does not handle the situation where result is an index to array
@@ -113,7 +113,7 @@ OpAtomicLoad(t, result, pointer) ==
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, Index(-1))})  
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, labels>>
+        /\  UNCHANGED <<state, CFG>>
 
 OpAtomicStore(t, pointer, value) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -132,7 +132,7 @@ OpAtomicStore(t, pointer, value) ==
                     ELSE
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, EvalExpr(t, WorkGroupId(t)+1, value), pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, labels>>
+        /\  UNCHANGED <<state, CFG>>
 
 OpAtomicAdd(t, pointer) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -149,7 +149,7 @@ OpAtomicAdd(t, pointer) ==
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value + 1, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, labels>>
+        /\  UNCHANGED <<state, CFG>>
 
 
 OpAtomicSub(t, pointer) == 
@@ -166,20 +166,20 @@ OpAtomicSub(t, pointer) ==
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value - 1, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, labels>>
+        /\  UNCHANGED <<state, CFG>>
 
  OpControlBarrier(t, scope) ==
     IF scope = "subgroup" THEN \* already waiting at a subgroup barrier
         \* find all threads and their corresponding barrier state within the same subgroup
         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
-            currentTangle == FindCurrentBlockTangle(CFG.node, pc[t])
+            currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle
         IN
             IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
                 Print("UB: All threads within subgroup must converge at current block", FALSE)
             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
             ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                 /\  state' = [state EXCEPT ![t] = "subgroup"]
-                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, labels>>
+                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
             \* if all threads in the subgroup are waiting at the barrier, release them
             ELSE 
                 \* release all barrier in the subgroup, marking state as ready
@@ -198,7 +198,7 @@ OpAtomicSub(t, pointer) ==
                             ELSE 
                                 pc[tid]
                     ]
-                /\  UNCHANGED <<threadLocals, globalVars, CFG, labels>>
+                /\  UNCHANGED <<threadLocals, globalVars, CFG>>
 
     ELSE IF scope = "workgroup" THEN \* already waiting at a workgroup barrier
         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
@@ -206,7 +206,7 @@ OpAtomicSub(t, pointer) ==
             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
             IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, labels>>
+                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
             \* if all threads in the subgroup are waiting at the barrier, release them
             ELSE 
                 \* release all barrier in the subgroup, marking state as ready
@@ -225,7 +225,7 @@ OpAtomicSub(t, pointer) ==
                             ELSE 
                                 pc[tid]
                     ]
-                /\  UNCHANGED <<threadLocals, globalVars, CFG, labels>>
+                /\  UNCHANGED <<threadLocals, globalVars, CFG>>
     ELSE    
         FALSE
 
@@ -241,14 +241,14 @@ OpGroupAll(t, result, predicate, scope) ==
         /\  scope \in ScopeOperand
         /\  IF scope = "subgroup" THEN
                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
-                        currentTangle == FindCurrentBlockTangle(CFG.node, pc[t])
+                        currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle
                     IN
                         IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
                                 Print("UB: All threads within subgroup must converge at current block", FALSE)
                         \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, labels>>
+                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
                         ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -286,7 +286,7 @@ OpGroupAll(t, result, predicate, scope) ==
                     IN      \* if there is a thread that has not reached the opgroupAll, return false
                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
                                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, labels>>
+                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
                             ELSE IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -351,7 +351,7 @@ OpAtomicExchange(t, result, pointer, value) ==
                 ELSE
                     Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, labels>>
+        /\  UNCHANGED <<state, CFG>>
 
 (* result and pointer are variable, compare and value are literal *)
 OpAtomicCompareExchange(t, result, pointer, compare, value) ==
@@ -393,7 +393,7 @@ OpAtomicCompareExchange(t, result, pointer, compare, value) ==
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, labels>>
+        /\  UNCHANGED <<state, CFG>>
 
 
 (* zheyuan chen: invocation is escaped from reconvergence if: 
@@ -404,22 +404,29 @@ OpAtomicCompareExchange(t, result, pointer, compare, value) ==
 *)
 OpBranch(t, label) ==
     /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
-            targetBlock == FindBlockbyOpLabel(CFG.node, label.name)
+            targetBlock == FindBlockbyOpLabelIdx(CFG.node, GetVal(-1, label))
+            labelVal == GetVal(-1, label)
         IN
-            IF 
+            CFG' = GenerateCFG(BranchUpdate(t, curBlock.tangle, {labelVal}, labelVal), CFG.edge) 
         
-    /\ pc' = [pc EXCEPT ![t] = label.pc]
-    /\  UNCHANGED <<state, threadLocals, globalVars, CFG>>
+    /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
+    /\  UNCHANGED <<state, threadLocals, globalVars>>
 
 (* condition is an expression, trueLabel and falseLabel are integer representing pc *)
 OpBranchConditional(t, condition, trueLabel, falseLabel) ==
     /\  IsLiteral(trueLabel)
     /\  IsLiteral(falseLabel)
-    /\  IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
-            /\  pc' = [pc EXCEPT ![t] = trueLabel.value]
-        ELSE
-            /\  pc' = [pc EXCEPT ![t] = falseLabel.value]
-    /\  UNCHANGED <<state, threadLocals, globalVars, CFG>>
+    /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
+            trueLabelVal == GetVal(-1, trueLabel)
+            falseLabelVal == GetVal(-1, falseLabel)
+        IN
+            IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
+                /\  CFG' = GenerateCFG(BranchUpdate(t, FindCurrentBlock(CFG.node, pc[t]).tangle, {trueLabelVal, falseLabelVal}, trueLabelVal), CFG.edge)
+                /\  pc' = [pc EXCEPT ![t] = GetVal(-1, trueLabel)]
+            ELSE
+                /\  CFG' = GenerateCFG(BranchUpdate(t, FindCurrentBlock(CFG.node, pc[t]).tangle, {trueLabelVal, falseLabelVal}, falseLabelVal), CFG.edge)
+                /\  pc' = [pc EXCEPT ![t] = GetVal(-1, falseLabel)]
+    /\  UNCHANGED <<state, threadLocals, globalVars>>
 
 OpLabel(t, label) ==
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
@@ -430,7 +437,7 @@ OpLoopMerge(t, mergeLabel, continueTarget) ==
     \* because the merge instruction must be the second to last instruction in the block, we can find the currren block by looking at the termination instruction
     LET currBlock == FindBlockByTerminationIns(CFG.node, pc[t]+1)
     IN 
-        /\  UpdateBlocks(currBlock.tangle, {GetLabelPc(mergeLabel), GetLabelPc(continueTarget)})
+        /\  CFG' = GenerateCFG(MergeUpdate(currBlock.opLabelIdx, currBlock.tangle, {GetVal(-1, mergeLabel), GetVal(-1, continueTarget)}), CFG.edge)
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<state, threadLocals, globalVars>>
 
@@ -439,14 +446,15 @@ OpSelectionMerge(t, mergeLabel) ==
     \* because the merge instruction must be the second to last instruction in the block, we can find the currren block by looking at the termination instruction
     LET currBlock == FindBlockByTerminationIns(CFG.node, pc[t]+1)
     IN
-        /\  UpdateBlocks(currBlock.tangle, {GetLabelPc(mergeLabel)})
+        /\  CFG' = GenerateCFG(MergeUpdate(currBlock.opLabelIdx, currBlock.tangle, {GetVal(-1, mergeLabel)}), CFG.edge)
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<state, threadLocals, globalVars>>
 
 \* zheyuan chen: update tangle
 Terminate(t) ==
+    /\  CFG' = GenerateCFG(TerminateUpdate(t, FindBlockByTerminationIns(CFG.node, pc[t]).opLabelIdx), CFG.edge)
     /\  state' = [state EXCEPT ![t] = "terminated"]
-    /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
+    /\  UNCHANGED <<pc, threadLocals, globalVars>>
 
 ExecuteInstruction(t) ==
     LET workgroupId == WorkGroupId(t)+1
