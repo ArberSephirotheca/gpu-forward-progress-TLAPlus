@@ -2,10 +2,11 @@
 LOCAL INSTANCE Integers
 LOCAL INSTANCE Naturals
 LOCAL INSTANCE Sequences
+LOCAL INSTANCE FiniteSets
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES globalVars, threadLocals, CFG
+VARIABLES globalVars, threadLocals, CFG, MaxPathLength
 (* Layout Configuration *)
 SubgroupSize == 1
 WorkGroupSize == 1
@@ -71,6 +72,7 @@ IsIntermediate(var) ==
     /\ var.scope = "intermediate"
 
 Range(f) == { f[x] : x \in DOMAIN f }
+Max(S) == CHOOSE s \in S : \A t \in S : s >= t
 Min(S) == CHOOSE s \in S : \A t \in S : s <= t
 MinIndices(s, allowedIndices) ==
     LET allowedValues == {s[i] : i \in DOMAIN s \cap allowedIndices}
@@ -494,10 +496,81 @@ DetermineBlockType(startIdx) ==
         "None"
 
 
+RECURSIVE DFS(_, _, _, _, _)
+DFS(node, cfg, visited, finished, backEdges) ==
+    LET
+        newVisited == visited \union {node}
+        successors == {n \in DOMAIN cfg.node : <<node, n>> \in cfg.edge}
+        newBackEdges == 
+            LET
+                newLoopEdges == 
+                    {<<node, s>> : s \in visited} \cap 
+                    {<<node, s>> : s \in successors}
+            IN
+            backEdges \union {edge \in newLoopEdges: edge[2] \notin finished}
+    IN
+    IF node \in finished THEN
+        [visited |-> visited, finished |-> finished, backEdges |-> backEdges]
+    ELSE IF \A s \in successors : s \in visited
+    THEN 
+        [visited |-> newVisited, 
+         finished |-> finished \union {node}, 
+         backEdges |-> newBackEdges]
+    ELSE
+        LET
+            unvisitedSuccs == {s \in successors : s \notin visited}
+            RECURSIVE DFSAll(_, _, _, _)
+            DFSAll(nodes, v, f, b) ==
+                IF nodes = {} THEN [visited |-> v, finished |-> f, backEdges |-> b]
+                ELSE
+                    LET 
+                        next == CHOOSE n \in nodes : TRUE
+                        result == DFS(next, cfg, v, f, b)
+                    IN
+                    DFSAll(nodes \ {next}, result.visited, result.finished, result.backEdges)
+        IN
+        LET
+            result == DFSAll(unvisitedSuccs, newVisited, finished, newBackEdges)
+        IN
+        [visited |-> result.visited, 
+         finished |-> result.finished \union {node}, 
+         backEdges |-> result.backEdges]
+
+IdentifyLoops(cfg) ==
+    LET
+        startNode == CHOOSE n \in DOMAIN cfg.node : TRUE  \* Arbitrary start node
+        result == DFS(startNode, cfg, {}, {}, {})
+    IN
+    result.backEdges
+
+RECURSIVE LoopNestingDepth(_, _, _, _)
+LoopNestingDepth(node, cfg, loops, visited) ==
+    LET
+        successors == {n \in DOMAIN cfg.node : <<node, n>> \in cfg.edge}
+        loopEdges == {e \in loops : e[2] = node}
+    IN
+    IF node \in visited THEN 0  \* Prevent infinite recursion on cycles
+    ELSE IF loopEdges = {} THEN 0
+    ELSE 1 + Max({LoopNestingDepth(e[1], cfg, loops \ {e}, visited \union {node}) : e \in loopEdges})
+
+MaxLoopNestingDepth(cfg) ==
+    LET 
+        loops == IdentifyLoops(cfg)
+    IN
+    Max({LoopNestingDepth(n, cfg, loops, {}) : n \in DOMAIN cfg.node})
+
+
+SuggestedPathLength(cfg) ==
+    LET
+        loopDepth == MaxLoopNestingDepth(cfg)
+        nodeCount == Cardinality(DOMAIN cfg.node)
+    IN
+        nodeCount * (2 ^ loopDepth)
+
 \* return a set of all paths in graph G
 StructuredControlFlowPaths(G) == {
     \* fixme: we need to use ExtractOpLabelIdxSet as node are records, which are non-enumerable
-    p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), Len(CFG.node)) :
+    p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), MaxPathLength) :
         /\ p # <<>>(* p is not an empty sequence *)
         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
     }
@@ -522,7 +595,7 @@ StructuredControlFlowPaths(G) == {
 \* fixme: maximum length of the path should be sounded.
 StructuredControlFlowPathsTo(B) =={
     \* fixme: we need to use ExtractOpLabelIdxSet as node are records, which are non-enumerable
-    p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), Len(CFG.node)) :
+    p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), MaxPathLength) :
         /\ p # <<>>(* p is not an empty sequence *)
         /\ p[1] = 1
         /\ p[Len(p)] = B
@@ -661,11 +734,14 @@ MergeUpdate(currentLabelIdx, tangle, opLabelIdxSet) ==
 \*     CHOOSE i \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][i] = "OpLabel" /\ GetVal(-1, ThreadArguments[1][i][1]) = GetVal(-1, label)
     
 InitCFG == 
-    LET blocks == SelectSeq(GenerateBlocks(ThreadInstructions[1]), LAMBDA b: b.opLabelIdx # -1) 
-    IN 
-        CFG = GenerateCFG(blocks, 
+    LET blocks == SelectSeq(GenerateBlocks(ThreadInstructions[1]), LAMBDA b: b.opLabelIdx # -1)
+        graph == GenerateCFG(blocks, 
                 UNION { {<<i, target>> : target \in FindTargetBlocks(blocks[i].opLabelIdx, blocks[i].terminatedInstrIdx)} : i \in DOMAIN blocks }
                 )
+    IN 
+        /\  CFG = graph
+        /\  MaxPathLength = SuggestedPathLength(graph)
+
 InitGPU ==
     \* for spinlock
     \* /\  globalVars = {Var("global", "lock", 0, Index(-1))}

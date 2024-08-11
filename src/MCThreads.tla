@@ -4,7 +4,7 @@ LOCAL INSTANCE Naturals
 LOCAL INSTANCE Sequences
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
-VARIABLES pc, state, threadLocals, globalVars, CFG
+VARIABLES pc, state, threadLocals, globalVars, CFG, MaxPathLength
 
 (* Thread Configuration *)
 INSTANCE  MCProgram
@@ -73,7 +73,7 @@ GetGlobalId(t, result) ==
             \/  IsIntermediate(mangledResult)
         /\  Assignment(t, {Var(mangledResult.scope, mangledResult.name, GlobalInvocationId(t), Index(-1))})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state>>
+        /\  UNCHANGED <<state, MaxPathLength>>
 
 
 \* It does not handle the situation where result is an index to array
@@ -113,7 +113,7 @@ OpAtomicLoad(t, result, pointer) ==
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, Index(-1))})  
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
 OpAtomicStore(t, pointer, value) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -132,7 +132,7 @@ OpAtomicStore(t, pointer, value) ==
                     ELSE
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, EvalExpr(t, WorkGroupId(t)+1, value), pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
 OpAtomicAdd(t, pointer) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -149,7 +149,7 @@ OpAtomicAdd(t, pointer) ==
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value + 1, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
 
 OpAtomicSub(t, pointer) == 
@@ -166,7 +166,7 @@ OpAtomicSub(t, pointer) ==
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value - 1, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
  OpControlBarrier(t, scope) ==
     IF scope = "subgroup" THEN \* already waiting at a subgroup barrier
@@ -179,7 +179,7 @@ OpAtomicSub(t, pointer) ==
             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
             ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                 /\  state' = [state EXCEPT ![t] = "subgroup"]
-                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
+                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
             \* if all threads in the subgroup are waiting at the barrier, release them
             ELSE 
                 \* release all barrier in the subgroup, marking state as ready
@@ -198,7 +198,7 @@ OpAtomicSub(t, pointer) ==
                             ELSE 
                                 pc[tid]
                     ]
-                /\  UNCHANGED <<threadLocals, globalVars, CFG>>
+                /\  UNCHANGED <<threadLocals, globalVars, CFG, MaxPathLength>>
 
     ELSE IF scope = "workgroup" THEN \* already waiting at a workgroup barrier
         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
@@ -206,7 +206,7 @@ OpAtomicSub(t, pointer) ==
             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
             IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
+                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
             \* if all threads in the subgroup are waiting at the barrier, release them
             ELSE 
                 \* release all barrier in the subgroup, marking state as ready
@@ -225,7 +225,7 @@ OpAtomicSub(t, pointer) ==
                             ELSE 
                                 pc[tid]
                     ]
-                /\  UNCHANGED <<threadLocals, globalVars, CFG>>
+                /\  UNCHANGED <<threadLocals, globalVars, CFG, MaxPathLength>>
     ELSE    
         FALSE
 
@@ -248,7 +248,7 @@ OpGroupAll(t, result, predicate, scope) ==
                         \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
+                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
                         ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -286,7 +286,7 @@ OpGroupAll(t, result, predicate, scope) ==
                     IN      \* if there is a thread that has not reached the opgroupAll, return false
                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
                                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG>>
+                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
                             ELSE IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -351,7 +351,7 @@ OpAtomicExchange(t, result, pointer, value) ==
                 ELSE
                     Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
 (* result and pointer are variable, compare and value are literal *)
 OpAtomicCompareExchange(t, result, pointer, compare, value) ==
@@ -393,7 +393,7 @@ OpAtomicCompareExchange(t, result, pointer, compare, value) ==
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
 
 (* zheyuan chen: invocation is escaped from reconvergence if: 
@@ -410,7 +410,7 @@ OpBranch(t, label) ==
             CFG' = GenerateCFG(BranchUpdate(t, curBlock.tangle, {labelVal}, labelVal), CFG.edge) 
         
     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
-    /\  UNCHANGED <<state, threadLocals, globalVars>>
+    /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
 
 (* condition is an expression, trueLabel and falseLabel are integer representing pc *)
 OpBranchConditional(t, condition, trueLabel, falseLabel) ==
@@ -426,11 +426,11 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
             ELSE
                 /\  CFG' = GenerateCFG(BranchUpdate(t, FindCurrentBlock(CFG.node, pc[t]).tangle, {trueLabelVal, falseLabelVal}, falseLabelVal), CFG.edge)
                 /\  pc' = [pc EXCEPT ![t] = GetVal(-1, falseLabel)]
-    /\  UNCHANGED <<state, threadLocals, globalVars>>
+    /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
 
 OpLabel(t, label) ==
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-    /\  UNCHANGED <<state, threadLocals, globalVars, CFG>>
+    /\  UNCHANGED <<state, threadLocals, globalVars, CFG, MaxPathLength>>
 
 (* structured loop, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block *)
 OpLoopMerge(t, mergeLabel, continueTarget) ==
@@ -439,7 +439,7 @@ OpLoopMerge(t, mergeLabel, continueTarget) ==
     IN 
         /\  CFG' = GenerateCFG(MergeUpdate(currBlock.opLabelIdx, currBlock.tangle, {GetVal(-1, mergeLabel), GetVal(-1, continueTarget)}), CFG.edge)
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, threadLocals, globalVars>>
+        /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
 
 (* structured switch/if, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block  *)
 OpSelectionMerge(t, mergeLabel) ==
@@ -448,13 +448,13 @@ OpSelectionMerge(t, mergeLabel) ==
     IN
         /\  CFG' = GenerateCFG(MergeUpdate(currBlock.opLabelIdx, currBlock.tangle, {GetVal(-1, mergeLabel)}), CFG.edge)
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, threadLocals, globalVars>>
+        /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
 
 \* zheyuan chen: update tangle
 Terminate(t) ==
     /\  CFG' = GenerateCFG(TerminateUpdate(t, FindBlockByTerminationIns(CFG.node, pc[t]).opLabelIdx), CFG.edge)
     /\  state' = [state EXCEPT ![t] = "terminated"]
-    /\  UNCHANGED <<pc, threadLocals, globalVars>>
+    /\  UNCHANGED <<pc, threadLocals, globalVars, MaxPathLength>>
 
 ExecuteInstruction(t) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -465,7 +465,7 @@ ExecuteInstruction(t) ==
             ELSE IF ThreadInstructions[t][pc[t]] = "Assignment" THEN
                 /\  Assignment(t, {Mangle(t, ThreadArguments[t][pc[t]][1])})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, CFG>>
+                /\  UNCHANGED <<state, CFG, MaxPathLength>>
             ELSE IF ThreadInstructions[t][pc[t]] = "GetGlobalId" THEN
                 GetGlobalId(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicAdd" THEN
@@ -499,7 +499,7 @@ ExecuteInstruction(t) ==
             ELSE
                 FALSE
         ELSE 
-            /\ UNCHANGED << threadVars, threadLocals, globalVars, CFG>>
+            /\ UNCHANGED << threadVars, threadLocals, globalVars, CFG, MaxPathLength>>
 
 
 (* This property ensures all the instructions in all threads are bounded to the instruction set *)

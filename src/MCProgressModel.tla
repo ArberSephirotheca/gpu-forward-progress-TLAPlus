@@ -3,7 +3,7 @@ EXTENDS Integers, Naturals, Sequences, MCThreads, TLC
 
 VARIABLES fairExecutionSet, selected
 
-vars == <<fairExecutionSet, pc, state, selected, threadLocals, globalVars, CFG>>
+vars == <<fairExecutionSet, pc, state, selected, threadLocals, globalVars, CFG, MaxPathLength>>
 
 
 InitOBE ==
