@@ -387,7 +387,7 @@ ThreadArguments == [t \in 1..NumThreads |->
 <<Var("literal", "D", 13, Index(-1)), Var("literal", "continue", 11, Index(-1))>>,
 <<Var("literal", "A", 4, Index(-1))>>,
 <<Var("literal", "A", 4, Index(-1))>>,
-<<Var("literal", "C", 5, Index(-1))>>,
+<<Var("literal", "C", 9, Index(-1))>>,
 <<Var("literal", "", TRUE, Index(-1)), Var("literal", "B", 7, Index(-1)), Var("literal", "C", 9, Index(-1))>>,
 <<Var("literal", "B", 7, Index(-1))>>,
 <<Var("literal", "D", 13, Index(-1))>>,
@@ -496,11 +496,12 @@ DetermineBlockType(startIdx) ==
         "None"
 
 
+\* node is the index to the opLabel
 RECURSIVE DFS(_, _, _, _, _)
 DFS(node, cfg, visited, finished, backEdges) ==
     LET
         newVisited == visited \union {node}
-        successors == {n \in DOMAIN cfg.node : <<node, n>> \in cfg.edge}
+        successors == {n \in ExtractOpLabelIdxSet(cfg.node) : <<node, n>> \in cfg.edge}
         newBackEdges == 
             LET
                 newLoopEdges == 
@@ -536,6 +537,8 @@ DFS(node, cfg, visited, finished, backEdges) ==
          finished |-> result.finished \union {node}, 
          backEdges |-> result.backEdges]
 
+\* Given a CFG, identify all the back edges in the CFG
+\* Node is the index to the opLabel
 IdentifyLoops(cfg) ==
     LET
         startNode == 1 \* Start from the entry block
@@ -546,7 +549,7 @@ IdentifyLoops(cfg) ==
 RECURSIVE LoopNestingDepth(_, _, _, _)
 LoopNestingDepth(node, cfg, loops, visited) ==
     LET
-        successors == {n \in DOMAIN cfg.node : <<node, n>> \in cfg.edge}
+        successors == {n \in ExtractOpLabelIdxSet(cfg.node) : <<node, n>> \in cfg.edge}
         loopEdges == {e \in loops : e[2] = node}
     IN
     IF node \in visited THEN 0  \* Prevent infinite recursion on cycles
@@ -557,7 +560,7 @@ MaxLoopNestingDepth(cfg) ==
     LET 
         loops == IdentifyLoops(cfg)
     IN
-    Max({LoopNestingDepth(n, cfg, loops, {}) : n \in DOMAIN cfg.node})
+    Max({LoopNestingDepth(n, cfg, loops, {}) : n \in ExtractOpLabelIdxSet(cfg.node)})
 
 
 SuggestedPathLength(cfg) ==
@@ -567,10 +570,25 @@ SuggestedPathLength(cfg) ==
     IN
         nodeCount * (2 ^ loopDepth)
 
+
+RECURSIVE GeneratePaths(_, _, _)
+GeneratePaths(node, cfg, length) ==
+  IF length = 0 THEN {<<>>}
+  ELSE
+    LET 
+      successors == {n \in ExtractOpLabelIdxSet(cfg.node) : <<node, n>> \in cfg.edge}
+      subpaths == UNION {GeneratePaths(s, cfg, length - 1) : s \in successors}
+    IN
+    {<<node>> \o path : path \in subpaths}
+
+ValidPaths(startNode, cfg, maxPathLength) == 
+    UNION {GeneratePaths(startNode, cfg, len) : len \in 1..MaxPathLength}
+
 \* return a set of all paths in graph G
 StructuredControlFlowPaths(G) == {
     \* fixme: we need to use ExtractOpLabelIdxSet as node are records, which are non-enumerable
-    p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), MaxPathLength) :
+    \* p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), MaxPathLength) :
+    p \in ValidPaths(1, CFG, MaxPathLength) :
         /\ p # <<>>(* p is not an empty sequence *)
         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
     }
@@ -595,7 +613,8 @@ StructuredControlFlowPaths(G) == {
 \* fixme: maximum length of the path should be sounded.
 StructuredControlFlowPathsTo(B) =={
     \* fixme: we need to use ExtractOpLabelIdxSet as node are records, which are non-enumerable
-    p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), MaxPathLength) :
+    \* p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), MaxPathLength) :
+    p \in ValidPaths(1, CFG, MaxPathLength) :
         /\ p # <<>>(* p is not an empty sequence *)
         /\ p[1] = 1
         /\ p[Len(p)] = B
@@ -736,7 +755,7 @@ MergeUpdate(currentLabelIdx, tangle, opLabelIdxSet) ==
 InitCFG == 
     LET blocks == SelectSeq(GenerateBlocks(ThreadInstructions[1]), LAMBDA b: b.opLabelIdx # -1)
         graph == GenerateCFG(blocks, 
-                UNION { {<<i, target>> : target \in FindTargetBlocks(blocks[i].opLabelIdx, blocks[i].terminatedInstrIdx)} : i \in DOMAIN blocks }
+                UNION { {<<blocks[i].opLabelIdx, target>> : target \in FindTargetBlocks(blocks[i].opLabelIdx, blocks[i].terminatedInstrIdx)} : i \in DOMAIN blocks }
                 )
     IN 
         /\  CFG = graph
