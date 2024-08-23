@@ -15,7 +15,7 @@ earthly bootstrap
 ```
 Then, run following to see the output
 ```bash
-earthly +tlaplus-image --OUT<format>
+earthly +tlaplus-image --OUT <format>
 ```
 ## Command Line Option
 - *format*: text, dot, all

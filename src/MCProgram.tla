@@ -223,6 +223,20 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
                 ELSE
                     FALSE
 
+GlobalInvocationId(tid) == tid-1
+
+LocalInvocationId(tid) == GlobalInvocationId(tid) % WorkGroupSize
+
+WorkGroupId(tid) == GlobalInvocationId(tid) \div WorkGroupSize
+    
+SubgroupId(tid) == LocalInvocationId(tid) \div SubgroupSize
+
+SubgroupInovcationId(tid) == LocalInvocationId(tid) % SubgroupSize
+
+ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
+
+ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
+
 (* Thread Configuration *)
 InstructionSet == {"Assignment", "GetGlobalId", "OpAtomicLoad", "OpAtomicStore", "OpAtomicAdd" , "OpAtomicSub", "OpGroupAll", 
 "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpControlBarrier", "OpLoopMerge",
@@ -445,6 +459,9 @@ ExtractOpLabelIdxSet(blocks) ==
 \* make non-order-sensitive sequence becomes enumerable
 SeqToSet(seq) == { seq[i]: i \in 1..Len(seq) }
 
+\* update the sequence of sets
+newSeqOfSets(seq, idx, newSet) == [seq EXCEPT ![idx] = newSet]
+
 \* BoundedSeq: return a set of all sequences of length at most n, this helps to make the sequence enumerable
 BoundedSeq(S, N) == UNION { [1..n -> S]: n \in 0..N}
 
@@ -638,10 +655,10 @@ GenerateBlocks(insts) ==
   [i \in 1..Len(insts) |-> 
      IF IsOpLabel(insts[i]) THEN 
        LET terminationIndex == Min({j \in i+1..Len(insts) : IsTerminationInstruction(insts[j])} \cup {Len(insts)})
-           tangle == IF i = 1 THEN {t : t \in 1..NumThreads} ELSE {}  (* First OpLabel includes all threads as tangle *)
+           tangle == IF i = 1 THEN [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroup(wg-1)] ELSE [wg \in 1..NumWorkGroups |-> {}]  (* First OpLabel includes all threads as tangle *)
        IN 
             Block(i, terminationIndex, tangle, DetermineBlockType(i))
-     ELSE Block(-1, <<>>, {}, "None")
+     ELSE Block(-1, <<>>, <<>>, "None")
   ]
 
 
@@ -702,32 +719,37 @@ FindHeaderBlocks(mergeBlock) ==
 
 \* Rule 4: If there exists OpKill in the block, then remove thread itself from the tangle of all merge blocks as well as current block
 \* for every header block that structurally dominates the current block
-TerminateUpdate(t, currentLabelIdx) ==
+TerminateUpdate(wgid, t, currentLabelIdx) ==
     [i \in 1..Len(CFG.node) |->
-        IF IsMergeBlock(CFG.node[i]) /\ (\E block \in FindHeaderBlocks(CFG.node[i]) : StrictlyStructurallyDominates(block.opLabelIdx, currentLabelIdx)) THEN
-            Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, CFG.node[i].tangle \ {t}, CFG.node[i].type)
+        IF IsMergeBlock(CFG.node[i]) /\ (\E block \in FindHeaderBlocks(CFG.node[i]) : 
+            StrictlyStructurallyDominates(block.opLabelIdx, currentLabelIdx)) 
+        THEN
+            \* Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, CFG.node[i].tangle \ {t}, CFG.node[i].type)
+            Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), CFG.node[i].type)
         ELSE
             CFG.node[i]
     ] 
 
 \* BranchUpdate: update the tangle of the blocks that are pointed by the branch instruction
-\* tangle is the tangle that is going to be updated to the blocks
+\* tangle is the tangle that is going to be updated to the blocks, each workgroup has its own tangle
 \* opLabelIdxSet is the set of indices to the opLabel instructions that are pointed by the branch instruction
 \* choosenBranchIdx is the index to the opLabel instruction that is choosen by the branch instruction
-BranchUpdate(t, tangle, opLabelIdxSet, choosenBranchIdx) ==
+BranchUpdate(wgid, t, tangle, opLabelIdxSet, choosenBranchIdx) ==
     [i \in 1..Len(CFG.node) |-> 
         IF CFG.node[i].opLabelIdx \in opLabelIdxSet THEN
             \* rule 2: If a thread reaches a branch instruction and the block it points to has empty tangle, update the tangle of tha block to the tangle of the merge instruction
             \* And remove the thread itself from the tangle of unchoosen block if that block is not a merge block
-            IF CFG.node[i].tangle = {} THEN
+            IF CFG.node[i].tangle[wgid] = {} THEN
                 \* unchoosen block and is not a merge block
                 IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].type # "Merge" THEN
-                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, tangle \ {t}, CFG.node[i].type)
+                    \* Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, tangle \ {t}, CFG.node[i].type)
+                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].type)
                 ELSE
-                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, tangle, CFG.node[i].type)
+                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].type)
             \* rule 3: If the unchoosen block has non-empty tangle and is not a merge block, remove the thread from the tangle
             ELSE IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].type # "Merge" THEN
-                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, CFG.node[i].tangle \ {t}, CFG.node[i].type)
+                \* Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, CFG.node[i].tangle \ {t}, CFG.node[i].type)
+                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].type)
             ELSE 
                 CFG.node[i]
         ELSE 
@@ -735,12 +757,12 @@ BranchUpdate(t, tangle, opLabelIdxSet, choosenBranchIdx) ==
     ]
 
 \* Helper function that return the updated blocks in CFG regarding the merge instruction
-MergeUpdate(currentLabelIdx, tangle, opLabelIdxSet) ==
+MergeUpdate(wgid, currentLabelIdx, tangle, opLabelIdxSet) ==
     [i \in 1..Len(CFG.node) |-> 
         IF CFG.node[i].opLabelIdx \in opLabelIdxSet THEN
             \* rule 1: If a thread reaches a merge instruction and the block it points to has empty tangle, update the tangle of tha block to the tangle of the merge instruction
-            IF CFG.node[i].tangle = {} THEN
-                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, tangle, CFG.node[i].type) 
+            IF CFG.node[i].tangle[wgid] = {} THEN
+                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].type) 
             ELSE 
                 CFG.node[i]
         ELSE
@@ -772,16 +794,6 @@ InitGPU ==
 InitProgram ==
     /\ InitCFG
     /\ InitGPU
-
-GlobalInvocationId(tid) == tid-1
-
-LocalInvocationId(tid) == GlobalInvocationId(tid) % WorkGroupSize
-
-WorkGroupId(tid) == GlobalInvocationId(tid) \div WorkGroupSize
-    
-SubgroupId(tid) == LocalInvocationId(tid) \div SubgroupSize
-
-SubgroupInovcationId(tid) == LocalInvocationId(tid) % SubgroupSize
 
 ====
 

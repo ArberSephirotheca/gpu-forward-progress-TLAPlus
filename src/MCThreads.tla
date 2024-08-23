@@ -22,9 +22,9 @@ InitThreadVars ==
 InitThreads == 
     /\  InitThreadVars
 
-ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
+\* ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
 
-ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
+\* ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
 
 LowestPcWithinSubgroup(sid, wgid) == Min({pc[tid]: tid \in ThreadsWithinSubgroup(sid, wgid)})
 
@@ -172,7 +172,7 @@ OpAtomicSub(t, pointer) ==
     IF scope = "subgroup" THEN \* already waiting at a subgroup barrier
         \* find all threads and their corresponding barrier state within the same subgroup
         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
-            currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle
+            currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle[WorkGroupId(t) + 1]
         IN
             IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
                 Print("UB: All threads within subgroup must converge at current block", FALSE)
@@ -241,7 +241,7 @@ OpGroupAll(t, result, predicate, scope) ==
         /\  scope \in ScopeOperand
         /\  IF scope = "subgroup" THEN
                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
-                        currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle
+                        currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle[WorkGroupId(t) + 1]
                     IN
                         IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
                                 Print("UB: All threads within subgroup must converge at current block", FALSE)
@@ -406,8 +406,9 @@ OpBranch(t, label) ==
     /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
             targetBlock == FindBlockbyOpLabelIdx(CFG.node, GetVal(-1, label))
             labelVal == GetVal(-1, label)
+            workGroupId == WorkGroupId(t)+1
         IN
-            CFG' = GenerateCFG(BranchUpdate(t, curBlock.tangle, {labelVal}, labelVal), CFG.edge) 
+            CFG' = GenerateCFG(BranchUpdate(workGroupId, t, curBlock.tangle[workGroupId], {labelVal}, labelVal), CFG.edge) 
         
     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
     /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
@@ -419,12 +420,13 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
     /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
             trueLabelVal == GetVal(-1, trueLabel)
             falseLabelVal == GetVal(-1, falseLabel)
+            workGroupId == WorkGroupId(t)+1
         IN
             IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
-                /\  CFG' = GenerateCFG(BranchUpdate(t, FindCurrentBlock(CFG.node, pc[t]).tangle, {trueLabelVal, falseLabelVal}, trueLabelVal), CFG.edge)
+                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, trueLabelVal), CFG.edge)
                 /\  pc' = [pc EXCEPT ![t] = GetVal(-1, trueLabel)]
             ELSE
-                /\  CFG' = GenerateCFG(BranchUpdate(t, FindCurrentBlock(CFG.node, pc[t]).tangle, {trueLabelVal, falseLabelVal}, falseLabelVal), CFG.edge)
+                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, falseLabelVal), CFG.edge)
                 /\  pc' = [pc EXCEPT ![t] = GetVal(-1, falseLabel)]
     /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
 
@@ -436,8 +438,9 @@ OpLabel(t, label) ==
 OpLoopMerge(t, mergeLabel, continueTarget) ==
     \* because the merge instruction must be the second to last instruction in the block, we can find the currren block by looking at the termination instruction
     LET currBlock == FindBlockByTerminationIns(CFG.node, pc[t]+1)
+        workGroupId == WorkGroupId(t)+1
     IN 
-        /\  CFG' = GenerateCFG(MergeUpdate(currBlock.opLabelIdx, currBlock.tangle, {GetVal(-1, mergeLabel), GetVal(-1, continueTarget)}), CFG.edge)
+        /\  CFG' = GenerateCFG(MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel), GetVal(-1, continueTarget)}), CFG.edge)
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
 
@@ -445,16 +448,19 @@ OpLoopMerge(t, mergeLabel, continueTarget) ==
 OpSelectionMerge(t, mergeLabel) ==
     \* because the merge instruction must be the second to last instruction in the block, we can find the currren block by looking at the termination instruction
     LET currBlock == FindBlockByTerminationIns(CFG.node, pc[t]+1)
+        workGroupId == WorkGroupId(t)+1
     IN
-        /\  CFG' = GenerateCFG(MergeUpdate(currBlock.opLabelIdx, currBlock.tangle, {GetVal(-1, mergeLabel)}), CFG.edge)
+        /\  CFG' = GenerateCFG(MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel)}), CFG.edge)
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
 
 \* zheyuan chen: update tangle
 Terminate(t) ==
-    /\  CFG' = GenerateCFG(TerminateUpdate(t, FindBlockByTerminationIns(CFG.node, pc[t]).opLabelIdx), CFG.edge)
-    /\  state' = [state EXCEPT ![t] = "terminated"]
-    /\  UNCHANGED <<pc, threadLocals, globalVars, MaxPathLength>>
+    LET workgroupId == WorkGroupId(t)+1
+    IN
+        /\  CFG' = GenerateCFG(TerminateUpdate(workgroupId, t, FindBlockByTerminationIns(CFG.node, pc[t]).opLabelIdx), CFG.edge)
+        /\  state' = [state EXCEPT ![t] = "terminated"]
+        /\  UNCHANGED <<pc, threadLocals, globalVars, MaxPathLength>>
 
 ExecuteInstruction(t) ==
     LET workgroupId == WorkGroupId(t)+1
