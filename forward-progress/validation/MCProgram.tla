@@ -11,11 +11,10 @@ VARIABLES globalVars, threadLocals, CFG, MaxPathLength
 SubgroupSize == 1
 WorkGroupSize == 1
 NumWorkGroups == 2
+Scheduler == "OBE"
 NumThreads == WorkGroupSize * NumWorkGroups
 
 Threads == {tid : tid \in 1..NumThreads}
-
-Scheduler == "OBE"
 
 
 (* Variable *)
@@ -240,10 +239,14 @@ ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \i
 (* Thread Configuration *)
 InstructionSet == {"Assignment", "GetGlobalId", "OpAtomicLoad", "OpAtomicStore", "OpAtomicAdd" , "OpAtomicSub", "OpGroupAll", 
 "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpControlBarrier", "OpLoopMerge",
-"OpSelectionMerge", "OpLabel", "Terminate"}
+"OpSelectionMerge", "OpLabel", "Terminate", "OpEqual", "OpNotEqual", "OpLess", "OpLessOrEqual", "OpGreater",
+"OpGreaterOrEqual", "OpAdd", "OpSub", "OpMul", "Indexing"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup", "tangle"}
 BlockTypeSet == {"Merge", "None"}
+
+
+(*Program *)
 \* (* spinlock test *)
 \* ThreadInstructions ==  [t \in 1..NumThreads |-> <<"Assignment", "OpAtomicCompareExchange", "OpBranchConditional", "OpAtomicStore", "Terminate">> ]
 \* ThreadArguments == [t \in 1..NumThreads |-> <<
@@ -783,6 +786,7 @@ InitCFG ==
         /\  CFG = graph
         /\  MaxPathLength = SuggestedPathLength(graph)
 
+(* Global Variables *)
 InitGPU ==
     \* for spinlock
     \* /\  globalVars = {Var("global", "lock", 0, Index(-1))}

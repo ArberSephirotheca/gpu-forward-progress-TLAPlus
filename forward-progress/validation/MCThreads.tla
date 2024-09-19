@@ -62,6 +62,143 @@ ChangeElementAt(var, index, value) ==
         Var(var.scope, var.name, [currentIndex \in DOMAIN var.value |-> IF currentIndex = index THEN value ELSE var.value[currentIndex] ], var.index)
 
 
+OpEqual(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val = operand2Val THEN
+                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+
+OpNotEqual(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val # operand2Val THEN
+                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+
+OpLess(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val < operand2Val THEN
+                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpLessOrEqual(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val <= operand2Val THEN
+                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpGreater(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val > operand2Val THEN
+                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpGreaterOrEqual(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val >= operand2Val THEN
+                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpAdd(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                Assignment(t, {Var(var.scope, var.name, operand1Val + operand2Val, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpSub(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                Assignment(t, {Var(var.scope, var.name, operand1Val - operand2Val, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpMul(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                Assignment(t, {Var(var.scope, var.name, operand1Val * operand2Val, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
 
 GetGlobalId(t, result) ==
     LET mangledResult == Mangle(t, result)
