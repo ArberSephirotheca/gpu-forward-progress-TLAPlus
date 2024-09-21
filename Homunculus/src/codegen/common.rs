@@ -60,7 +60,7 @@ impl Display for InstructionName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InstructionName::Assignment => write!(f, "Assignment"),
-            InstructionName::Return => write!(f, "Return"),
+            InstructionName::Return => write!(f, "Terminate"),
             // InstructionName::Load => write!(f, "OpLoad"),
             // InstructionName::Store => write!(f, "OpStore"),
             InstructionName::Load | InstructionName::AtomicLoad => write!(f, "OpAtomicLoad"),

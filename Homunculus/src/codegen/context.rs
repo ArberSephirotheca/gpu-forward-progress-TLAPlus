@@ -1216,7 +1216,7 @@ impl CodegenCx {
                     .index(IndexKind::Literal(-1))
                     .name(var_name)
                     .scope(VariableScope::Global)
-                    .value(InstructionValue::None)
+                    .value(InstructionValue::Int(self.current_inst_position as i32))
                     .build()
                     .unwrap();
 
