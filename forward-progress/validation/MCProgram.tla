@@ -8,13 +8,14 @@ LOCAL INSTANCE TLC
 
 VARIABLES globalVars, threadLocals, CFG, MaxPathLength
 (* Layout Configuration *)
-SubgroupSize == 1
-WorkGroupSize == 1
-NumWorkGroups == 2
-Scheduler == "OBE"
-NumThreads == WorkGroupSize * NumWorkGroups
+
+\* NumThreads == WorkGroupSize * NumWorkGroups
 
 Threads == {tid : tid \in 1..NumThreads}
+\* SubgroupSize == 1
+\* WorkGroupSize == 1
+\* NumWorkGroups == 2
+\* Scheduler == "OBE"
 
 
 (* Variable *)
@@ -381,40 +382,42 @@ BlockTypeSet == {"Merge", "None"}
 
 
 (* maximal reconvergence test *)
-ThreadInstructions ==  [t \in 1..NumThreads |-> 
-<<
-"OpLabel",
-"OpLoopMerge",
-"OpBranch",
-"OpLabel",
-"OpSelectionMerge",
-"OpBranchConditional",
-"OpLabel",
-"OpBranch",
-"OpLabel",
-"OpBranch",
-"OpLabel",
-"OpBranch",
-"OpLabel",
-"Terminate"
->>]
-ThreadArguments == [t \in 1..NumThreads |-> 
-<<
-<<Var("literal", "loop", 1, Index(-1))>>,
-<<Var("literal", "D", 13, Index(-1)), Var("literal", "continue", 11, Index(-1))>>,
-<<Var("literal", "A", 4, Index(-1))>>,
-<<Var("literal", "A", 4, Index(-1))>>,
-<<Var("literal", "C", 9, Index(-1))>>,
-<<Var("literal", "", TRUE, Index(-1)), Var("literal", "B", 7, Index(-1)), Var("literal", "C", 9, Index(-1))>>,
-<<Var("literal", "B", 7, Index(-1))>>,
-<<Var("literal", "D", 13, Index(-1))>>,
-<<Var("literal", "C", 9, Index(-1))>>,
-<<Var("literal", "continue", 11, Index(-1))>>,
-<<Var("literal", "continue", 11, Index(-1))>>,
-<<Var("literal", "loop", 1, Index(-1))>>,
-<<Var("literal", "D", 13, Index(-1))>>,
-<<>>
->>]
+\* ThreadInstructions ==  [t \in 1..NumThreads |-> 
+\* <<
+\* "OpLabel",
+\* "OpLoopMerge",
+\* "OpBranch",
+\* "OpLabel",
+\* "OpSelectionMerge",
+\* "OpBranchConditional",
+\* "OpLabel",
+\* "OpBranch",
+\* "OpLabel",
+\* "OpBranch",
+\* "OpLabel",
+\* "OpBranch",
+\* "OpLabel",
+\* "Terminate"
+\* >>]
+\* ThreadArguments == [t \in 1..NumThreads |-> 
+\* <<
+\* <<Var("literal", "loop", 1, Index(-1))>>,
+\* <<Var("literal", "D", 13, Index(-1)), Var("literal", "continue", 11, Index(-1))>>,
+\* <<Var("literal", "A", 4, Index(-1))>>,
+\* <<Var("literal", "A", 4, Index(-1))>>,
+\* <<Var("literal", "C", 9, Index(-1))>>,
+\* <<Var("literal", "", TRUE, Index(-1)), Var("literal", "B", 7, Index(-1)), Var("literal", "C", 9, Index(-1))>>,
+\* <<Var("literal", "B", 7, Index(-1))>>,
+\* <<Var("literal", "D", 13, Index(-1))>>,
+\* <<Var("literal", "C", 9, Index(-1))>>,
+\* <<Var("literal", "continue", 11, Index(-1))>>,
+\* <<Var("literal", "continue", 11, Index(-1))>>,
+\* <<Var("literal", "loop", 1, Index(-1))>>,
+\* <<Var("literal", "D", 13, Index(-1))>>,
+\* <<>>
+\* >>]
+
+(* Program *)
 
 INSTANCE ProgramConf
 
@@ -786,14 +789,15 @@ InitCFG ==
         /\  CFG = graph
         /\  MaxPathLength = SuggestedPathLength(graph)
 
+\* InitGPU ==
+\*     \* for spinlock
+\*     \* /\  globalVars = {Var("global", "lock", 0, Index(-1))}
+\*     \* for producer-consumer
+\*     /\  globalVars = {Var("global", "msg", 0, Index(-1))}
+\*     \* decoupled lookback
+\*     \* /\ globalVars = {Var("global", "partition", 0, Index(-1)), Var("global", "result", [t \in 1..NumThreads |-> 0], Index(0)), Var("global", "workgroupPartition", [wg \in 1..NumWorkGroups |-> 0], Index(0))}
+
 (* Global Variables *)
-InitGPU ==
-    \* for spinlock
-    \* /\  globalVars = {Var("global", "lock", 0, Index(-1))}
-    \* for producer-consumer
-    /\  globalVars = {Var("global", "msg", 0, Index(-1))}
-    \* decoupled lookback
-    \* /\ globalVars = {Var("global", "partition", 0, Index(-1)), Var("global", "result", [t \in 1..NumThreads |-> 0], Index(0)), Var("global", "workgroupPartition", [wg \in 1..NumWorkGroups |-> 0], Index(0))}
 
 InitProgram ==
     /\ InitCFG

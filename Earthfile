@@ -1,12 +1,18 @@
 VERSION 0.6
 
 ARG OUT=text
+ARG SG_SIZE=1
+ARG WG_SIZE=1
+ARG NUM_WG=1
+ARG SCH='HSA'
 
 ARG INPUT
 
 tlaplusbuild-image:
     FROM openjdk:23-slim
     RUN apt-get update && apt-get install -y git bash sudo curl graphviz clang cmake
+    RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+    ENV PATH="/root/.cargo/bin:${PATH}"
     RUN git clone https://github.com/pmer/tla-bin.git
     RUN git clone https://github.com/KhronosGroup/glslang.git
     WORKDIR /tla-bin
@@ -25,7 +31,12 @@ tlaplus-image:
     FROM +tlaplusbuild-image
     WORKDIR /workdir
     COPY forward-progress forward-progress
-    RUN echo $INPUT
+    COPY Homunculus Homunculus
+    RUN CARGO_TARGET_DIR=Homunculus/target cargo build --release --manifest-path=Homunculus/Cargo.toml
+    RUN echo $SG_SIZE
+    RUN echo $WG_SIZE
+    RUN echo $NUM_WG
+    RUN echo $SCH
     IF [ "$INPUT" = "" ]
         RUN echo "No input file provided"
     ELSE
@@ -33,6 +44,7 @@ tlaplus-image:
         RUN /glslang/build/install/bin/glslang -V $INPUT -o $INPUT.spv
         RUN /glslang/build/install/bin/spirv-dis $INPUT.spv > spirv-asm.txt 2>&1 || true
     END
+    RUN Homunculus/target/release/homunculus ./spirv-asm.txt $SG_SIZE $WG_SIZE $NUM_WG $SCH
     IF [ "$OUT" = "text" ]
         RUN tlc forward-progress/validation/MCProgressModel  > output.txt 2>&1 || true
     ELSE IF [ "$OUT" = "dot" ]
@@ -45,3 +57,4 @@ tlaplus-image:
     END
     SAVE ARTIFACT output.* AS LOCAL ./build/
     SAVE ARTIFACT spirv-asm.txt AS LOCAL ./build/
+    SAVE ARTIFACT forward-progress/validation/MCProgram.tla AS LOCAL ./build/
