@@ -78,6 +78,21 @@ impl CodegenCx {
         self.label_table.lookup(label)
     }
 
+    fn construct_instruction_value(info : VariableInfo) ->InstructionValue{
+        if info.is_builtin(){
+            InstructionValue::BuiltIn(InstructionBuiltInVariable::cast(
+                info.get_builtin().unwrap(),
+            ))
+        }else if info.is_constant(){
+            match info.get_constant_info(){
+                ConstantInfo::Int { width: _, signed: _, value: val } => InstructionValue::Int(val),
+                ConstantInfo::Bool { value: val } => InstructionValue::Bool(val),
+            }
+        } else{
+            info.ty.default_instruction_value()
+        }
+
+    }
     /// get_from_spirv_type will return the InstructionValueType and index for the given SpirvType.
     pub fn get_from_spirv_type(&self, spirv_type: &SpirvType) -> (InstructionValue, IndexKind) {
         match spirv_type {
@@ -1216,7 +1231,7 @@ impl CodegenCx {
                     .index(IndexKind::Literal(-1))
                     .name(var_name)
                     .scope(VariableScope::Global)
-                    .value(InstructionValue::Int(self.current_inst_position as i32))
+                    .value(InstructionValue::Int((self.current_inst_position + 1) as i32))
                     .build()
                     .unwrap();
 
@@ -1252,14 +1267,7 @@ impl CodegenCx {
                 // second arg is the pointer to load from
                 let pointer = inst_arg2_builder
                     .name(pointer_ssa_id.text().to_string() /* .get_var_name()*/)
-                    .value(if pointer_info.is_builtin() {
-                        InstructionValue::BuiltIn(InstructionBuiltInVariable::cast(
-                            pointer_info.get_builtin().unwrap(),
-                        ))
-                    } else {
-                        // as we are loading from a pointer, the value should be None
-                        InstructionValue::None
-                    })
+                    .value(Self::construct_instruction_value(pointer_info.clone()))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
@@ -1295,14 +1303,7 @@ impl CodegenCx {
                 // second arg is the pointer to load from
                 let pointer = inst_arg2_builder
                     .name(pointer_ssa_id.text().to_string() /* .get_var_name()*/)
-                    .value(if pointer_info.is_builtin() {
-                        InstructionValue::BuiltIn(InstructionBuiltInVariable::cast(
-                            pointer_info.get_builtin().unwrap(),
-                        ))
-                    } else {
-                        // as we are loading from a pointer, the value should be None
-                        InstructionValue::None
-                    })
+                    .value(Self::construct_instruction_value(pointer_info.clone()))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()

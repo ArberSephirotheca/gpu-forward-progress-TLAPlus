@@ -4,11 +4,11 @@ use super::constant::Constant;
 use crate::compiler::parse::symbol_table::{
     BuiltInVariable, ConstantInfo, StorageClass, VariableInfo,
 };
-use std::fs;
 use camino::Utf8Path;
 use eyre::{eyre, Report, Result};
 use smallvec::SmallVec;
 use std::fmt::Display;
+use std::fs;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::str::FromStr;
@@ -273,7 +273,7 @@ impl Display for InstructionArguments {
         write!(f, "<<")?;
         for idx in 0..self.arguments.len() {
             write!(f, "{}", self.arguments[idx])?;
-            if idx != self.arguments.len()-1 {
+            if idx != self.arguments.len() - 1 {
                 write!(f, ", ")?;
             }
         }
@@ -333,26 +333,40 @@ impl Program {
         // Write global variables to the lines
         writeln!(writer, "InitGPU == ")?;
         writeln!(writer, "\tglobalVars = {{")?;
-        for global_var in self.global_vars.iter() {
-            writeln!(
-                writer,
-                "\t\tVar(\"{}\", \"{}\", {}, Index({}))",
-                global_var.get_storage_class(),
-                global_var.get_var_name(),
-                global_var.initial_value(),
-                global_var.get_index(),
-            )?;
+        for (idx, global_var) in self.global_vars.iter().enumerate() {
+            if idx != self.global_vars.len() - 1 {
+                writeln!(
+                    writer,
+                    "\t\tVar(\"{}\", \"{}\", {}, Index({})),",
+                    global_var.get_storage_class(),
+                    global_var.get_var_name(),
+                    global_var.initial_value(),
+                    global_var.get_index(),
+                )?;
+            } else {
+                writeln!(
+                    writer,
+                    "\t\tVar(\"{}\", \"{}\", {}, Index({}))",
+                    global_var.get_storage_class(),
+                    global_var.get_var_name(),
+                    global_var.initial_value(),
+                    global_var.get_index(),
+                )?;
+            }
         }
         writeln!(writer, "\t}}")?;
         Ok(())
     }
     fn write_program(&self, writer: &mut BufWriter<File>) -> Result<()> {
         // Write instructions to the lines
-        writeln!(writer, r"ThreadInstructions ==  [t \in 1..NumThreads |-> <<")?;
+        writeln!(
+            writer,
+            r"ThreadInstructions ==  [t \in 1..NumThreads |-> <<"
+        )?;
         for (idx, inst) in self.instructions.iter().enumerate() {
-            if idx != self.instructions.len() - 1{   
+            if idx != self.instructions.len() - 1 {
                 writeln!(writer, "\"{}\",", inst.name)?;
-            }else{
+            } else {
                 writeln!(writer, "\"{}\"", inst.name)?;
             }
         }
@@ -363,7 +377,7 @@ impl Program {
         for (idx, inst) in self.instructions.iter().enumerate() {
             if idx != self.instructions.len() - 1 {
                 writeln!(writer, "{}, ", inst.arguments)?;
-            } else{
+            } else {
                 writeln!(writer, "{}", inst.arguments)?;
             }
         }
@@ -384,7 +398,7 @@ impl Program {
         let mut found_globals = false;
         let mut found_program = false;
 
-        for line in reader.lines(){
+        for line in reader.lines() {
             let line = line?;
             if line.trim() == LAYOUT_CONFIG_HINT {
                 found_layout = true;
@@ -401,13 +415,13 @@ impl Program {
         }
         drop(writer);
 
-        if !found_layout{
+        if !found_layout {
             return Err(eyre!("Layout configuration hint not found in the file."));
         }
-        if !found_globals{
+        if !found_globals {
             return Err(eyre!("Global variables hint not found in the file."));
         }
-        if !found_program{
+        if !found_program {
             return Err(eyre!("Program hint not found in the file."));
         }
 

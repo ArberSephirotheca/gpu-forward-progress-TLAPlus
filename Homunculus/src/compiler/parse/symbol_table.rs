@@ -4,8 +4,13 @@
 //! Currently supported types are `OpTypeBool`, `OpTypeInt, `OpTypeVector`, `OpTypeArray`, `OpTypeRuntimeArray`, `OpTypeStruct`, `OpTypePointer`
 //! for variable table, we have a struct SymbolTable with a method insert and lookup
 //! Whenever we encounter a variable declaration (e.g. `OpVariable`), we add it to the variable table
+use crate::codegen::common::InstructionValue;
+
 use super::syntax::TokenKind;
-use std::{collections::HashMap, fmt::{self, Display}};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+};
 type VariableSymbol = String;
 type TypeSymbol = String;
 type ConstantSymbol = String;
@@ -109,10 +114,13 @@ pub(crate) enum SpirvType {
 }
 
 impl SpirvType {
-    pub fn default_value(&self) -> ConstantInfo {
+    pub fn default_instruction_value(&self) -> InstructionValue {
         match self {
-            SpirvType::Bool => ConstantInfo::new_bool(false),
-            SpirvType::Int { signed, .. } => ConstantInfo::new_int(-1, *signed),
+            SpirvType::Bool => InstructionValue::Bool(true),
+            SpirvType::Int { signed, .. } => InstructionValue::Int(0),
+            SpirvType::Pointer { ty: _, storage_class: storage_class } => {
+                InstructionValue::None
+            }
             _ => panic!("No default value for type {:?}", self),
         }
     }
@@ -286,8 +294,8 @@ impl VariableInfo {
         self.storage_class.clone()
     }
 
-    pub(crate) fn initial_value(&self) -> ConstantInfo {
-        self.ty.default_value()
+    pub(crate) fn initial_value(&self) -> InstructionValue {
+        self.ty.default_instruction_value()
     }
 
     // FIXME: implement array and struct
@@ -336,6 +344,13 @@ impl VariableInfo {
         }
     }
 
+    pub(crate) fn get_constant_info(&self) -> ConstantInfo {
+        if self.is_constant() {
+            self.const_value.clone().unwrap()
+        } else {
+            panic!("Not a constant variable");
+        }
+    }
     pub(crate) fn get_constant_int(&self) -> i32 {
         if self.is_constant() {
             match &self.const_value {
@@ -427,7 +442,15 @@ impl VariableSymbolTable {
     }
 
     pub fn get_global_variables(&self) -> Vec<VariableInfo> {
-        self.global.values().cloned().collect()
+        let shared: Vec<VariableInfo> = self.shared.values().cloned().collect();
+        let mut global: Vec<VariableInfo> = self
+            .global
+            .values()
+            .cloned()
+            .filter(|val| !val.is_builtin())
+            .collect();
+        global.extend(shared);
+        global
     }
 }
 
