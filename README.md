@@ -16,7 +16,7 @@ earthly bootstrap
 ```
 Then, run following to see the output
 ```bash
-earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIXE=<size of subgroup> --WG_SIZE=<workgroup size> --NUM_WG=<number of workgroup> --SCH=<scheduler>
+earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<size of subgroup> --WG_SIZE=<workgroup size> --NUM_WG=<number of workgroup> --SCH=<scheduler>
 ```
 
 ## Example:
