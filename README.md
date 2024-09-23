@@ -4,6 +4,7 @@
 - [Docker](https://docs.docker.com/install/) or [Podman](https://github.com/containers/podman/blob/main/docs/tutorials/podman_tutorial.md)
 - [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 - [Earthly](https://earthly.dev/get-earthly)
+
 ## Get Started
 Make sure you've started the docker service
 ```bash
@@ -24,3 +25,39 @@ earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIXE=<siz
 ## Command Line Option
 - *format*: text, dot, all
 - *scheduler*: HSA, OBE
+
+## List of supported SPIR-V Instructions
+- OpVariable,
+- OpReturn,
+- OpLoad,
+- OpStore,
+- OpAtomicLoad,
+- OPAtomicStore,
+- OpBranch,
+- OpBranchConditional,
+- OpLabel,
+- OpSelectionMerge,
+- OpLoopMerge,
+- OpAtomicExchange,
+- OpEqual,
+- OpNotEqual,
+- OpLess,
+- OpLessOrEqual,
+- OpGreater,
+- GreaterOrEqual,
+- OpAdd,
+- OpSub,
+- OpMul,
+
+**Note**: The model treats the following instructions as equivalent:
+- `OpLoad` and `OpAtomicLoad`
+- `OpStore` and `OpAtomicStore`
+
+## Supported Type
+- int
+- uint
+- bool
+
+## Memory Semantics
+The model does not implement any extension to memory semantics, and all SPIR-V instructions
+are behaving like `SequentiallyConsistent`.
