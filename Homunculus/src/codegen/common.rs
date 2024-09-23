@@ -127,7 +127,7 @@ pub enum InstructionScope {
     None,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum InstructionBuiltInVariable {
     NumWorkgroups,
     WorkgroupSize,
@@ -190,10 +190,10 @@ impl Display for IndexKind {
         }
     }
 }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum InstructionValue {
     None,
-    Pointer(String, VariableInfo),
+    // Pointer(String),
     BuiltIn(InstructionBuiltInVariable),
     Bool(bool),
     // String(String),
@@ -205,7 +205,7 @@ impl Display for InstructionValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             InstructionValue::None => write!(f, "\"\""),
-            InstructionValue::Pointer(name, _) => write!(f, "\"\""),
+            // InstructionValue::Pointer(name) => write!(f, "\"\""),
             InstructionValue::BuiltIn(var) => write!(f, "{}", var),
             InstructionValue::Bool(value) => {
                 if *value {
@@ -427,41 +427,6 @@ impl Program {
 
         // Replace the original file with the new file
         fs::rename(temp_path, path)?;
-
-        // Read all lines into a vector
-        // let mut lines: Vec<String> = reader.lines().collect::<Result<_, _>>()?;
-
-        // // Find the index of the line that matches the hint
-        // if let Some(index) = lines
-        //     .iter()
-        //     .position(|line| line.trim() == LAYOUT_CONFIG_HINT)
-        // {
-        //     // Insert the new content after the hint line
-        //     self.write_layout(&mut lines, index)?;
-        // } else {
-        //     return Err(eyre!("Layout configuration hint not found in the file."));
-        // }
-
-        // if let Some(index) = lines
-        //     .iter()
-        //     .position(|line| line.trim() == GLOBAL_VARIABLES_HINT)
-        // {
-        //     // Insert the new content after the hint line
-        //     self.write_global_variables(&mut lines, index)?;
-        // } else {
-        //     return Err(eyre!("Global variables hint not found in the file."));
-        // }
-
-        // if let Some(index) = lines.iter().position(|line| line.trim() == PROGRAM_HINT) {
-        //     // Insert the new content after the hint line
-        //     self.write_program(&mut lines, index)?;
-        // } else {
-        //     return Err(eyre!("Program hint not found in the file."));
-        // }
-        // drop(file);
-        // for line in lines {
-        //     file.write(line.as_bytes())?;
-        // }
         Ok(())
     }
 }

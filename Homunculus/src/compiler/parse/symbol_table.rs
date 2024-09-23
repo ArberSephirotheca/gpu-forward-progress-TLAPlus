@@ -117,8 +117,8 @@ impl SpirvType {
     pub fn default_instruction_value(&self) -> InstructionValue {
         match self {
             SpirvType::Bool => InstructionValue::Bool(true),
-            SpirvType::Int { signed, .. } => InstructionValue::Int(0),
-            SpirvType::Pointer { ty: _, storage_class: storage_class } => {
+            SpirvType::Int { signed: _, .. } => InstructionValue::Int(0),
+            SpirvType::Pointer { ty: _, storage_class:_ } => {
                 InstructionValue::None
             }
             _ => panic!("No default value for type {:?}", self),
@@ -230,6 +230,7 @@ pub struct VariableInfo {
     pub storage_class: StorageClass,
     pub const_value: Option<ConstantInfo>,
     pub built_in: Option<BuiltInVariable>,
+    pub default_value: InstructionValue,
 }
 
 impl VariableInfo {
@@ -244,6 +245,7 @@ impl VariableInfo {
         storage_class: StorageClass,
         const_value: Option<ConstantInfo>,
         built_in: Option<BuiltInVariable>,
+        default_value: InstructionValue,
     ) -> Self {
         Self {
             id,
@@ -252,6 +254,7 @@ impl VariableInfo {
             storage_class,
             const_value,
             built_in,
+            default_value,
         }
     }
 
@@ -263,6 +266,7 @@ impl VariableInfo {
             storage_class: StorageClass::Constant,
             const_value: Some(ConstantInfo::new_int(value, signed)),
             built_in: None,
+            default_value: InstructionValue::Int(value),
         }
     }
     pub(crate) fn new_const_bool(id: String, value: bool) -> Self {
@@ -273,6 +277,7 @@ impl VariableInfo {
             storage_class: StorageClass::Constant,
             const_value: Some(ConstantInfo::new_bool(value)),
             built_in: None,
+            default_value: InstructionValue::Bool(value),
         }
     }
 
@@ -295,7 +300,7 @@ impl VariableInfo {
     }
 
     pub(crate) fn initial_value(&self) -> InstructionValue {
-        self.ty.default_instruction_value()
+        self.default_value.clone()
     }
 
     // FIXME: implement array and struct

@@ -55,6 +55,16 @@ impl CodegenCx {
         self.type_table.lookup(id)
     }
 
+    pub fn resolve_real_type(&self, spirv_type: &SpirvType) -> SpirvType {
+        match spirv_type {
+            SpirvType::Pointer { ty, storage_class: _ } => {
+                let real_type = self.lookup_type(ty.as_str()).unwrap();
+                self.resolve_real_type(real_type)
+            }
+            _ => spirv_type.clone(),
+        }
+    }
+
     pub fn insert_variable(&mut self, name: String, var_info: VariableInfo) {
         self.variable_table.insert(name, var_info);
     }
@@ -78,7 +88,8 @@ impl CodegenCx {
         self.label_table.lookup(label)
     }
 
-    fn construct_instruction_value(info : VariableInfo) ->InstructionValue{
+    // only builtin and constant variable can be resolved to a value
+    fn construct_instruction_value(&self, info : &VariableInfo) ->InstructionValue{
         if info.is_builtin(){
             InstructionValue::BuiltIn(InstructionBuiltInVariable::cast(
                 info.get_builtin().unwrap(),
@@ -89,12 +100,15 @@ impl CodegenCx {
                 ConstantInfo::Bool { value: val } => InstructionValue::Bool(val),
             }
         } else{
-            info.ty.default_instruction_value()
+            InstructionValue::None
+            // let (inst_val, _) = self.resolve_spirv_type_to_default_value(&info.ty);
+            // println!("inst_val: {:#?} for {:#?}", inst_val, info);
+            // inst_val
         }
 
     }
     /// get_from_spirv_type will return the InstructionValueType and index for the given SpirvType.
-    pub fn get_from_spirv_type(&self, spirv_type: &SpirvType) -> (InstructionValue, IndexKind) {
+    pub fn resolve_spirv_type_to_default_value(&self, spirv_type: &SpirvType) -> (InstructionValue, IndexKind) {
         match spirv_type {
             SpirvType::Void => (InstructionValue::None, IndexKind::Literal(-1)),
             SpirvType::Function { .. } => (InstructionValue::None, IndexKind::Literal(-1)),
@@ -106,14 +120,14 @@ impl CodegenCx {
             SpirvType::Vector { element, count } => {
                 let real_type = self.lookup_type(element.as_str()).unwrap();
                 (
-                    self.get_from_spirv_type(real_type).0,
+                    self.resolve_spirv_type_to_default_value(real_type).0,
                     IndexKind::Literal(*count as i32),
                 )
             }
             SpirvType::Array { element, count } => {
                 let real_type = self.lookup_type(element.as_str()).unwrap();
                 (
-                    self.get_from_spirv_type(real_type).0,
+                    self.resolve_spirv_type_to_default_value(real_type).0,
                     IndexKind::Literal(*count as i32),
                 )
             }
@@ -121,7 +135,7 @@ impl CodegenCx {
             SpirvType::RuntimeArray { element } => {
                 let real_type = self.lookup_type(element.as_str()).unwrap();
                 (
-                    self.get_from_spirv_type(real_type).0,
+                    self.resolve_spirv_type_to_default_value(real_type).0,
                     IndexKind::Literal(-1),
                 )
             }
@@ -129,7 +143,7 @@ impl CodegenCx {
             // run the function recursively to get the actual type
             SpirvType::Struct { members } => {
                 let real_type = self.lookup_type(members.as_str()).unwrap();
-                self.get_from_spirv_type(real_type)
+                self.resolve_spirv_type_to_default_value(real_type)
             }
 
             SpirvType::Pointer {
@@ -137,7 +151,7 @@ impl CodegenCx {
                 storage_class: _,
             } => {
                 let real_type = self.lookup_type(ty.as_str()).unwrap();
-                self.get_from_spirv_type(real_type)
+                self.resolve_spirv_type_to_default_value(real_type)
             }
         }
     }
@@ -151,6 +165,7 @@ impl CodegenCx {
                 let ty_name = var_expr.ty_name().unwrap();
                 let storage_class = var_expr.storage_class().unwrap();
                 // get the actual type of the variable
+
                 let built_in = self.built_in_variable(var_name.as_str());
 
                 let spirv_type = match self.lookup_type(ty_name.text()) {
@@ -166,6 +181,7 @@ impl CodegenCx {
                     storage_class,
                     None,
                     built_in,
+                    self.resolve_spirv_type_to_default_value(spirv_type).0,
                 );
                 self.insert_variable(var_name, var_info);
                 self.increment_inst_position();
@@ -204,6 +220,7 @@ impl CodegenCx {
                     base_var_info.get_storage_class(),
                     None,
                     base_var_info.get_builtin(),
+                    self.resolve_spirv_type_to_default_value(ty).0,
                 );
 
                 // Insert the new variable information into the symbol table
@@ -245,6 +262,7 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(spirv_type).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -267,6 +285,8 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(spirv_type).0,
+
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -288,6 +308,7 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(spirv_type).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -301,6 +322,7 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(&SpirvType::Bool).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -314,6 +336,7 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(&SpirvType::Bool).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -327,6 +350,7 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(&SpirvType::Bool).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -340,6 +364,7 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(&SpirvType::Bool).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -353,6 +378,7 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(&SpirvType::Bool).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -366,6 +392,7 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(&SpirvType::Bool).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -410,6 +437,7 @@ impl CodegenCx {
                     StorageClass::Local,
                     None,
                     None,
+                    self.resolve_spirv_type_to_default_value(&spirv_type).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -497,23 +525,17 @@ impl CodegenCx {
                 let inst_args_builder = InstructionArguments::builder();
                 let inst_arg_builder = InstructionArgument::builder();
                 // fixme: error handling
+                let var = self.lookup_variable(&var_name).unwrap();
                 let ty_name = var_expr.ty_name().unwrap();
-                // get the actual type of the variable
-                let built_in = self.built_in_variable(var_name.as_str());
+                // get the actual type of the variable'
 
                 let spirv_type = match self.lookup_type(ty_name.text()) {
                     Some(ty) => ty,
                     None => panic!("Type {} not found", ty_name),
                 };
 
-                let (instr_value, idx) = match &built_in {
-                    Some(b) => {
-                        let instr_value =
-                            InstructionValue::BuiltIn(InstructionBuiltInVariable::cast(b.clone()));
-                        (instr_value, IndexKind::Literal(-1))
-                    }
-                    None => self.get_from_spirv_type(spirv_type),
-                };
+                let (instr_value, idx) = self.resolve_spirv_type_to_default_value(spirv_type);
+    
                 // fixme: avoid using unwrap, use better error handling instead
                 let arg = inst_arg_builder
                     .name(var_name)
@@ -571,6 +593,9 @@ impl CodegenCx {
                 let first_operand = add_expr.first_operand().unwrap();
                 let second_operand = add_expr.second_operand().unwrap();
 
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("AddExpr: Result variable not found");
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
                     .expect("AddExpr: First operand not found");
@@ -583,27 +608,18 @@ impl CodegenCx {
                     .name(var_name.clone())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Local)
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
                     .build()
                     .unwrap();
 
-                let first_operand_arg = if first_operand_info.is_constant() {
-                    inst_arg1_builder
+                let first_operand_arg = 
+                                    inst_arg1_builder
                         .name(first_operand.text().to_string())
-                        .value(InstructionValue::Int(first_operand_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg1_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::None)
+                        .value(self.construct_instruction_value(&first_operand_info))
                         .index(IndexKind::Literal(-1))
                         .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
                         .build()
-                        .unwrap()
-                };
+                        .unwrap();
 
                 let second_operand_arg = if second_operand_info.is_constant() {
                     inst_arg2_builder
@@ -646,6 +662,9 @@ impl CodegenCx {
                 let first_operand = sub_expr.first_operand().unwrap();
                 let second_operand = sub_expr.second_operand().unwrap();
 
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("SubExpr: Result variable not found");
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
                     .expect("SubExpr: First operand not found");
@@ -658,49 +677,27 @@ impl CodegenCx {
                     .name(var_name.clone())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Local)
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
                     .build()
                     .unwrap();
 
-                let first_operand_arg = if first_operand_info.is_constant() {
-                    inst_arg1_builder
+                let first_operand_arg = 
+                inst_arg1_builder
                         .name(first_operand.text().to_string())
-                        .value(InstructionValue::Int(first_operand_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg1_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::None)
+                        .value(self.construct_instruction_value(&first_operand_info))
                         .index(IndexKind::Literal(-1))
                         .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
                         .build()
-                        .unwrap()
-                };
+                        .unwrap();
 
-                let second_operand_arg = if second_operand_info.is_constant() {
-                    inst_arg2_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::Int(
-                            second_operand_info.get_constant_int(),
-                        ))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg2_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(
-                            &second_operand_info.get_storage_class(),
-                        ))
-                        .build()
-                        .unwrap()
-                };
+                let second_operand_arg = 
+                inst_arg2_builder
+                .name(second_operand.text().to_string())
+                .value(self.construct_instruction_value(&second_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&second_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
 
                 Some(
                     inst_args_builder
@@ -720,6 +717,9 @@ impl CodegenCx {
                 let first_operand = mul_expr.first_operand().unwrap();
                 let second_operand = mul_expr.second_operand().unwrap();
 
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("MulExpr: Result variable not found");
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
                     .expect("MulExpr: First operand not found");
@@ -732,49 +732,27 @@ impl CodegenCx {
                     .name(var_name.clone())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Local)
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
                     .build()
                     .unwrap();
 
-                let first_operand_arg = if first_operand_info.is_constant() {
-                    inst_arg1_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::Int(first_operand_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg1_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
-                        .build()
-                        .unwrap()
-                };
-
-                let second_operand_arg = if second_operand_info.is_constant() {
-                    inst_arg2_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::Int(
-                            second_operand_info.get_constant_int(),
-                        ))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg2_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(
-                            &second_operand_info.get_storage_class(),
-                        ))
-                        .build()
-                        .unwrap()
-                };
+                let first_operand_arg = 
+                inst_arg1_builder
+                .name(first_operand.text().to_string())
+                .value(self.construct_instruction_value(&first_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
+            
+                let second_operand_arg = 
+                inst_arg2_builder
+                .name(second_operand.text().to_string())
+                .value(self.construct_instruction_value(&second_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&second_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
 
                 Some(
                     inst_args_builder
@@ -795,6 +773,9 @@ impl CodegenCx {
                 let first_operand = equal_expr.first_operand().unwrap();
                 let second_operand = equal_expr.second_operand().unwrap();
 
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("EqualExpr: Result variable not found");
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
                     .expect("EqualExpr: First operand not found");
@@ -807,48 +788,27 @@ impl CodegenCx {
                     .name(var_name.clone())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Local)
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
                     .build()
                     .unwrap();
-                let first_operand_arg = if first_operand_info.is_constant() {
-                    inst_arg1_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::Int(first_operand_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg1_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
-                        .build()
-                        .unwrap()
-                };
 
-                let second_operand_arg = if second_operand_info.is_constant() {
-                    inst_arg2_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::Int(
-                            second_operand_info.get_constant_int(),
-                        ))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg2_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(
-                            &second_operand_info.get_storage_class(),
-                        ))
-                        .build()
-                        .unwrap()
-                };
+                let first_operand_arg =
+                inst_arg1_builder
+                .name(first_operand.text().to_string())
+                .value(self.construct_instruction_value(&first_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
+
+                let second_operand_arg =
+                inst_arg2_builder
+                .name(second_operand.text().to_string())
+                .value(self.construct_instruction_value(&second_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&second_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
 
                 Some(
                     inst_args_builder
@@ -868,6 +828,9 @@ impl CodegenCx {
                 let first_operand = not_equal_expr.first_operand().unwrap();
                 let second_operand = not_equal_expr.second_operand().unwrap();
 
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("NotEqualExpr: Result variable not found");
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
                     .expect("NotEqualExpr: First operand not found");
@@ -879,49 +842,27 @@ impl CodegenCx {
                     .name(var_name.clone())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Local)
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
                     .build()
                     .unwrap();
 
-                let first_operand_arg = if first_operand_info.is_constant() {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::Int(first_operand_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
-                        .build()
-                        .unwrap()
-                };
-                let second_operand_arg = if second_operand_info.is_constant() {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::Int(
-                            second_operand_info.get_constant_int(),
-                        ))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(
-                            &second_operand_info.get_storage_class(),
-                        ))
-                        .build()
-                        .unwrap()
-                };
+                let first_operand_arg = 
+                first_operand_builder
+                .name(first_operand.text().to_string())
+                .value(self.construct_instruction_value(&first_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
 
+                let second_operand_arg =
+                second_operand_builder
+                .name(second_operand.text().to_string())
+                .value(self.construct_instruction_value(&second_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&second_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
                 Some(
                     inst_args_builder
                         .name(InstructionName::NotEqual)
@@ -940,6 +881,7 @@ impl CodegenCx {
                 let first_operand = less_expr.first_operand().unwrap();
                 let second_operand = less_expr.second_operand().unwrap();
 
+                let result_info = self.lookup_variable(&var_name).unwrap();
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
                     .expect("LessThanExpr: First operand not found");
@@ -955,45 +897,23 @@ impl CodegenCx {
                     .build()
                     .unwrap();
 
-                let first_operand_arg = if first_operand_info.is_constant() {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::Int(first_operand_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
-                        .build()
-                        .unwrap()
-                };
+                let first_operand_arg = 
+                first_operand_builder
+                .name(first_operand.text().to_string())
+                .value(self.construct_instruction_value(&first_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
 
-                let second_operand_arg = if second_operand_info.is_constant() {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::Int(
-                            second_operand_info.get_constant_int(),
-                        ))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(
-                            &second_operand_info.get_storage_class(),
-                        ))
-                        .build()
-                        .unwrap()
-                };
+                let second_operand_arg = 
+                second_operand_builder
+                .name(second_operand.text().to_string())
+                .value(self.construct_instruction_value(&second_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&second_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
 
                 Some(
                     inst_args_builder
@@ -1013,14 +933,7 @@ impl CodegenCx {
                 let first_operand = less_equal_expr.first_operand().unwrap();
                 let second_operand = less_equal_expr.second_operand().unwrap();
 
-                let result_arg = result_arg_builder
-                    .name(var_name.clone())
-                    .value(InstructionValue::None)
-                    .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Local)
-                    .build()
-                    .unwrap();
-
+                let result_info = self.lookup_variable(&var_name).unwrap();
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
                     .expect("LessThanEqualExpr: First operand not found");
@@ -1028,45 +941,31 @@ impl CodegenCx {
                     .lookup_variable(second_operand.text())
                     .expect("LessThanEqualExpr: Second operand not found");
 
-                let first_operand_arg = if first_operand_info.is_constant() {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::Int(first_operand_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
-                        .build()
-                        .unwrap()
-                };
+                    let result_arg = result_arg_builder
+                    .name(var_name.clone())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
 
-                let second_operand_arg = if second_operand_info.is_constant() {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::Int(
-                            second_operand_info.get_constant_int(),
-                        ))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(
-                            &second_operand_info.get_storage_class(),
-                        ))
-                        .build()
-                        .unwrap()
-                };
+                let first_operand_arg = 
+                first_operand_builder
+                .name(first_operand.text().to_string())
+                .value(self.construct_instruction_value(&first_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
+
+                let second_operand_arg = 
+                second_operand_builder
+                .name(second_operand.text().to_string())
+                .value(self.construct_instruction_value(&second_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&second_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
 
                 Some(
                     inst_args_builder
@@ -1082,18 +981,12 @@ impl CodegenCx {
                 let result_arg_builder = InstructionArgument::builder();
                 let first_operand_builder = InstructionArgument::builder();
                 let second_operand_builder = InstructionArgument::builder();
-
+                
                 let first_operand = greater_expr.first_operand().unwrap();
                 let second_operand = greater_expr.second_operand().unwrap();
 
-                let result_arg = result_arg_builder
-                    .name(var_name.clone())
-                    .value(InstructionValue::None)
-                    .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Local)
-                    .build()
-                    .unwrap();
 
+                let result_info = self.lookup_variable(&var_name).unwrap();
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
                     .expect("GreaterThanExpr: First operand not found");
@@ -1101,45 +994,31 @@ impl CodegenCx {
                     .lookup_variable(second_operand.text())
                     .expect("GreaterThanExpr: Second operand not found");
 
-                let first_operand_arg = if first_operand_info.is_constant() {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::Int(first_operand_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
-                        .build()
-                        .unwrap()
-                };
+                let result_arg = result_arg_builder
+                    .name(var_name.clone())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
 
-                let second_operand_arg = if second_operand_info.is_constant() {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::Int(
-                            second_operand_info.get_constant_int(),
-                        ))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(
-                            &second_operand_info.get_storage_class(),
-                        ))
-                        .build()
-                        .unwrap()
-                };
+                let first_operand_arg = 
+                first_operand_builder
+                .name(first_operand.text().to_string())
+                .value(self.construct_instruction_value(&first_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
+
+                let second_operand_arg = 
+                second_operand_builder
+                .name(second_operand.text().to_string())
+                .value(self.construct_instruction_value(&second_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&second_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
 
                 Some(
                     inst_args_builder
@@ -1159,14 +1038,7 @@ impl CodegenCx {
                 let first_operand = greater_equal_expr.first_operand().unwrap();
                 let second_operand = greater_equal_expr.second_operand().unwrap();
 
-                let result_arg = result_arg_builder
-                    .name(var_name.clone())
-                    .value(InstructionValue::None)
-                    .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Local)
-                    .build()
-                    .unwrap();
-
+                let result_info = self.lookup_variable(&var_name).unwrap();
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
                     .expect("GreaterThanEqualExpr: First operand not found");
@@ -1174,46 +1046,31 @@ impl CodegenCx {
                     .lookup_variable(second_operand.text())
                     .expect("GreaterThanEqualExpr: Second operand not found");
 
-                let first_operand_arg = if first_operand_info.is_constant() {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::Int(first_operand_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    first_operand_builder
-                        .name(first_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
-                        .build()
-                        .unwrap()
-                };
+                    let result_arg = result_arg_builder
+                    .name(var_name.clone())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
 
-                let second_operand_arg = if second_operand_info.is_constant() {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::Int(
-                            second_operand_info.get_constant_int(),
-                        ))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    second_operand_builder
-                        .name(second_operand.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(
-                            &second_operand_info.get_storage_class(),
-                        ))
-                        .build()
-                        .unwrap()
-                };
+                let first_operand_arg =
+                first_operand_builder
+                .name(first_operand.text().to_string())
+                .value(self.construct_instruction_value(&first_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
 
+                let second_operand_arg = 
+                second_operand_builder
+                .name(second_operand.text().to_string())
+                .value(self.construct_instruction_value(&second_operand_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&second_operand_info.get_storage_class()))
+                .build()
+                .unwrap();
                 Some(
                     inst_args_builder
                         .name(InstructionName::GreaterThanEqual)
@@ -1253,6 +1110,7 @@ impl CodegenCx {
                 // fixme: better error handling
                 let pointer_ssa_id = load_expr.pointer().unwrap();
                 let pointer_info = self.lookup_variable(pointer_ssa_id.text()).unwrap();
+                let result_info = self.lookup_variable(&var_name).unwrap();
 
                 // first arg is the pointer to load into
                 let result = inst_arg1_builder
@@ -1260,14 +1118,14 @@ impl CodegenCx {
                     // it is intializing a ssa, so the value is None
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Intermediate)
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
                     .build()
                     .unwrap();
 
                 // second arg is the pointer to load from
                 let pointer = inst_arg2_builder
                     .name(pointer_ssa_id.text().to_string() /* .get_var_name()*/)
-                    .value(Self::construct_instruction_value(pointer_info.clone()))
+                    .value(self.construct_instruction_value(&pointer_info))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
@@ -1303,7 +1161,7 @@ impl CodegenCx {
                 // second arg is the pointer to load from
                 let pointer = inst_arg2_builder
                     .name(pointer_ssa_id.text().to_string() /* .get_var_name()*/)
-                    .value(Self::construct_instruction_value(pointer_info.clone()))
+                    .value(self.construct_instruction_value(&pointer_info))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
@@ -1347,10 +1205,11 @@ impl CodegenCx {
 
                 let pointer_arg = pointer_arg_builder
                     .name(pointer.text().to_string())
-                    .value(InstructionValue::Pointer(
-                        pointer.text().to_string(),
-                        pointer_info.clone(),
-                    ))
+                    // .value(InstructionValue::Pointer(
+                    //     pointer.text().to_string(),
+                    //     pointer_info.clone(),
+                    // ))
+                    .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
@@ -1358,10 +1217,11 @@ impl CodegenCx {
 
                 let value_arg = value_arg_builder
                     .name(value.text().to_string())
-                    .value(InstructionValue::Pointer(
-                        value.text().to_string(),
-                        value_info.clone(),
-                    ))
+                    // .value(InstructionValue::Pointer(
+                    //     value.text().to_string(),
+                    //     value_info.clone(),
+                    // ))
+                    .value(self.construct_instruction_value(&value_info))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&value_info.get_storage_class()))
                     .build()
@@ -1446,6 +1306,8 @@ impl CodegenCx {
                     StorageClass::Global,
                     None,
                     Some(BuiltInVariable::cast(built_in.kind())),
+                    InstructionValue::None,
+
                 );
 
                 self.insert_variable(name.text().to_string(), var_info);
@@ -1475,26 +1337,34 @@ impl CodegenCx {
                     .unwrap();
 
                 let var_info = self.lookup_variable(object_ssa_id.text()).unwrap();
-                let value_arg = if var_info.is_constant() {
-                    inst_arg2_builder
+                let value_arg =  
+                                   inst_arg2_builder
                         .name(object_ssa_id.text().to_string())
-                        .value(InstructionValue::Int(var_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg2_builder
-                        .name(object_ssa_id.text().to_string())
-                        .value(InstructionValue::Pointer(
-                            var_info.get_var_name(),
-                            var_info.clone(),
-                        ))
+                        .value(self.construct_instruction_value(&var_info))
                         .index(IndexKind::Literal(-1))
                         .scope(VariableScope::cast(&var_info.get_storage_class()))
                         .build()
-                        .unwrap()
-                };
+                        .unwrap();
+                // if var_info.is_constant() {
+                //     inst_arg2_builder
+                //         .name(object_ssa_id.text().to_string())
+                //         .value(InstructionValue::Int(var_info.get_constant_int()))
+                //         .index(IndexKind::Literal(-1))
+                //         .scope(VariableScope::Literal)
+                //         .build()
+                //         .unwrap()
+                // } else {
+                //     inst_arg2_builder
+                //         .name(object_ssa_id.text().to_string())
+                //         .value(InstructionValue::Pointer(
+                //             var_info.get_var_name(),
+                //             var_info.clone(),
+                //         ))
+                //         .index(IndexKind::Literal(-1))
+                //         .scope(VariableScope::cast(&var_info.get_storage_class()))
+                //         .build()
+                //         .unwrap()
+                // };
 
                 let inst_args = inst_args_builder
                     .name(InstructionName::Store)
@@ -1537,26 +1407,34 @@ impl CodegenCx {
                     .unwrap();
 
                 let var_info = self.lookup_variable(value_ssa_id.text()).unwrap();
-                let value_arg = if var_info.is_constant() {
-                    inst_arg2_builder
-                        .name(value_ssa_id.text().to_string())
-                        .value(InstructionValue::Int(var_info.get_constant_int()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg2_builder
-                        .name(value_ssa_id.text().to_string())
-                        .value(InstructionValue::Pointer(
-                            var_info.get_var_name(),
-                            var_info.clone(),
-                        ))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(&var_info.get_storage_class()))
-                        .build()
-                        .unwrap()
-                };
+                let value_arg = 
+                inst_arg2_builder
+                .name(value_ssa_id.text().to_string())
+                .value(self.construct_instruction_value(&var_info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&var_info.get_storage_class()))
+                .build()
+                .unwrap();
+                // if var_info.is_constant() {
+                //     inst_arg2_builder
+                //         .name(value_ssa_id.text().to_string())
+                //         .value(InstructionValue::Int(var_info.get_constant_int()))
+                //         .index(IndexKind::Literal(-1))
+                //         .scope(VariableScope::Literal)
+                //         .build()
+                //         .unwrap()
+                // } else {
+                //     inst_arg2_builder
+                //         .name(value_ssa_id.text().to_string())
+                //         .value(InstructionValue::Pointer(
+                //             var_info.get_var_name(),
+                //             var_info.clone(),
+                //         ))
+                //         .index(IndexKind::Literal(-1))
+                //         .scope(VariableScope::cast(&var_info.get_storage_class()))
+                //         .build()
+                //         .unwrap()
+                // };
 
                 let inst_args = inst_args_builder
                     .name(InstructionName::AtomicStore)
@@ -1615,23 +1493,31 @@ impl CodegenCx {
                 let false_label_position = self.lookup_label(false_label.text()).unwrap();
 
                 let info = self.lookup_variable(condition.text()).unwrap();
-                let condition_arg = if info.is_constant() {
-                    inst_arg1_builder
-                        .name(condition.text().to_string())
-                        .value(InstructionValue::Bool(info.get_constant_bool()))
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::Literal)
-                        .build()
-                        .unwrap()
-                } else {
-                    inst_arg1_builder
-                        .name(condition.text().to_string())
-                        .value(InstructionValue::None)
-                        .index(IndexKind::Literal(-1))
-                        .scope(VariableScope::cast(&info.get_storage_class()))
-                        .build()
-                        .unwrap()
-                };
+                let condition_arg = 
+                inst_arg1_builder
+                .name(condition.text().to_string())
+                .value(self.construct_instruction_value(&info))
+                .index(IndexKind::Literal(-1))
+                .scope(VariableScope::cast(&info.get_storage_class()))
+                .build()
+                .unwrap();
+                // if info.is_constant() {
+                //     inst_arg1_builder
+                //         .name(condition.text().to_string())
+                //         .value(InstructionValue::Bool(info.get_constant_bool()))
+                //         .index(IndexKind::Literal(-1))
+                //         .scope(VariableScope::Literal)
+                //         .build()
+                //         .unwrap()
+                // } else {
+                //     inst_arg1_builder
+                //         .name(condition.text().to_string())
+                //         .value(InstructionValue::None)
+                //         .index(IndexKind::Literal(-1))
+                //         .scope(VariableScope::cast(&info.get_storage_class()))
+                //         .build()
+                //         .unwrap()
+                // };
 
                 let truel_label_arg = inst_arg2_builder
                     .name(true_label.text().to_string())
@@ -2028,20 +1914,7 @@ mod test {
         assert_eq!(store.arguments.arguments[1].name, "%uint_0");
         assert_eq!(
             store.arguments.arguments[1].value,
-            InstructionValue::Pointer(
-                "%uint_0".to_string(),
-                VariableInfo::new(
-                    "%uint_0".to_string(),
-                    SpirvType::Int {
-                        width: 32,
-                        signed: false
-                    },
-                    vec![],
-                    StorageClass::Local,
-                    None,
-                    None
-                )
-            )
+            InstructionValue::None
         );
         assert_eq!(store.arguments.arguments[1].index, IndexKind::Literal(-1));
         assert_eq!(store.arguments.arguments[1].scope, VariableScope::Local);
