@@ -220,7 +220,7 @@ impl Display for InstructionValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Scheduler {
     OBE,
     HSA,

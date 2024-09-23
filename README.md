@@ -15,8 +15,12 @@ earthly bootstrap
 ```
 Then, run following to see the output
 ```bash
-earthly +tlaplus-image --OUT <format>
+earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIXE=<size of subgroup> --WG_SIZE=<workgroup size> --NUM_WG=<number of workgroup> --SCH=<scheduler>
 ```
+
+## Example:
+`earthly -i +tlaplus-image --INPUT example_shader_program/producer_consumer.comp --OUT=all --SG_SIZE=1 --WG_SIZE=1 --NUM_WG=2 --SCH=HSA`
+
 ## Command Line Option
 - *format*: text, dot, all
-
+- *scheduler*: HSA, OBE

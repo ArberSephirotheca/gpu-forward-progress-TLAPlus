@@ -1656,7 +1656,7 @@ impl CodegenCx {
             .work_group_size(self.work_group_size)
             .subgroup_size(self.sub_group_size)
             .num_threads(self.num_work_group * self.work_group_size)
-            .scheduler(Scheduler::OBE)
+            .scheduler(self.scheduler.clone())
             .build()
             .unwrap()
     }
