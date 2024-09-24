@@ -134,7 +134,7 @@ impl Instruction {
 pub struct InstructionBuilder {
     position: Option<u32>,
     name: Option<InstructionName>,
-    scope: Option<InstructionScope>,
+    scope: Option<ExecutionScope>,
     arguments: Option<InstructionArguments>,
 }
 
@@ -154,7 +154,7 @@ impl InstructionBuilder {
         self
     }
 
-    pub fn scope(mut self, scope: InstructionScope) -> Self {
+    pub fn scope(mut self, scope: ExecutionScope) -> Self {
         self.scope = Some(scope);
         self
     }

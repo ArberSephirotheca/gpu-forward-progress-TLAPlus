@@ -4,7 +4,7 @@
 //! Currently supported types are `OpTypeBool`, `OpTypeInt, `OpTypeVector`, `OpTypeArray`, `OpTypeRuntimeArray`, `OpTypeStruct`, `OpTypePointer`
 //! for variable table, we have a struct SymbolTable with a method insert and lookup
 //! Whenever we encounter a variable declaration (e.g. `OpVariable`), we add it to the variable table
-use crate::codegen::common::InstructionValue;
+use crate::codegen::common::{IndexKind, InstructionValue};
 
 use super::syntax::TokenKind;
 use std::{
@@ -111,19 +111,6 @@ pub(crate) enum SpirvType {
     //     base: VariableSymbol,
     //     index: String,
     // },
-}
-
-impl SpirvType {
-    pub fn default_instruction_value(&self) -> InstructionValue {
-        match self {
-            SpirvType::Bool => InstructionValue::Bool(true),
-            SpirvType::Int { signed: _, .. } => InstructionValue::Int(0),
-            SpirvType::Pointer { ty: _, storage_class:_ } => {
-                InstructionValue::None
-            }
-            _ => panic!("No default value for type {:?}", self),
-        }
-    }
 }
 
 /// each time we encounter a constant declaration, we add it to the constant table
@@ -304,9 +291,9 @@ impl VariableInfo {
     }
 
     // FIXME: implement array and struct
-    pub(crate) fn get_index(&self) -> i32 {
+    pub(crate) fn get_index(&self) -> IndexKind {
         match &self.ty {
-            _ => -1,
+            _ => IndexKind::Literal(-1),
         }
     }
     pub(crate) fn is_intermediate(&self) -> bool {

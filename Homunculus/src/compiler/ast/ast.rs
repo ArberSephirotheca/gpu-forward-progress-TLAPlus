@@ -75,6 +75,8 @@ pub struct AtomicExchangeExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct AtomicCompareExchangeExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
+pub struct GroupAllExpr(SyntaxNode);
+#[derive(Debug)]
 pub struct ReturnStatement(SyntaxNode);
 #[derive(Debug)]
 pub struct BranchConditionalStatement(SyntaxNode);
@@ -110,6 +112,7 @@ pub enum Expr {
     GreaterThanEqualExpr(GreaterThanEqualExpr),
     AtomicExchangeExpr(AtomicExchangeExpr),
     AtomicCompareExchangeExpr(AtomicCompareExchangeExpr),
+    GroupAllExpr(GroupAllExpr),
 }
 
 #[derive(Debug)]
@@ -129,17 +132,7 @@ pub enum Stmt {
     Expr(Expr),
 }
 
-// pub(crate) static BINARY_EXPRESSION_SET : [TokenKind;9] = [
-//     TokenKind::AddExpr,
-//     TokenKind::SubExpr,
-//     TokenKind::MulExpr,
-//     TokenKind::EqualExpr,
-//     TokenKind::NotEqualExpr,
-//     TokenKind::LessThanExpr,
-//     TokenKind::GreaterThanExpr,
-//     TokenKind::LessThanEqualExpr,
-//     TokenKind::GreaterThanEqualExpr,
-// ];
+
 impl Expr {
     pub(crate) fn cast(node: SyntaxNode) -> Option<Self> {
         match node.kind() {
@@ -180,6 +173,7 @@ impl Expr {
             TokenKind::AtomicCompareExchangeExpr => Some(Self::AtomicCompareExchangeExpr(
                 AtomicCompareExchangeExpr(node),
             )),
+            TokenKind::GroupAllExpr => Some(Self::GroupAllExpr(GroupAllExpr(node))),
             _ => None,
         }
     }
@@ -484,17 +478,9 @@ impl ConstExpr {
     }
 }
 
-impl AddExpr {
-    pub(crate) fn expr(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
-    }
-}
+impl AddExpr {}
 
-impl SubExpr {
-    pub(crate) fn expr(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
-    }
-}
+impl SubExpr {}
 
 impl MulExpr {
     pub(crate) fn expr(&self) -> Option<Expr> {
@@ -502,17 +488,9 @@ impl MulExpr {
     }
 }
 
-impl EqualExpr {
-    pub(crate) fn expr(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
-    }
-}
+impl EqualExpr {}
 
 impl NotEqualExpr {
-    pub(crate) fn expr(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
-    }
-
     pub(crate) fn ty(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
@@ -521,17 +499,9 @@ impl NotEqualExpr {
     }
 }
 
-impl LessThanExpr {
-    pub(crate) fn expr(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
-    }
-}
+impl LessThanExpr {}
 
-impl GreaterThanExpr {
-    pub(crate) fn expr(&self) -> Option<Expr> {
-        self.0.children().find_map(Expr::cast)
-    }
-}
+impl GreaterThanExpr {}
 
 impl LessThanEqualExpr {}
 
@@ -572,6 +542,24 @@ impl AtomicExchangeExpr {
                 },
             )
             .nth(4)
+    }
+}
+
+impl GroupAllExpr {
+    pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn predicate(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
     }
 }
 

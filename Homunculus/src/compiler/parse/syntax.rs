@@ -122,6 +122,7 @@ pub enum TokenKind {
     LessThanEqualExpr,
     AtomicExchangeExpr,
     AtomicCompareExchangeExpr,
+    GroupAllExpr,
 
     // Type expression
     TypeBoolExpr,
@@ -226,11 +227,11 @@ pub enum TokenKind {
     OpAccessChain,
 
     // Storage class
-    #[regex("Uniform|Input|Output")]
+    #[regex("Uniform")]
     Global,
     #[regex("Workgroup")]
     Shared,
-    #[regex("Function")]
+    #[regex("Function|Input|Output")]
     Local,
 
     #[regex("OpLabel")]
@@ -538,7 +539,7 @@ mod test {
         // assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Percent));
         assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Ident));
         assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Whitespace));
-        assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Global));
+        assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Local));
     }
 
     #[test]
@@ -556,7 +557,7 @@ mod test {
         // assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Percent));
         assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Ident));
         assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Whitespace));
-        assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Global));
+        assert_eq!(lexer.next().unwrap(), Ok(TokenKind::Local));
     }
 
     #[test]

@@ -45,6 +45,7 @@ pub enum InstructionName {
     SelectionMerge,
     LoopMerge,
     AtomicExchange,
+    GroupAll,
     Equal,
     NotEqual,
     LessThan,
@@ -71,6 +72,7 @@ impl Display for InstructionName {
             InstructionName::SelectionMerge => write!(f, "OpSelectionMerge"),
             InstructionName::LoopMerge => write!(f, "OpLoopMerge"),
             InstructionName::AtomicExchange => write!(f, "OpAtomicExchange"),
+            InstructionName::GroupAll => write!(f, "OpGroupAll"),
             InstructionName::Equal => write!(f, "OpEqual"),
             InstructionName::NotEqual => write!(f, "OpNotEqual"),
             InstructionName::LessThan => write!(f, "OpLess"),
@@ -118,13 +120,37 @@ impl VariableScope {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum InstructionScope {
+pub enum ExecutionScope {
     // CrossDevice = 0,
     // Device = 1,
     WorkGroup = 2,
     SubGroup = 3,
     Invocation = 4,
     None,
+}
+
+impl From<i32> for ExecutionScope {
+    fn from(value: i32) -> Self {
+        match value {
+            2 => ExecutionScope::WorkGroup,
+            3 => ExecutionScope::SubGroup,
+            4 => ExecutionScope::Invocation,
+            _ => ExecutionScope::None,
+        }
+    }
+}
+
+impl Display for ExecutionScope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            // ExecutionScope::CrossDevice => write!(f, "CrossDevice"),
+            // ExecutionScope::Device => write!(f, "Device"),
+            ExecutionScope::WorkGroup => write!(f, "workgroup"),
+            ExecutionScope::SubGroup => write!(f, "subgroup"),
+            ExecutionScope::Invocation => write!(f, "invocation"),
+            ExecutionScope::None => write!(f, "none"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -196,7 +222,7 @@ pub enum InstructionValue {
     // Pointer(String),
     BuiltIn(InstructionBuiltInVariable),
     Bool(bool),
-    // String(String),
+    String(String),
     Int(i32),
     UInt(u32),
 }
@@ -216,6 +242,7 @@ impl Display for InstructionValue {
             }
             InstructionValue::Int(value) => write!(f, "{}", value),
             InstructionValue::UInt(value) => write!(f, "{}", value),
+            InstructionValue::String(value) => write!(f, "\"{}\"", value),
         }
     }
 }
@@ -285,7 +312,7 @@ impl Display for InstructionArguments {
 pub struct Instruction {
     pub position: u32,
     pub name: InstructionName,
-    pub scope: InstructionScope,
+    pub scope: ExecutionScope,
     pub arguments: InstructionArguments,
 }
 

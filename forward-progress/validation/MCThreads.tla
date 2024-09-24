@@ -64,138 +64,147 @@ ChangeElementAt(var, index, value) ==
 
 OpEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
-        \* mangledOperand1 == Mangle(t, operand1)
-        \* mangledOperand2 == Mangle(t, operand2)
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
 
     IN
-        /\  LET operand1Val == GetVal(workgroupId, operand1)
-                operand2Val == GetVal(workgroupId, operand2)
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
             IN
                 /\  IF operand1Val = operand2Val THEN
-                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
                     ELSE
-                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
 
 OpNotEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
-        \* mangledOperand1 == Mangle(t, operand1)
-        \* mangledOperand2 == Mangle(t, operand2)
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
 
     IN
-        /\  LET operand1Val == GetVal(workgroupId, operand1)
-                operand2Val == GetVal(workgroupId, operand2)
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
             IN
                 /\  IF operand1Val # operand2Val THEN
-                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
                     ELSE
-                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
 
 OpLess(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
-        \* mangledOperand1 == Mangle(t, operand1)
-        \* mangledOperand2 == Mangle(t, operand2)
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
 
     IN
-        /\  LET operand1Val == GetVal(workgroupId, operand1)
-                operand2Val == GetVal(workgroupId, operand2)
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
             IN
                 /\  IF operand1Val < operand2Val THEN
-                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
                     ELSE
-                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
 OpLessOrEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
-        \* mangledOperand1 == Mangle(t, operand1)
-        \* mangledOperand2 == Mangle(t, operand2)
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
 
     IN
-        /\  LET operand1Val == GetVal(workgroupId, operand1)
-                operand2Val == GetVal(workgroupId, operand2)
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
             IN
                 /\  IF operand1Val <= operand2Val THEN
-                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
                     ELSE
-                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
 OpGreater(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
-        \* mangledOperand1 == Mangle(t, operand1)
-        \* mangledOperand2 == Mangle(t, operand2)
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
 
     IN
-        /\  LET operand1Val == GetVal(workgroupId, operand1)
-                operand2Val == GetVal(workgroupId, operand2)
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
             IN
                 /\  IF operand1Val > operand2Val THEN
-                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
                     ELSE
-                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
 OpGreaterOrEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
-        \* mangledOperand1 == Mangle(t, operand1)
-        \* mangledOperand2 == Mangle(t, operand2)
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
 
     IN
-        /\  LET operand1Val == GetVal(workgroupId, operand1)
-                operand2Val == GetVal(workgroupId, operand2)
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
             IN
                 /\  IF operand1Val >= operand2Val THEN
-                        Assignment(t, {Var(var.scope, var.name, TRUE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
                     ELSE
-                        Assignment(t, {Var(var.scope, var.name, FALSE, Index(-1))})
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
 OpAdd(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
-        \* mangledOperand1 == Mangle(t, operand1)
-        \* mangledOperand2 == Mangle(t, operand2)
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
 
     IN
-        /\  LET operand1Val == GetVal(workgroupId, operand1)
-                operand2Val == GetVal(workgroupId, operand2)
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
             IN
-                Assignment(t, {Var(var.scope, var.name, operand1Val + operand2Val, Index(-1))})
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val + operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
 OpSub(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
-        \* mangledOperand1 == Mangle(t, operand1)
-        \* mangledOperand2 == Mangle(t, operand2)
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
 
     IN
-        /\  LET operand1Val == GetVal(workgroupId, operand1)
-                operand2Val == GetVal(workgroupId, operand2)
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
             IN
-                Assignment(t, {Var(var.scope, var.name, operand1Val - operand2Val, Index(-1))})
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val - operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
 OpMul(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
-        \* mangledOperand1 == Mangle(t, operand1)
-        \* mangledOperand2 == Mangle(t, operand2)
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
 
     IN
-        /\  LET operand1Val == GetVal(workgroupId, operand1)
-                operand2Val == GetVal(workgroupId, operand2)
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
             IN
-                Assignment(t, {Var(var.scope, var.name, operand1Val * operand2Val, Index(-1))})
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val * operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
@@ -220,48 +229,45 @@ OpAtomicLoad(t, result, pointer) ==
     IN
         /\
             \/  
-                /\  IsVariable(result)
+                /\  IsVariable(mangledResult)
                 \* /\  VarExists(WorkGroupId(t)+1, mangledResult)
-            \/  IsIntermediate(result)
-        /\  IsVariable(pointer)
-        /\  VarExists(WorkGroupId(t)+1, pointer)
+            \/  IsIntermediate(mangledResult)
+        /\  IsVariable(mangledPointer)
+        /\  VarExists(WorkGroupId(t)+1, mangledPointer)
         /\  IF IsIntermediate(mangledResult) THEN 
-                LET pointerVar == GetVar(WorkGroupId(t)+1, pointer)
+                LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                     evaluatedIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
                 IN 
                     /\
                         IF evaluatedIndex > 0 THEN 
-                            Assignment(t, {Var("intermediate", result.name, pointerVar.value[evaluatedIndex], Index(-1))})
+                            Assignment(t, {Var("intermediate", mangledResult.name, pointerVar.value[evaluatedIndex], Index(-1))})
                         ELSE
-                            Assignment(t, {Var("intermediate", result.name, pointerVar.value, Index(-1))})
+                            Assignment(t, {Var("intermediate", mangledResult.name, pointerVar.value, Index(-1))})
             ELSE
-                LET pointerVar == GetVar(WorkGroupId(t)+1, pointer)
+                LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                     \* resultVar == GetVar(WorkGroupId(t)+1, mangledResult)
+                    resultVar == mangledResult
                     evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
                     evaluatedResultIndex == EvalExpr(t, WorkGroupId(t)+1, result.index)
                 IN
                     /\
                         IF evaluatedPointerIndex > 0 /\ evaluatedResultIndex > 0 THEN
-                            \* Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex])})
-                            Assignment(t, {ChangeElementAt(result, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex])})
+                            Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex])})
                         ELSE IF evaluatedPointerIndex > 0 THEN
-                            \* Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], Index(-1))})
-                            Assignment(t, {Var(result.scope, result.name, pointerVar.value[evaluatedPointerIndex], Index(-1))})
+                            Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], Index(-1))})
                         ELSE IF evaluatedResultIndex > 0 THEN
-                            \* Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value)})
-                            Assignment(t, {ChangeElementAt(result, evaluatedResultIndex, pointerVar.value)})
+                            Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value)})
                         ELSE
-                            \* Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, Index(-1))})  
-                            Assignment(t, {Var(result.scope, result.name, pointerVar.value, Index(-1))})  
+                            Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, Index(-1))})  
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
 OpAtomicStore(t, pointer, value) == 
     LET mangledPointer == Mangle(t, pointer)
     IN
-        /\  IsVariable(pointer)
-        /\  VarExists(WorkGroupId(t)+1, pointer)
-        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, pointer)
+        /\  IsVariable(mangledPointer)
+        /\  VarExists(WorkGroupId(t)+1, mangledPointer)
+        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                 evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
             IN
                 /\
@@ -275,10 +281,10 @@ OpAtomicStore(t, pointer, value) ==
 OpAtomicAdd(t, pointer) == 
     LET mangledPointer == Mangle(t, pointer)
     IN
-        /\  IsVariable(pointer)
-        /\  VarExists(WorkGroupId(t)+1, pointer)
+        /\  IsVariable(mangledPointer)
+        /\  VarExists(WorkGroupId(t)+1, mangledPointer)
         /\  IsArray(pointer) = FALSE
-        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, pointer)
+        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                 evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
             IN
                 /\
@@ -293,9 +299,9 @@ OpAtomicAdd(t, pointer) ==
 OpAtomicSub(t, pointer) == 
     LET mangledPointer == Mangle(t, pointer)
     IN
-        /\  IsVariable(pointer)
-        /\  VarExists(WorkGroupId(t)+1, pointer)
-        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, pointer)
+        /\  IsVariable(mangledPointer)
+        /\  VarExists(WorkGroupId(t)+1, mangledPointer)
+        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                 evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
             IN
                 /\
@@ -369,26 +375,27 @@ OpAtomicSub(t, pointer) ==
 
 
 \* zheyuan: add assertion to check if the all threads within subgroup converge at current block because it is UB if not
+\* fixme:: mangling
 OpGroupAll(t, result, predicate, scope) ==
     LET mangledResult == Mangle(t, result)
     IN
         /\  
-            \/  /\  IsVariable(result)
-                /\  VarExists(WorkGroupId(t)+1, result)
-            \/  IsIntermediate(result)
-        /\  scope \in ScopeOperand
-        /\  IF scope = "subgroup" THEN
+            \/  /\  IsVariable(mangledResult)
+                /\  VarExists(WorkGroupId(t)+1, mangledResult)
+            \/  IsIntermediate(mangledResult)
+        /\  scope.value \in ScopeOperand
+        /\  IF scope.value = "subgroup" THEN
                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
                         currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle[WorkGroupId(t) + 1]
                     IN
                         IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
-                                Print("UB: All threads within subgroup must converge at current block", FALSE)
+                                Print("UB: All threads within subgroup must converge at current block for OpGroupAll", FALSE)
                         \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
                             /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
                         ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
-                            /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
+                            /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                     tid \in Threads |->
                                         IF tid \in sthreads THEN 
@@ -404,7 +411,7 @@ OpGroupAll(t, result, predicate, scope) ==
                                             pc[tid]
                                 ]
                         ELSE 
-                            /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
+                            /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                     tid \in Threads |->
                                         IF tid \in sthreads THEN 
@@ -419,14 +426,14 @@ OpGroupAll(t, result, predicate, scope) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-            ELSE IF scope = "workgroup" THEN 
+            ELSE IF scope.value = "workgroup" THEN 
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
                     IN      \* if there is a thread that has not reached the opgroupAll, return false
                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
                                 /\  state' = [state EXCEPT ![t] = "workgroup"]
                                 /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
                             ELSE IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
-                                /\  Assignment(t, {Var(result.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
+                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                         tid \in Threads |->
                                             IF tid \in wthreads THEN 
@@ -442,7 +449,7 @@ OpGroupAll(t, result, predicate, scope) ==
                                                 pc[tid]
                                     ]
                             ELSE 
-                                /\  Assignment(t, {Var(result.scope, Mangle(wthread, result).name, FALSE, Index(-1)): wthread \in wthreads })
+                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE, Index(-1)): wthread \in wthreads })
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                         tid \in Threads |->
                                             IF tid \in wthreads THEN 
@@ -461,37 +468,90 @@ OpGroupAll(t, result, predicate, scope) ==
                 /\  FALSE
 
 
-(* result and pointer are variable, value is literal *)
 
+
+\* OpGroupNonUniformAll(t, result, predicate, scope) ==
+\*     LET mangledResult == Mangle(t, result)
+\*     IN
+\*         /\  
+\*             \/  /\  IsVariable(result)
+\*                 /\  VarExists(WorkGroupId(t)+1, result)
+\*             \/  IsIntermediate(result)
+\*         /\  scope \in ScopeOperand
+\*         /\  IF scope = "subgroup" THEN
+\*                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
+\*                         currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle[WorkGroupId(t) + 1]
+\*                     IN
+\*                         IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
+\*                                 Print("UB: All threads within subgroup must converge at current block for OpGroupAll", FALSE)
+\*                         \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
+\*                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
+\*                             /\  state' = [state EXCEPT ![t] = "subgroup"]
+\*                             /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+\*                         ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+\*                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*                         ELSE 
+\*                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*             ELSE
+\*                 /\  FALSE
+
+
+
+(* result and pointer are variable, value is literal *)
 OpAtomicExchange(t, result, pointer, value) ==
     LET mangledResult == Mangle(t, result)
         mangledPointer == Mangle(t, pointer)
     IN
-        /\  IsVariable(result)
+        /\  IsVariable(mangledResult)
         \* /\  VarExists(WorkGroupId(t)+1, mangledResult)
-        /\  IsVariable(pointer)
-        /\  VarExists(WorkGroupId(t)+1, pointer)
+        /\  IsVariable(mangledPointer)
+        /\  VarExists(WorkGroupId(t)+1, mangledPointer)
         /\  
             \/  IsLiteral(value) 
             \/  IsExpression(value)
-        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, pointer)
+        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                 \* resultVar == GetVar(WorkGroupId(t)+1, mangledResult)
+                resultVar == mangledResult
                 evaluatedResultIndex == EvalExpr(t, WorkGroupId(t)+1, result.index)
                 evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
                 evaluatedValue == EvalExpr(t, WorkGroupId(t)+1, value)
             IN
                 IF evaluatedResultIndex > 0 /\ evaluatedPointerIndex > 0 THEN
-                    \* Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex]), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
-                    Assignment(t, {ChangeElementAt(result, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex]), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
+                    Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex]), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
                 ELSE IF evaluatedResultIndex > 0 THEN
-                    \* Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
-                    Assignment(t, {ChangeElementAt(result, evaluatedResultIndex, pointerVar.value), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
+                    Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
                 ELSE IF evaluatedPointerIndex > 0 THEN
-                    \* Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], resultVar.index), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
-                    Assignment(t, {Var(result.scope, result.name, pointerVar.value[evaluatedPointerIndex], result.index), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
+                    Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], resultVar.index), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
                 ELSE
-                    \* Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
-                    Assignment(t, {Var(result.scope, result.name, pointerVar.value, result.index), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
+                    Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
@@ -500,15 +560,16 @@ OpAtomicCompareExchange(t, result, pointer, compare, value) ==
     LET mangledResult == Mangle(t, result)
         mangledPointer == Mangle(t, pointer)
     IN
-        /\  IsVariable(result)
-        /\  IsVariable(pointer)
-        /\  VarExists(WorkGroupId(t)+1, pointer)
+        /\  IsVariable(mangledResult)
+        /\  IsVariable(mangledPointer)
+        /\  VarExists(WorkGroupId(t)+1, mangledPointer)
         /\  IsLiteral(compare)
         /\  
             \/  IsLiteral(value)
             \/  IsExpression(value)
-        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, pointer)
-                resultVar == GetVar(WorkGroupId(t)+1, result)
+        /\  LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
+                \* resultVar == GetVar(WorkGroupId(t)+1, result)
+                resultVar == mangledResult
                 evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
                 evaluatedResultIndex == EvalExpr(t, WorkGroupId(t)+1, result.index)
                 evaluatedValue == EvalExpr(t, WorkGroupId(t)+1, value)
@@ -611,7 +672,7 @@ ExecuteInstruction(t) ==
             IF  ThreadInstructions[t][pc[t]] = "Terminate" THEN
                 Terminate(t)
             ELSE IF ThreadInstructions[t][pc[t]] = "Assignment" THEN
-                /\  Assignment(t, {ThreadArguments[t][pc[t]][1]})
+                /\  Assignment(t, {Mangle(t,ThreadArguments[t][pc[t]][1])})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, CFG, MaxPathLength>>
             ELSE IF ThreadInstructions[t][pc[t]] = "GetGlobalId" THEN

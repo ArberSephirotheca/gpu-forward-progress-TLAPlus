@@ -183,8 +183,8 @@ EvalExpr(t, workgroupId, expr) ==
     ELSE IF IsUnaryExpr(expr) = TRUE THEN 
         ApplyUnaryExpr(t, workgroupId, expr)
     ELSE
-        \* GetVal(workgroupId, Mangle(t, expr))
-        GetVal(workgroupId, expr)
+        GetVal(workgroupId, Mangle(t, expr))
+        \* GetVal(workgroupId, expr)
     
 
 ApplyBinaryExpr(t, workgroupId, expr) ==

@@ -76,4 +76,3 @@ fn main() {
         Err(e) => eprintln!("Failed to read GLSL file '{}': {}", filename, e),
     }
 }
-
