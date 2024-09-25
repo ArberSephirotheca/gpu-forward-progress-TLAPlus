@@ -56,6 +56,8 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_constant_true_expr(p))
     } else if p.at(TokenKind::OpConstantFalse) {
         Some(op_constant_false_expr(p))
+    } else if p.at(TokenKind::OpLogicalNot){
+        Some(op_logical_not_expr(p))
     } else if p.at(TokenKind::OpReturn) {
         Some(op_return_statement(p))
     } else if p.at(TokenKind::OpLoad) {
@@ -90,6 +92,8 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_atomic_compare_exchange_expr(p))
     } else if p.at(TokenKind::OpGroupAll) {
         Some(op_group_all_expr(p))
+    } else if p.at(TokenKind::OpGroupNonUniformAll){
+        Some(op_group_nonuniform_all_expr(p))
     } else if p.at(TokenKind::OpBranch) {
         Some(op_branch_statement(p))
     } else if p.at(TokenKind::OpBranchConditional) {
@@ -399,6 +403,17 @@ fn op_constant_false_expr(p: &mut Parser) -> CompletedMarker {
     m.complete(p, TokenKind::ConstantFalseExpr)
 }
 
+/// example: OpLogicalNot %bool %14
+fn op_logical_not_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpLogicalNot token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::LogicalNotExpr)
+}
+
 /// example: OpReturn
 fn op_return_statement(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
@@ -457,6 +472,7 @@ fn op_atomic_load_expr(p: &mut Parser) -> CompletedMarker {
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::AtomicLoadExpr)
 }
 
@@ -470,19 +486,17 @@ fn op_atomic_store_statement(p: &mut Parser) -> CompletedMarker {
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::AtomicStoreStatement)
 }
 
-/// example: %cmp = OpIEqual %bool %call %num_elements
+/// example: OpIEqual %bool %1 %2
 fn op_equal_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     // skip OpIEqual token
     p.bump();
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::EqualExpr)
@@ -726,6 +740,18 @@ fn op_group_all_expr(p: &mut Parser) -> CompletedMarker {
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::GroupAllExpr)
+}
+
+/// example: OpGroupNonUniformAll %bool %uint_0 %value
+fn op_group_nonuniform_all_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpGroupNonUniformAll token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::GroupNonUniformAllExpr)
 }
 
 fn variable_def(p: &mut Parser) -> Option<CompletedMarker> {

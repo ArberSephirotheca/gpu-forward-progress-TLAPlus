@@ -63,3 +63,30 @@ pub fn derive_binary_expr_trait(input: TokenStream) -> TokenStream {
     // Convert the generated code into a TokenStream and return it
     TokenStream::from(expanded)
 }
+
+
+// Procedural macro to automatically implement UnaryExpr
+#[proc_macro_derive(UnaryExpr)]
+pub fn derive_unary_expr_trait(input: TokenStream) -> TokenStream {
+    // Parse the input token stream into a DeriveInput (which represents a struct, enum, etc.)
+    let input = parse_macro_input!(input as DeriveInput);
+
+    // Get the name of the struct we are deriving for
+    let name = input.ident;
+
+    // Generate the code to implement Expr for the given struct
+    let expanded = quote! {
+        impl UnaryExpr for #name {
+            fn operand(&self) -> Option<SyntaxToken> {
+                self.0
+                .children_with_tokens()
+                .filter_map(|x| x.into_token())
+                .filter(|x| x.kind() == TokenKind::Ident)
+                .nth(1)
+            }
+        }
+    };
+
+    // Convert the generated code into a TokenStream and return it
+    TokenStream::from(expanded)
+}

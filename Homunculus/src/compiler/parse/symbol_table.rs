@@ -183,6 +183,7 @@ impl ConstantInfo {
     }
 }
 // Type table, mapping result ID to SpirvType
+#[derive(Debug)]
 pub struct SpirvTypeTable {
     types: HashMap<String, SpirvType>,
 }
@@ -293,6 +294,7 @@ impl VariableInfo {
     // FIXME: implement array and struct
     pub(crate) fn get_index(&self) -> IndexKind {
         match &self.ty {
+            
             _ => IndexKind::Literal(-1),
         }
     }
@@ -377,11 +379,13 @@ pub struct VariableInfoBuilder {
 type Scope = HashMap<SSAID, VariableInfo>;
 
 // Represents the entire symbol table with multiple scopes
+#[derive(Debug)]
 pub struct VariableSymbolTable {
     global: Scope,
     shared: Scope,
     local: Scope,
     constant: Scope,
+    Indexing: Scope,
 }
 
 impl VariableSymbolTable {
@@ -392,32 +396,40 @@ impl VariableSymbolTable {
             shared: HashMap::new(),
             local: HashMap::new(),
             constant: HashMap::new(),
+            Indexing: HashMap::new(),
         }
     }
 
     // Insert a new variable declaration into the current scope
     pub fn insert(&mut self, var_name: String, var_info: VariableInfo) {
-        match var_info.storage_class {
-            StorageClass::Global => {
-                self.global.insert(var_name, var_info);
-            }
-            StorageClass::Shared => {
-                self.shared.insert(var_name, var_info);
-            }
-            StorageClass::Local => {
-                self.local.insert(var_name, var_info);
-            }
-            StorageClass::Intermediate => {
-                self.local.insert(var_name, var_info);
-            }
-            StorageClass::Constant => {
-                self.constant.insert(var_name, var_info);
+        if !var_info.access_chain.is_empty() {
+            self.Indexing.insert(var_name, var_info);
+        } else {
+            match var_info.storage_class {
+                StorageClass::Global => {
+                    self.global.insert(var_name, var_info);
+                }
+                StorageClass::Shared => {
+                    self.shared.insert(var_name, var_info);
+                }
+                StorageClass::Local => {
+                    self.local.insert(var_name, var_info);
+                }
+                StorageClass::Intermediate => {
+                    self.local.insert(var_name, var_info);
+                }
+                StorageClass::Constant => {
+                    self.constant.insert(var_name, var_info);
+                }
             }
         }
     }
 
     // Lookup a variable by name, searching from the innermost scope outward
     pub fn lookup(&self, name: &str) -> Option<VariableInfo> {
+        if let Some(var) = self.Indexing.get(name) {
+            return Some(var.clone());
+        }
         if let Some(var) = self.local.get(name) {
             return Some(var.clone());
         }
@@ -434,14 +446,13 @@ impl VariableSymbolTable {
     }
 
     pub fn get_global_variables(&self) -> Vec<VariableInfo> {
-        // let shared: Vec<VariableInfo> = self.shared.values().cloned().collect();
         let global: Vec<VariableInfo> = self
             .global
             .values()
             .cloned()
             .filter(|val| !val.is_builtin())
             .collect();
-        // global.extend(shared);
+        println!("Global variables: {:?}", global);
         global
     }
 }
@@ -466,6 +477,7 @@ impl ConstantSymbolTable {
     }
 }
 
+#[derive(Debug)]
 pub struct LabelTable {
     labels: HashMap<Label, Position>,
 }

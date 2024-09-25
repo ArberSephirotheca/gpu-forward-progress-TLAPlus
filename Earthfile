@@ -30,6 +30,14 @@ tlaplusbuild-image:
 tlaplus-image:
     FROM +tlaplusbuild-image
     WORKDIR /workdir
+    IF [ "$INPUT" = "" ]
+        RUN echo "No input file provided"
+    ELSE
+        COPY $INPUT $INPUT
+        RUN /glslang/build/install/bin/glslang -V --target-env vulkan1.1 $INPUT -o $INPUT.spv
+        RUN /glslang/build/install/bin/spirv-dis $INPUT.spv > spirv-asm.txt 2>&1 || true
+        SAVE ARTIFACT spirv-asm.txt AS LOCAL ./build/
+    END
     COPY forward-progress forward-progress
     COPY Homunculus Homunculus
     RUN CARGO_TARGET_DIR=Homunculus/target cargo build --release --manifest-path=Homunculus/Cargo.toml
@@ -37,13 +45,6 @@ tlaplus-image:
     RUN echo $WG_SIZE
     RUN echo $NUM_WG
     RUN echo $SCH
-    IF [ "$INPUT" = "" ]
-        RUN echo "No input file provided"
-    ELSE
-        COPY $INPUT $INPUT
-        RUN /glslang/build/install/bin/glslang -V $INPUT -o $INPUT.spv
-        RUN /glslang/build/install/bin/spirv-dis $INPUT.spv > spirv-asm.txt 2>&1 || true
-    END
     RUN Homunculus/target/release/homunculus ./spirv-asm.txt $SG_SIZE $WG_SIZE $NUM_WG $SCH
     IF [ "$OUT" = "text" ]
         RUN tlc forward-progress/validation/MCProgressModel  > output.txt 2>&1 || true
@@ -56,5 +57,4 @@ tlaplus-image:
         RUN echo "Invalid output format"
     END
     SAVE ARTIFACT output.* AS LOCAL ./build/
-    SAVE ARTIFACT spirv-asm.txt AS LOCAL ./build/
     SAVE ARTIFACT forward-progress/validation/MCProgram.tla AS LOCAL ./build/

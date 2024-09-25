@@ -109,6 +109,7 @@ pub enum TokenKind {
     // ConstantCompositeExpr,
     ConstantTrueExpr,
     ConstantFalseExpr,
+    LogicalNotExpr,
     LoadExpr,
     AtomicLoadExpr,
     AddExpr,
@@ -123,6 +124,7 @@ pub enum TokenKind {
     AtomicExchangeExpr,
     AtomicCompareExchangeExpr,
     GroupAllExpr,
+    GroupNonUniformAllExpr,
 
     // Type expression
     TypeBoolExpr,
@@ -227,11 +229,11 @@ pub enum TokenKind {
     OpAccessChain,
 
     // Storage class
-    #[regex("Uniform")]
+    #[regex("UniformConstant|Uniform|CrossWorkgroup|PushConstant|StorageBuffer")]
     Global,
     #[regex("Workgroup")]
     Shared,
-    #[regex("Function|Input|Output")]
+    #[regex("Function|Private|Input|Output|AtomicCounter")]
     Local,
 
     #[regex("OpLabel")]
@@ -254,6 +256,8 @@ pub enum TokenKind {
     OpConstantTrue,
     #[regex("OpConstantFalse")]
     OpConstantFalse,
+    #[regex("OpLogicalNot")]
+    OpLogicalNot,
     #[regex("OpIAdd")]
     OpIAdd,
     #[regex("OpISub")]
@@ -290,6 +294,8 @@ pub enum TokenKind {
     OpAtomicCompareExchange,
     #[regex("OpGroupAll")]
     OpGroupAll,
+    #[regex("OpGroupNonUniformAll")]
+    OpGroupNonUniformAll,
 
     // #[regex("Op[A-Za-z]*", |lex|
     //     let inst = lex.slice();

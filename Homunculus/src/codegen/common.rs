@@ -44,8 +44,7 @@ pub enum InstructionName {
     Label,
     SelectionMerge,
     LoopMerge,
-    AtomicExchange,
-    GroupAll,
+    LogicalNot,
     Equal,
     NotEqual,
     LessThan,
@@ -55,6 +54,9 @@ pub enum InstructionName {
     Add,
     Sub,
     Mul,
+    AtomicExchange,
+    GroupAll,
+    GroupNonUniformAll,
 }
 
 impl Display for InstructionName {
@@ -71,8 +73,7 @@ impl Display for InstructionName {
             InstructionName::Label => write!(f, "OpLabel"),
             InstructionName::SelectionMerge => write!(f, "OpSelectionMerge"),
             InstructionName::LoopMerge => write!(f, "OpLoopMerge"),
-            InstructionName::AtomicExchange => write!(f, "OpAtomicExchange"),
-            InstructionName::GroupAll => write!(f, "OpGroupAll"),
+            InstructionName::LogicalNot => write!(f, "OpLogicalNot"),
             InstructionName::Equal => write!(f, "OpEqual"),
             InstructionName::NotEqual => write!(f, "OpNotEqual"),
             InstructionName::LessThan => write!(f, "OpLess"),
@@ -82,6 +83,9 @@ impl Display for InstructionName {
             InstructionName::Add => write!(f, "OpAdd"),
             InstructionName::Sub => write!(f, "OpSub"),
             InstructionName::Mul => write!(f, "OpMul"),
+            InstructionName::AtomicExchange => write!(f, "OpAtomicExchange"),
+            InstructionName::GroupAll => write!(f, "OpGroupAll"),
+            InstructionName::GroupNonUniformAll => write!(f, "OpGroupNonUniformAll"),
         }
     }
 }

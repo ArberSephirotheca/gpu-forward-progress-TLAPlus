@@ -1,6 +1,6 @@
 use rowan::TokenAtOffset;
 use smallvec::smallvec;
-use syntax_node_derive::{BinaryExpr, ResultType};
+use syntax_node_derive::{BinaryExpr, ResultType, UnaryExpr};
 
 use crate::compiler::parse::symbol_table::{SpirvType, StorageClass};
 use crate::compiler::parse::syntax::{
@@ -14,6 +14,10 @@ pub trait ResultType {
 pub trait BinaryExpr {
     fn first_operand(&self) -> Option<SyntaxToken>;
     fn second_operand(&self) -> Option<SyntaxToken>;
+}
+
+pub trait UnaryExpr{
+    fn operand(&self) -> Option<SyntaxToken>;
 }
 
 #[derive(Debug)]
@@ -48,7 +52,8 @@ pub struct ConstExpr(SyntaxNode);
 pub struct ConstTrueExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct ConstFalseExpr(SyntaxNode);
-
+#[derive(Debug, ResultType, UnaryExpr)]
+pub struct LogicalNot(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
 pub struct AddExpr(SyntaxNode);
 
@@ -76,6 +81,8 @@ pub struct AtomicExchangeExpr(SyntaxNode);
 pub struct AtomicCompareExchangeExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct GroupAllExpr(SyntaxNode);
+#[derive(Debug, ResultType)]
+pub struct GroupNonUniformAllExpr(SyntaxNode);
 #[derive(Debug)]
 pub struct ReturnStatement(SyntaxNode);
 #[derive(Debug)]
@@ -101,6 +108,7 @@ pub enum Expr {
     ConstExpr(ConstExpr),
     ConstTrueExpr(ConstTrueExpr),
     ConstFalseExpr(ConstFalseExpr),
+    LogicalNot(LogicalNot),
     AddExpr(AddExpr),
     SubExpr(SubExpr),
     MulExpr(MulExpr),
@@ -113,6 +121,7 @@ pub enum Expr {
     AtomicExchangeExpr(AtomicExchangeExpr),
     AtomicCompareExchangeExpr(AtomicCompareExchangeExpr),
     GroupAllExpr(GroupAllExpr),
+    GroupNonUniformAllExpr(GroupNonUniformAllExpr),
 }
 
 #[derive(Debug)]
@@ -131,7 +140,6 @@ pub enum Stmt {
     SelectionMergeStatement(SelectionMergeStatement),
     Expr(Expr),
 }
-
 
 impl Expr {
     pub(crate) fn cast(node: SyntaxNode) -> Option<Self> {
@@ -154,6 +162,7 @@ impl Expr {
             // TokenKind::ConstantCompositeExpr => Some(Self::ConstExpr(ConstExpr(node))),
             TokenKind::ConstantTrueExpr => Some(Self::ConstTrueExpr(ConstTrueExpr(node))),
             TokenKind::ConstantFalseExpr => Some(Self::ConstFalseExpr(ConstFalseExpr(node))),
+            TokenKind::LogicalNotExpr => Some(Self::LogicalNot(LogicalNot(node))),
             TokenKind::AddExpr => Some(Self::AddExpr(AddExpr(node))),
             TokenKind::SubExpr => Some(Self::SubExpr(SubExpr(node))),
             TokenKind::MulExpr => Some(Self::MulExpr(MulExpr(node))),
@@ -174,6 +183,9 @@ impl Expr {
                 AtomicCompareExchangeExpr(node),
             )),
             TokenKind::GroupAllExpr => Some(Self::GroupAllExpr(GroupAllExpr(node))),
+            TokenKind::GroupNonUniformAllExpr => {
+                Some(Self::GroupNonUniformAllExpr(GroupNonUniformAllExpr(node)))
+            }
             _ => None,
         }
     }
@@ -272,7 +284,12 @@ impl TypeExpr {
             }
             TokenKind::OpTypeArray => todo!(),
             TokenKind::OpTypeRuntimeArray => todo!(),
-            TokenKind::OpTypeStruct => todo!(),
+            TokenKind::OpTypeStruct => {
+                let member = &tokens[1];
+                SpirvType::Struct {
+                    members: member.text().to_string(),
+                }
+            }
             TokenKind::OpTypePointer => {
                 let storage_class = &tokens[1];
                 let ty = &tokens[2];
@@ -546,6 +563,24 @@ impl AtomicExchangeExpr {
 }
 
 impl GroupAllExpr {
+    pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn predicate(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
+    }
+}
+
+impl GroupNonUniformAllExpr {
     pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()

@@ -241,9 +241,9 @@ ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
 ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
 
 (* Thread Configuration *)
-InstructionSet == {"Assignment", "GetGlobalId", "OpAtomicLoad", "OpAtomicStore", "OpAtomicAdd" , "OpAtomicSub", "OpGroupAll", 
+InstructionSet == {"Assignment", "GetGlobalId", "OpAtomicLoad", "OpAtomicStore", "OpAtomicAdd" , "OpAtomicSub", "OpGroupAll", "OpGroupNonUniformAll",
 "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpControlBarrier", "OpLoopMerge",
-"OpSelectionMerge", "OpLabel", "Terminate", "OpEqual", "OpNotEqual", "OpLess", "OpLessOrEqual", "OpGreater",
+"OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalNot","OpEqual", "OpNotEqual", "OpLess", "OpLessOrEqual", "OpGreater",
 "OpGreaterOrEqual", "OpAdd", "OpSub", "OpMul", "Indexing"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup", "tangle"}
