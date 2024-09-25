@@ -81,7 +81,8 @@ MinIndices(s, allowedIndices) ==
     IN {i \in DOMAIN s \cap allowedIndices : s[i] = minVal}
 
 VarExists(workgroupId, var) == 
-    IF IsShared(var) \/ IsGlobal(var) THEN 
+    \* IF IsShared(var) \/ IsGlobal(var) THEN 
+    IF IsGlobal(var) THEN 
         \E variable \in globalVars : variable.name = var.name 
     ELSE 
         \E variable \in threadLocals[workgroupId] : (variable.name = var.name /\ variable.scope = var.scope)
@@ -89,7 +90,7 @@ VarExists(workgroupId, var) ==
 
 (* todo: resolve scope if duplicate name *)
 GetVar(workgroupId, var) == 
-    IF IsShared(var) \/ IsGlobal(var) THEN 
+    IF IsGlobal(var) THEN 
         CHOOSE variable \in globalVars : variable.name = var.name 
     ELSE 
         CHOOSE variable \in threadLocals[workgroupId]: (variable.name = var.name /\ variable.scope = var.scope)

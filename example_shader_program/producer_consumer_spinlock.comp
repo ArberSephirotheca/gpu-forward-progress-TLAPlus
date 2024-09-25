@@ -2,14 +2,18 @@
 #extension GL_KHR_shader_subgroup_basic : enable
 layout(local_size_x = 256) in;
 
+uint lock;
 
-shared uint lock;
 void main() {
     lock = 0;
-    uint old = 1;
+    int gid = int(gl_GlobalInvocationID.x);
+    bool done = false;
     do {
+        if(!done) {
+            if (gid == atomicLoad())
+        }
         old = atomicExchange(lock, 1);
-    } while (old != 0);
+    } while (subgroup_all(old == 1));
     
     lock = 0;
 }

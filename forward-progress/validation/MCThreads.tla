@@ -46,8 +46,8 @@ cleanIntermediateVar(t) ==
 
 Assignment(t, vars) == 
     /\  LET workgroupId == WorkGroupId(t)+1
-            AssGlobalVars == {var \in vars : var.scope = "global" \/ var.scope = "shared"} 
-            AssthreadLocals == {var \in vars : var.scope # "global" /\ var.scope # "shared"}
+            AssGlobalVars == {var \in vars : var.scope = "global"} 
+            AssthreadLocals == {var \in vars : var.scope # "global"}
             currthreadLocals == threadLocals[WorkGroupId(t)+1]
         IN
             \* try to eliminated var with old value and intermediate var

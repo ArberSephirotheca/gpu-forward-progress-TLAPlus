@@ -434,14 +434,14 @@ impl VariableSymbolTable {
     }
 
     pub fn get_global_variables(&self) -> Vec<VariableInfo> {
-        let shared: Vec<VariableInfo> = self.shared.values().cloned().collect();
-        let mut global: Vec<VariableInfo> = self
+        // let shared: Vec<VariableInfo> = self.shared.values().cloned().collect();
+        let global: Vec<VariableInfo> = self
             .global
             .values()
             .cloned()
             .filter(|val| !val.is_builtin())
             .collect();
-        global.extend(shared);
+        // global.extend(shared);
         global
     }
 }
