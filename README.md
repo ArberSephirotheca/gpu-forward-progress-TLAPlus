@@ -52,8 +52,12 @@ earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<siz
 - OpGroupAll
 - OpGroupNonUniformAll
 
-**Note**: The model treats the following instructions as equivalent:
-- `OpStore` and `OpAtomicStore`
+**Note**:
+- The model treats the following instructions as equivalent:
+    - `OpStore` and `OpAtomicStore`
+- Global variables (e.g. Storage Buffer) are assigned to default values if they are not initialized in the function body.
+    - For `uint` and `int` type, the default value is **0**.
+    - For `bool` type, the default value is **true**.
 
 ## Supported Type
 - int
