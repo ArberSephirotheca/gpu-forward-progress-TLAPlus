@@ -1,4 +1,4 @@
-use crate::compiler::ast::ast::{BinaryExpr, UnaryExpr, Expr, ResultType, Root, Stmt};
+use crate::compiler::ast::ast::{BinaryExpr, Expr, ResultType, Root, Stmt, UnaryExpr};
 /// `CodegenCx` is a struct that holds the compilation unit of the codegen.
 use crate::compiler::parse::symbol_table::*;
 use crate::compiler::parse::syntax::SyntaxNode;
@@ -10,7 +10,7 @@ use super::common::{
 };
 use crate::codegen::common::{IndexKind, InstructionName};
 
-# [derive(Debug)]
+#[derive(Debug)]
 pub struct CodegenCx {
     type_table: SpirvTypeTable,
     variable_table: VariableSymbolTable,
@@ -94,7 +94,7 @@ impl CodegenCx {
 
     // only builtin and constant variable can be resolved to a value
     fn construct_instruction_value(&self, info: &VariableInfo) -> InstructionValue {
-        if !info.access_chain.is_empty(){
+        if !info.access_chain.is_empty() {
             return InstructionValue::None;
         }
         if info.is_builtin() {
@@ -470,7 +470,7 @@ impl CodegenCx {
                         InstructionValue::None,
                     ),
                 );
-                self.increment_inst_position();
+                // self.increment_inst_position();
             }
 
             // fixme: handle array type
@@ -482,11 +482,11 @@ impl CodegenCx {
                 self.insert_variable(
                     var_name.clone(),
                     VariableInfo::new(
-                        // var_name,
-                        pointer_info.get_var_name(),
+                        var_name,
+                        // pointer_info.get_var_name(),
                         pointer_info.get_ty(),
                         pointer_info.access_chain,
-                        StorageClass::Local,
+                        StorageClass::Intermediate,
                         None,
                         None,
                         InstructionValue::None,
@@ -571,12 +571,43 @@ impl CodegenCx {
                 self.symbol_table_construction_pass_expr(var_name, &expr);
             }
             // decorate statement is used to attach built-in variables/metadata to a variable
-            Stmt::DecorateStatement(_) => {}
+            Stmt::DecorateStatement(decorate_stmt) => {
+                let name = decorate_stmt
+                    .name()
+                    .expect("DecorateStatement: Name not found in decorate statement")
+                    .text()
+                    .to_string();
+                let built_in_var = BuiltInVariable::cast(
+                    decorate_stmt
+                        .built_in_var()
+                        .expect(
+                            "DecorateStatement: Built-in variable not found in decorate statement",
+                        )
+                        .kind(),
+                );
+                self.insert_variable(
+                    name.clone(),
+                    VariableInfo::new(
+                        name,
+                        SpirvType::Int {
+                            width: 32,
+                            signed: true,
+                        },
+                        vec![],
+                        StorageClass::Local,
+                        None,
+                        Some(built_in_var.clone()),
+                        InstructionValue::BuiltIn(InstructionBuiltInVariable::cast(built_in_var)),
+                    ),
+                );
+            }
             // fixme:: does not support OpAccesschain yet
             Stmt::StoreStatement(store_stmt) => {
-                let pointer_ssa_id = store_stmt.pointer()
+                let pointer_ssa_id = store_stmt
+                    .pointer()
                     .expect("StoreStatement: Pointer not found in store statement");
-                let pointer_info = self.lookup_variable(pointer_ssa_id.text())
+                let pointer_info = self
+                    .lookup_variable(pointer_ssa_id.text())
                     .expect("StoreStatement: Pointer not found in symbol table");
 
                 self.insert_variable(pointer_ssa_id.text().to_string(), pointer_info.clone());
@@ -584,9 +615,11 @@ impl CodegenCx {
                 self.increment_inst_position();
             }
             Stmt::AtomicStoreStatement(atomic_store_stmt) => {
-                let pointer_ssa_id = atomic_store_stmt.pointer()
+                let pointer_ssa_id = atomic_store_stmt
+                    .pointer()
                     .expect("AtomicStoreStatement: Pointer not found in atomic store statement");
-                let pointer_info = self.lookup_variable(pointer_ssa_id.text())
+                let pointer_info = self
+                    .lookup_variable(pointer_ssa_id.text())
                     .expect("AtomicStoreStatement: Pointer not found in symbol table");
 
                 self.insert_variable(pointer_ssa_id.text().to_string(), pointer_info.clone());
@@ -630,11 +663,10 @@ impl CodegenCx {
                 let inst_arg_builder = InstructionArgument::builder();
                 // fixme: error handling
                 let var = self.lookup_variable(&var_name).unwrap();
-                let var_name = self.lookup_variable(&var_name).unwrap().id;
 
                 // fixme: avoid using unwrap, use better error handling instead
                 let arg = inst_arg_builder
-                    .name(var_name)
+                    .name(var.get_var_name())
                     .value(var.initial_value())
                     .index(var.get_index())
                     .scope(VariableScope::cast(&var_expr.storage_class().unwrap()))
@@ -709,7 +741,7 @@ impl CodegenCx {
                     .scope(VariableScope::cast(&operand_info.get_storage_class()))
                     .build()
                     .unwrap();
-                
+
                 Some(
                     inst_args_builder
                         .name(InstructionName::LogicalNot)
@@ -747,7 +779,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
-                    .name(first_operand.text().to_string())
+                    .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
@@ -755,15 +787,14 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
-                .name(second_operand.text().to_string())
-                .value(self.construct_instruction_value(&second_operand_info))
-                .index(IndexKind::Literal(-1))
-                .scope(VariableScope::cast(
-                    &second_operand_info.get_storage_class(),
-                ))
-                .build()
-                .unwrap();
-
+                    .name(second_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&second_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(
+                        &second_operand_info.get_storage_class(),
+                    ))
+                    .build()
+                    .unwrap();
 
                 Some(
                     inst_args_builder
@@ -812,7 +843,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
-                    .name(second_operand.text().to_string())
+                    .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(
@@ -1003,7 +1034,6 @@ impl CodegenCx {
                 let first_operand = less_expr.first_operand().unwrap();
                 let second_operand = less_expr.second_operand().unwrap();
 
-
                 let result_info = self.lookup_variable(&var_name).unwrap();
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
@@ -1108,7 +1138,8 @@ impl CodegenCx {
                 let first_operand = greater_expr.first_operand().unwrap();
                 let second_operand = greater_expr.second_operand().unwrap();
 
-                let result_info = self.lookup_variable(&var_name)
+                let result_info = self
+                    .lookup_variable(&var_name)
                     .expect("GreaterThanExpr: Result variable not found");
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
@@ -1161,7 +1192,8 @@ impl CodegenCx {
                 let first_operand = greater_equal_expr.first_operand().unwrap();
                 let second_operand = greater_equal_expr.second_operand().unwrap();
 
-                let result_info = self.lookup_variable(&var_name)
+                let result_info = self
+                    .lookup_variable(&var_name)
                     .expect("GreaterThanEqualExpr: Result variable not found");
                 let first_operand_info = self
                     .lookup_variable(first_operand.text())
@@ -1282,13 +1314,13 @@ impl CodegenCx {
                     // it is intializing a ssa, so the value is None
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::Intermediate)
+                    .scope(VariableScope::cast(&var_info.get_storage_class()))
                     .build()
                     .unwrap();
 
                 // second arg is the pointer to load from
                 let pointer = inst_arg2_builder
-                    .name(pointer_ssa_id.text().to_string() /* .get_var_name()*/)
+                    .name(pointer_info.get_var_name())
                     .value(self.construct_instruction_value(&pointer_info))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
@@ -1302,7 +1334,6 @@ impl CodegenCx {
                         .push_argument(result)
                         .push_argument(pointer),
                 )
-                
             }
             // fixme: consider memory scope in the future
             Expr::AtomicExchangeExpr(atomic_exch_expr) => {
@@ -1365,12 +1396,12 @@ impl CodegenCx {
                 let result_arg_builder = InstructionArgument::builder();
                 let predicate_arg_builder = InstructionArgument::builder();
 
-                let predicate = group_all_expr
-                    .predicate()
-                    .expect("GroupAllExpr: Predicate not found");
                 let execution_scope = group_all_expr
                     .execution_scope()
                     .expect("GroupAllExpr: Scope not found");
+                let predicate = group_all_expr
+                .predicate()
+                .expect("GroupAllExpr: Predicate not found");
 
                 let result_info = self
                     .lookup_variable(&var_name)
@@ -1396,7 +1427,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let predicate_arg = predicate_arg_builder
-                    .name(predicate.text().to_string())
+                    .name(predicate_info.get_var_name())
                     .value(self.construct_instruction_value(&predicate_info))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&predicate_info.get_storage_class()))
@@ -1404,7 +1435,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let scope_arg = InstructionArgument::builder()
-                    .name(execution_scope.text().to_string())
+                    .name(scope_info.get_var_name())
                     .value(InstructionValue::String(
                         ExecutionScope::from(scope).to_string(),
                     ))
@@ -1417,8 +1448,8 @@ impl CodegenCx {
                     .name(InstructionName::GroupAll)
                     .num_args(3)
                     .push_argument(result_arg)
-                    .push_argument(predicate_arg)
-                    .push_argument(scope_arg);
+                    .push_argument(scope_arg)
+                    .push_argument(predicate_arg);
 
                 Some(inst_args)
             }
@@ -1427,13 +1458,13 @@ impl CodegenCx {
                 let result_arg_builder = InstructionArgument::builder();
                 let predicate_arg_builder = InstructionArgument::builder();
 
-                let predicate = group_nonuniform_all
-                    .predicate()
-                    .expect("GroupNonUniformAllExpr: Predicate not found");
                 let execution_scope = group_nonuniform_all
                     .execution_scope()
                     .expect("GroupNonUniformAllExpr: Scope not found");
-
+                let predicate = group_nonuniform_all
+                .predicate()
+                .expect("GroupNonUniformAllExpr: Predicate not found");
+            
                 let result_info = self
                     .lookup_variable(&var_name)
                     .expect("GroupNonUniformAllExpr: Result not found");
@@ -1458,7 +1489,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let predicate_arg = predicate_arg_builder
-                    .name(predicate.text().to_string())
+                    .name(predicate_info.get_var_name())
                     .value(self.construct_instruction_value(&predicate_info))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&predicate_info.get_storage_class()))
@@ -1466,7 +1497,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let scope_arg = InstructionArgument::builder()
-                    .name(execution_scope.text().to_string())
+                    .name(scope_info.get_var_name())
                     .value(InstructionValue::String(
                         ExecutionScope::from(scope).to_string(),
                     ))
@@ -1479,8 +1510,8 @@ impl CodegenCx {
                     .name(InstructionName::GroupNonUniformAll)
                     .num_args(3)
                     .push_argument(result_arg)
-                    .push_argument(predicate_arg)
-                    .push_argument(scope_arg);
+                    .push_argument(scope_arg)
+                    .push_argument(predicate_arg);
 
                 Some(inst_args)
             }
@@ -1539,9 +1570,7 @@ impl CodegenCx {
                 }
             }
             // decorate statement is used to attach built-in variables/metadata to a variable
-            Stmt::DecorateStatement(_decorate_stmt) => {
-                None
-            }
+            Stmt::DecorateStatement(_decorate_stmt) => None,
             // fixme:: does not support OpAccesschain yet
             Stmt::StoreStatement(store_stmt) => {
                 let inst_args_builder = InstructionArguments::builder();

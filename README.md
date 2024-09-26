@@ -27,30 +27,32 @@ earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<siz
 - *scheduler*: HSA, OBE
 
 ## List of supported SPIR-V Instructions
-- OpVariable,
-- OpReturn,
-- OpLoad,
-- OpStore,
-- OpAtomicLoad,
-- OPAtomicStore,
-- OpBranch,
-- OpBranchConditional,
-- OpLabel,
-- OpSelectionMerge,
-- OpLoopMerge,
-- OpAtomicExchange,
-- OpEqual,
-- OpNotEqual,
-- OpLess,
-- OpLessOrEqual,
-- OpGreater,
-- GreaterOrEqual,
-- OpAdd,
-- OpSub,
-- OpMul,
+- OpVariable
+- OpReturn
+- OpLoad
+- OpStore
+- OpAtomicLoad
+- OPAtomicStore
+- OpBranch
+- OpBranchConditional
+- OpLabel
+- OpLogicalOr
+- OpEqual
+- OpNotEqual
+- OpLess
+- OpLessOrEqual
+- OpGreater
+- GreaterOrEqual
+- OpAdd
+- OpSub
+- OpMul
+- OpSelectionMerge
+- OpLoopMerge
+- OpAtomicExchange
+- OpGroupAll
+- OpGroupNonUniformAll
 
 **Note**: The model treats the following instructions as equivalent:
-- `OpLoad` and `OpAtomicLoad`
 - `OpStore` and `OpAtomicStore`
 
 ## Supported Type

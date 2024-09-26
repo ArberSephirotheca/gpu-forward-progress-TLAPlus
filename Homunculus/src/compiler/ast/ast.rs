@@ -16,7 +16,7 @@ pub trait BinaryExpr {
     fn second_operand(&self) -> Option<SyntaxToken>;
 }
 
-pub trait UnaryExpr{
+pub trait UnaryExpr {
     fn operand(&self) -> Option<SyntaxToken>;
 }
 

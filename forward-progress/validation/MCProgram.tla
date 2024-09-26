@@ -659,12 +659,18 @@ StrictlyStructurallyDominates(A, B) ==
     /\ StructurallyDominates(A, B)
     /\ A # B
 
+
+\* helper function that returns the index of the first OpLabel instruction
+\* We do not need to worry about empty set as we are guaranteed to have at least one OpLabel instruction (entry block)
+EntryLabel(insts) ==
+    Min({idx \in 1..Len(insts) : insts[idx] = "OpLabel"})
+    
 \* Generate blocks from the instructions
 GenerateBlocks(insts) == 
   [i \in 1..Len(insts) |-> 
      IF IsOpLabel(insts[i]) THEN 
        LET terminationIndex == Min({j \in i+1..Len(insts) : IsTerminationInstruction(insts[j])} \cup {Len(insts)})
-           tangle == IF i = 1 THEN [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroup(wg-1)] ELSE [wg \in 1..NumWorkGroups |-> {}]  (* First OpLabel includes all threads as tangle *)
+           tangle == IF i = EntryLabel(insts) THEN [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroup(wg-1)] ELSE [wg \in 1..NumWorkGroups |-> {}]  (* First OpLabel includes all threads as tangle *)
        IN 
             Block(i, terminationIndex, tangle, DetermineBlockType(i))
      ELSE Block(-1, <<>>, <<>>, "None")

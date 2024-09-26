@@ -294,7 +294,6 @@ impl VariableInfo {
     // FIXME: implement array and struct
     pub(crate) fn get_index(&self) -> IndexKind {
         match &self.ty {
-            
             _ => IndexKind::Literal(-1),
         }
     }
@@ -452,7 +451,6 @@ impl VariableSymbolTable {
             .cloned()
             .filter(|val| !val.is_builtin())
             .collect();
-        println!("Global variables: {:?}", global);
         global
     }
 }

@@ -56,7 +56,7 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_constant_true_expr(p))
     } else if p.at(TokenKind::OpConstantFalse) {
         Some(op_constant_false_expr(p))
-    } else if p.at(TokenKind::OpLogicalNot){
+    } else if p.at(TokenKind::OpLogicalNot) {
         Some(op_logical_not_expr(p))
     } else if p.at(TokenKind::OpReturn) {
         Some(op_return_statement(p))
@@ -92,7 +92,7 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_atomic_compare_exchange_expr(p))
     } else if p.at(TokenKind::OpGroupAll) {
         Some(op_group_all_expr(p))
-    } else if p.at(TokenKind::OpGroupNonUniformAll){
+    } else if p.at(TokenKind::OpGroupNonUniformAll) {
         Some(op_group_nonuniform_all_expr(p))
     } else if p.at(TokenKind::OpBranch) {
         Some(op_branch_statement(p))
@@ -169,7 +169,12 @@ fn op_decorate_stmt(p: &mut Parser) -> Option<CompletedMarker> {
     if p.at_set(&BUILT_IN_VARIABLE_SET) {
         p.bump();
     } else {
-        p.error();
+        while !p.at(TokenKind::Newline) {
+            p.bump();
+        }
+        p.expect(TokenKind::Newline);
+        m.complete(p, TokenKind::IgnoredOp);
+        return None;
     }
     p.expect(TokenKind::Newline);
     Some(m.complete(p, TokenKind::DecorateStatement))

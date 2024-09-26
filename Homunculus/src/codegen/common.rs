@@ -368,7 +368,7 @@ impl Program {
             if idx != self.global_vars.len() - 1 {
                 writeln!(
                     writer,
-                    "\t\tVar(\"{}\", \"{}\", {}, Index({})),",
+                    "\t\tVar(\"{}\", \"{}\", {}, {}),",
                     global_var.get_storage_class(),
                     global_var.get_var_name(),
                     global_var.initial_value(),
@@ -377,7 +377,7 @@ impl Program {
             } else {
                 writeln!(
                     writer,
-                    "\t\tVar(\"{}\", \"{}\", {}, Index({}))",
+                    "\t\tVar(\"{}\", \"{}\", {}, {})",
                     global_var.get_storage_class(),
                     global_var.get_var_name(),
                     global_var.initial_value(),
