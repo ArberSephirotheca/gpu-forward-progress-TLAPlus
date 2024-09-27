@@ -194,14 +194,22 @@ impl CodegenCx {
                         var_name.clone(),
                         spirv_type.clone(),
                         vec![],
-                        storage_class,
+                        storage_class.clone(),
                         None,
                         built_in,
                         default_value,
                     );
                     self.insert_variable(var_name, var_info);
                 }
-                self.increment_inst_position();
+
+                // increment the instruction position if the variable' scope is within current invocation, as global and shared variable shouldn't to be initialized explicitly by TLA+ code
+                match &storage_class {
+                    StorageClass::Global | StorageClass::Shared => {}
+                    _ => {
+                        self.increment_inst_position();
+                    }
+                    
+                }
             }
             // example: OpAccessChain
             // fixme: need testing
@@ -661,24 +669,29 @@ impl CodegenCx {
             Expr::VariableExpr(var_expr) => {
                 let inst_args_builder = InstructionArguments::builder();
                 let inst_arg_builder = InstructionArgument::builder();
-                // fixme: error handling
-                let var = self.lookup_variable(&var_name).unwrap();
+                // we dont initialize variable with scope larger than current invocation in TLA+, we do it in the global variable initialization pass
+                match &var_expr.storage_class().unwrap() {
+                    StorageClass::Global | StorageClass::Shared => None,
+                    _ => {
+                        let var = self.lookup_variable(&var_name).unwrap();
 
-                // fixme: avoid using unwrap, use better error handling instead
-                let arg = inst_arg_builder
-                    .name(var.get_var_name())
-                    .value(var.initial_value())
-                    .index(var.get_index())
-                    .scope(VariableScope::cast(&var_expr.storage_class().unwrap()))
-                    .build()
-                    .unwrap();
-
-                Some(
-                    inst_args_builder
-                        .name(InstructionName::Assignment)
-                        .num_args(1)
-                        .push_argument(arg),
-                )
+                        // fixme: avoid using unwrap, use better error handling instead
+                        let arg = inst_arg_builder
+                            .name(var.get_var_name())
+                            .value(var.initial_value())
+                            .index(var.get_index())
+                            .scope(VariableScope::cast(&var_expr.storage_class().unwrap()))
+                            .build()
+                            .unwrap();
+    
+                        Some(
+                            inst_args_builder
+                                .name(InstructionName::Assignment)
+                                .num_args(1)
+                                .push_argument(arg),
+                        )
+                    }
+                }
             }
             // example: OpAccessChain
             // fixme: need testing
@@ -1400,8 +1413,8 @@ impl CodegenCx {
                     .execution_scope()
                     .expect("GroupAllExpr: Scope not found");
                 let predicate = group_all_expr
-                .predicate()
-                .expect("GroupAllExpr: Predicate not found");
+                    .predicate()
+                    .expect("GroupAllExpr: Predicate not found");
 
                 let result_info = self
                     .lookup_variable(&var_name)
@@ -1462,9 +1475,9 @@ impl CodegenCx {
                     .execution_scope()
                     .expect("GroupNonUniformAllExpr: Scope not found");
                 let predicate = group_nonuniform_all
-                .predicate()
-                .expect("GroupNonUniformAllExpr: Predicate not found");
-            
+                    .predicate()
+                    .expect("GroupNonUniformAllExpr: Predicate not found");
+
                 let result_info = self
                     .lookup_variable(&var_name)
                     .expect("GroupNonUniformAllExpr: Result not found");

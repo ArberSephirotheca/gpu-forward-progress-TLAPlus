@@ -1,18 +1,20 @@
 ---- MODULE MCProgressModel ----
 EXTENDS Integers, Naturals, Sequences, MCThreads, TLC
 
-VARIABLES fairExecutionSet, selected
+VARIABLES fairExecutionSet, selected, runningThread
 
-vars == <<fairExecutionSet, pc, state, selected, threadLocals, globalVars, CFG, MaxPathLength>>
+vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, CFG, MaxPathLength>>
 
+
+InitState ==
+    /\ selected = -1
+    /\ runningThread = -1
 
 InitOBE ==
     /\  fairExecutionSet = {} 
-    /\  selected = -1
 
 InitHSA ==
     /\  fairExecutionSet = {0}
-    /\  selected = -1
 
 InitScheduler ==
     /\  IF Scheduler = "OBE" THEN
@@ -26,6 +28,7 @@ Init ==
     /\  InitProgram
     /\  InitThreads
     /\  InitScheduler
+    /\  InitState
 
 OBEUpdateFairExecutionSet(t) ==
     \* get the workgroup id of thread t, and update fair execution set based on the workgroup id of t
@@ -65,15 +68,23 @@ Execute(t) ==
         /\  ExecuteInstruction(t)
         /\  UpdateFairExecutionSet(t)
         /\  selected' = WorkGroupId(t)
+        /\  runningThread' = t
 
 
 Step ==
     LET ThreadsReady == {t \in Threads: state[t] = "ready"}
     IN
-         \*  if there is any thread that is not terminated, execute it
+        \*if there is any thread that is not terminated, execute it
         IF ThreadsReady # {} THEN
-            \E t \in ThreadsReady:
-                /\  Execute(t)
+            IF runningThread = -1 \/ IsMemoryOperation(ThreadInstructions[runningThread][pc[runningThread]]) \/ runningThread \notin ThreadsReady THEN
+                \E t \in ThreadsReady:
+                    /\  Execute(t)
+            ELSE
+                /\  Execute(runningThread)
+        
+        \* IF ThreadsReady # {} THEN
+        \*     \E t \in ThreadsReady:
+        \*         /\  Execute(t)
         ELSE
             /\ UNCHANGED vars
 \* Deadlock means reaching a state in which Next is not enabled.
