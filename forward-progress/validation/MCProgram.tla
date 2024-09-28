@@ -228,7 +228,7 @@ WorkGroupId(tid) == GlobalInvocationId(tid) \div WorkGroupSize
     
 SubgroupId(tid) == LocalInvocationId(tid) \div SubgroupSize
 
-SubgroupInovcationId(tid) == LocalInvocationId(tid) % SubgroupSize
+SubgroupInvocationId(tid) == LocalInvocationId(tid) % SubgroupSize
 
 ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
 
