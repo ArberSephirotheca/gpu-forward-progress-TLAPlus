@@ -541,7 +541,7 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
 
 
 
-(* result and pointer are variable, value is literal *)
+(* result and pointer are variable *)
 OpAtomicExchange(t, result, pointer, value) ==
     LET mangledResult == Mangle(t, result)
         mangledPointer == Mangle(t, pointer)
@@ -550,9 +550,7 @@ OpAtomicExchange(t, result, pointer, value) ==
         \* /\  VarExists(WorkGroupId(t)+1, mangledResult)
         /\  IsVariable(mangledPointer)
         /\  VarExists(WorkGroupId(t)+1, mangledPointer)
-        /\  
-            \/  IsLiteral(value) 
-            \/  IsExpression(value)
+
         /\  LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                 \* resultVar == GetVar(WorkGroupId(t)+1, mangledResult)
                 resultVar == mangledResult
@@ -572,25 +570,22 @@ OpAtomicExchange(t, result, pointer, value) ==
         /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
 (* result and pointer are variable, compare and value are literal *)
-OpAtomicCompareExchange(t, result, pointer, compare, value) ==
+OpAtomicCompareExchange(t, result, pointer, value, comparator) ==
     LET mangledResult == Mangle(t, result)
         mangledPointer == Mangle(t, pointer)
     IN
         /\  IsVariable(mangledResult)
-        /\  IsVariable(mangledPointer)
         /\  VarExists(WorkGroupId(t)+1, mangledPointer)
-        /\  IsLiteral(compare)
-        /\  
-            \/  IsLiteral(value)
-            \/  IsExpression(value)
+
         /\  LET pointerVar == GetVar(WorkGroupId(t)+1, mangledPointer)
                 \* resultVar == GetVar(WorkGroupId(t)+1, result)
                 resultVar == mangledResult
                 evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
                 evaluatedResultIndex == EvalExpr(t, WorkGroupId(t)+1, result.index)
                 evaluatedValue == EvalExpr(t, WorkGroupId(t)+1, value)
+                evaluatedComparator == EvalExpr(t, WorkGroupId(t)+1, comparator)
             IN 
-                IF pointerVar.value = compare.value THEN
+                IF pointerVar.value = evaluatedComparator THEN
                     /\  
                         IF evaluatedResultIndex > 0 /\ evaluatedPointerIndex > 0 THEN
                             Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex]), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})

@@ -526,7 +526,25 @@ impl CodegenCx {
             }
 
             Expr::AtomicCompareExchangeExpr(atomic_cmp_exch_expr) => {
-                unimplemented!();
+                let result_type = atomic_cmp_exch_expr.result_type().unwrap();
+                // get the actual type of the variable
+                let spirv_type = match self.lookup_type(result_type.text()) {
+                    Some(ty) => ty,
+                    None => panic!("Type {} not found", result_type),
+                };
+
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    self.resolve_spirv_type_to_default_value(&spirv_type).0,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
             }
 
             Expr::GroupAllExpr(_) => {
@@ -1402,7 +1420,70 @@ impl CodegenCx {
                 Some(inst_args)
             }
             Expr::AtomicCompareExchangeExpr(atomic_cmp_exch_expr) => {
-                todo!()
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let pointer_arg_builder = InstructionArgument::builder();
+                let value_arg_builder = InstructionArgument::builder();
+                let comparator_arg_builder = InstructionArgument::builder();
+
+                let pointer = atomic_cmp_exch_expr.pointer().unwrap();
+                let value = atomic_cmp_exch_expr.value().unwrap();
+                let comparator = atomic_cmp_exch_expr.comparator().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("AtomicExchangeExpr: Result not found");
+                let pointer_info = self
+                    .lookup_variable(pointer.text())
+                    .expect("AtomicExchangeExpr: Pointer not found");
+                let value_info = self
+                    .lookup_variable(value.text())
+                    .expect("AtomicExchangeExpr: Value not found");
+                let comparator_info = self
+                    .lookup_variable(comparator.text())
+                    .expect("AtomicExchangeExpr: Comparator not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let pointer_arg = pointer_arg_builder
+                    .name(pointer_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&pointer_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let value_arg = value_arg_builder
+                    .name(value_info.get_var_name())
+                    .value(self.construct_instruction_value(&value_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&value_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+                
+                let comparator_arg = comparator_arg_builder
+                    .name(comparator_info.get_var_name())
+                    .value(self.construct_instruction_value(&comparator_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&comparator_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let inst_args = inst_args_builder
+                    .name(InstructionName::AtomicCompareExchange)
+                    .num_args(4)
+                    .push_argument(result_arg)
+                    .push_argument(pointer_arg)
+                    .push_argument(value_arg)
+                    .push_argument(comparator_arg);
+
+                Some(inst_args)
             }
             Expr::GroupAllExpr(group_all_expr) => {
                 let inst_args_builder = InstructionArguments::builder();

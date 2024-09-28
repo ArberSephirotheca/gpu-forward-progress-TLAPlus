@@ -562,6 +562,71 @@ impl AtomicExchangeExpr {
     }
 }
 
+impl AtomicCompareExchangeExpr{
+    pub(crate) fn result_type(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .find(|x| x.kind() == TokenKind::Ident)
+    }
+
+    pub(crate) fn pointer(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn memory(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
+    }
+
+    pub(crate) fn memory_semantics_equal(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(3)
+    }
+    
+    pub(crate) fn memory_semantics_unequal(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(4)
+    }
+
+    pub(crate) fn value(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(
+                |x: &rowan::SyntaxToken<crate::compiler::parse::syntax::AsukaLanguage>| {
+                    x.kind() == TokenKind::Ident
+                },
+            )
+            .nth(5)
+    }
+
+    pub(crate) fn comparator(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(
+                |x: &rowan::SyntaxToken<crate::compiler::parse::syntax::AsukaLanguage>| {
+                    x.kind() == TokenKind::Ident
+                },
+            )
+            .nth(6)
+    }
+
+}
 impl GroupAllExpr {
     pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
         self.0

@@ -709,30 +709,30 @@ fn op_atomic_exchange_expr(p: &mut Parser) -> CompletedMarker {
     m.complete(p, TokenKind::AtomicExchangeExpr)
 }
 
-/// example: OpAtomicCompareExchange %uint %sharedVariable %uint_1 %uint_0 %uint_0 %19 %18
+/// example: OpAtomicCompareExchange %uint %27 %uint_1 %uint_0 %uint_0 %19 %18
 fn op_atomic_compare_exchange_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     // skip OpAtomicExchange token
     p.bump();
-    // p.expect(TokenKind::Percent);
+     
+    // result type
+    p.expect(TokenKind::Ident);
+    // pointer
+    p.expect(TokenKind::Ident);
+    // memory scope
+    p.expect(TokenKind::Ident);
+    // memory senmatics equal
+    p.expect(TokenKind::Ident);
+    // memory semantics unequal
+    p.expect(TokenKind::Ident);
+    // value
+    p.expect(TokenKind::Ident);
+    // comparator
     p.expect(TokenKind::Ident);
 
-    // p.expect(TokenKind::Percent);
-    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
 
-    // p.expect(TokenKind::Percent);
-    p.expect(TokenKind::Ident);
-
-    p.expect(TokenKind::Ident);
-
-    p.expect(TokenKind::Ident);
-
-    // p.expect(TokenKind::Percent);
-    p.expect(TokenKind::Ident);
-
-    p.expect(TokenKind::Ident);
-
-    m.complete(p, TokenKind::AtomicExchangeExpr)
+    m.complete(p, TokenKind::AtomicCompareExchangeExpr)
 }
 
 /// example: OpGroupAll %bool %uint_0 %value

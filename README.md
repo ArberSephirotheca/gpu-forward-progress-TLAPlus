@@ -49,6 +49,7 @@ earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<siz
 - OpSelectionMerge
 - OpLoopMerge
 - OpAtomicExchange
+- OpAtomicCompareExchange
 - OpGroupAll
 - OpGroupNonUniformAll
 
