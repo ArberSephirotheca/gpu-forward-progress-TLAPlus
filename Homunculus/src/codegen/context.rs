@@ -643,7 +643,33 @@ impl CodegenCx {
                 self.insert_variable(var_name, var_info);
                 self.increment_inst_position();
             }
+            Expr::GroupAnyExpr(_) => {
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    SpirvType::Bool,
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                );
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
             Expr::GroupNonUniformAllExpr(_) => {
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    SpirvType::Bool,
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                );
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
+            Expr::GroupNonUniformAnyExpr(_) => {
                 let var_info = VariableInfo::new(
                     var_name.clone(),
                     SpirvType::Bool,
@@ -1850,6 +1876,68 @@ impl CodegenCx {
 
                 Some(inst_args)
             }
+            Expr::GroupAnyExpr(group_any_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let predicate_arg_builder = InstructionArgument::builder();
+
+                let execution_scope = group_any_expr
+                    .execution_scope()
+                    .expect("GroupAnyExpr: Scope not found");
+                let predicate = group_any_expr
+                    .predicate()
+                    .expect("GroupAnyExpr: Predicate not found");
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("GroupAnyExpr: Result not found");
+                let predicate_info = self
+                    .lookup_variable(predicate.text())
+                    .expect("GroupAnyExpr: Predicate not found");
+                let scope_info = self
+                    .lookup_variable(execution_scope.text())
+                    .expect("GroupAnyExpr: Scope not found");
+                let scope = scope_info
+                    .const_value
+                    .as_ref()
+                    .expect("GroupAnyExpr: Scope is not a constant")
+                    .get_int_value();
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let predicate_arg = predicate_arg_builder
+                    .name(predicate_info.get_var_name())
+                    .value(self.construct_instruction_value(&predicate_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&predicate_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let scope_arg = InstructionArgument::builder()
+                    .name(scope_info.get_var_name())
+                    .value(InstructionValue::String(
+                        ExecutionScope::from(scope).to_string(),
+                    ))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::Literal)
+                    .build()
+                    .unwrap();
+
+                let inst_args = inst_args_builder
+                    .name(InstructionName::GroupAny)
+                    .num_args(3)
+                    .push_argument(result_arg)
+                    .push_argument(scope_arg)
+                    .push_argument(predicate_arg);
+
+                Some(inst_args)
+            }
             Expr::GroupNonUniformAllExpr(group_nonuniform_all) => {
                 let inst_args_builder = InstructionArguments::builder();
                 let result_arg_builder = InstructionArgument::builder();
@@ -1905,6 +1993,68 @@ impl CodegenCx {
 
                 let inst_args = inst_args_builder
                     .name(InstructionName::GroupNonUniformAll)
+                    .num_args(3)
+                    .push_argument(result_arg)
+                    .push_argument(scope_arg)
+                    .push_argument(predicate_arg);
+
+                Some(inst_args)
+            }
+            Expr::GroupNonUniformAnyExpr(group_nonuniform_any) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let predicate_arg_builder = InstructionArgument::builder();
+
+                let execution_scope = group_nonuniform_any
+                    .execution_scope()
+                    .expect("GroupNonUniformAnyExpr: Scope not found");
+                let predicate = group_nonuniform_any
+                    .predicate()
+                    .expect("GroupNonUniformAnyExpr: Predicate not found");
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("GroupNonUniformAnyExpr: Result not found");
+                let predicate_info = self
+                    .lookup_variable(predicate.text())
+                    .expect("GroupNonUniformAnyExpr: Predicate not found");
+                let scope_info = self
+                    .lookup_variable(execution_scope.text())
+                    .expect("GroupNonUniformAnyExpr: Scope not found");
+                let scope = scope_info
+                    .const_value
+                    .as_ref()
+                    .expect("GroupNonUniformAnyExpr: Scope is not a constant")
+                    .get_int_value();
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let predicate_arg = predicate_arg_builder
+                    .name(predicate_info.get_var_name())
+                    .value(self.construct_instruction_value(&predicate_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&predicate_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let scope_arg = InstructionArgument::builder()
+                    .name(scope_info.get_var_name())
+                    .value(InstructionValue::String(
+                        ExecutionScope::from(scope).to_string(),
+                    ))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::Literal)
+                    .build()
+                    .unwrap();
+
+                let inst_args = inst_args_builder
+                    .name(InstructionName::GroupNonUniformAny)
                     .num_args(3)
                     .push_argument(result_arg)
                     .push_argument(scope_arg)

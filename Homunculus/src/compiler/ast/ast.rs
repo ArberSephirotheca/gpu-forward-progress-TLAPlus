@@ -91,7 +91,11 @@ pub struct AtomicCompareExchangeExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct GroupAllExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
+pub struct GroupAnyExpr(SyntaxNode);
+#[derive(Debug, ResultType)]
 pub struct GroupNonUniformAllExpr(SyntaxNode);
+#[derive(Debug, ResultType)]
+pub struct GroupNonUniformAnyExpr(SyntaxNode);
 #[derive(Debug)]
 pub struct ReturnStatement(SyntaxNode);
 #[derive(Debug)]
@@ -134,7 +138,9 @@ pub enum Expr {
     AtomicExchangeExpr(AtomicExchangeExpr),
     AtomicCompareExchangeExpr(AtomicCompareExchangeExpr),
     GroupAllExpr(GroupAllExpr),
+    GroupAnyExpr(GroupAnyExpr),
     GroupNonUniformAllExpr(GroupNonUniformAllExpr),
+    GroupNonUniformAnyExpr(GroupNonUniformAnyExpr),
 }
 
 #[derive(Debug)]
@@ -200,8 +206,12 @@ impl Expr {
                 AtomicCompareExchangeExpr(node),
             )),
             TokenKind::GroupAllExpr => Some(Self::GroupAllExpr(GroupAllExpr(node))),
+            TokenKind::GroupAnyExpr => Some(Self::GroupAnyExpr(GroupAnyExpr(node))),
             TokenKind::GroupNonUniformAllExpr => {
                 Some(Self::GroupNonUniformAllExpr(GroupNonUniformAllExpr(node)))
+            }
+            TokenKind::GroupNonUniformAnyExpr => {
+                Some(Self::GroupNonUniformAnyExpr(GroupNonUniformAnyExpr(node)))
             }
             _ => None,
         }
@@ -662,7 +672,43 @@ impl GroupAllExpr {
     }
 }
 
+impl GroupAnyExpr {
+    pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn predicate(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
+    }
+}
+
 impl GroupNonUniformAllExpr {
+    pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn predicate(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
+    }
+}
+
+impl GroupNonUniformAnyExpr {
     pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()

@@ -554,6 +554,101 @@ OpGroupAll(t, result, scope, predicate) ==
 
 
 
+OpGroupAny(t, result, scope, predicate) ==
+    LET mangledResult == Mangle(t, result)
+    IN
+        /\  
+            \/  /\  IsVariable(mangledResult)
+                \* /\  VarExists(WorkGroupId(t)+1, mangledResult)
+            \/  IsIntermediate(mangledResult)
+        /\  scope.value \in ScopeOperand
+        /\  IF scope.value = "subgroup" THEN
+                /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
+                        currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle[WorkGroupId(t) + 1]
+                    IN
+                        IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
+                                Print("UB: All threads within subgroup must converge at current block for OpGroupAny", FALSE)
+                        \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
+                        ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
+                            /\  state' = [state EXCEPT ![t] = "subgroup"]
+                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                        ELSE IF \E sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                            /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
+                            /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+                                    tid \in Threads |->
+                                        IF tid \in sthreads THEN 
+                                            "ready" 
+                                        ELSE 
+                                            state[tid]
+                                ]
+                            /\  pc' = [
+                                    tid \in Threads |->
+                                        IF tid \in sthreads THEN 
+                                            pc[tid] + 1
+                                        ELSE 
+                                            pc[tid]
+                                ]
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                        ELSE 
+                            /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
+                            /\  state' = [\* release all barrier in the subgroup, marking barrier as
+                                    tid \in Threads |->
+                                        IF tid \in sthreads THEN 
+                                            "ready" 
+                                        ELSE 
+                                            state[tid]
+                                ]
+                            /\  pc' = [
+                                    tid \in Threads |->
+                                        IF tid \in sthreads THEN 
+                                            pc[tid] + 1
+                                        ELSE 
+                                            pc[tid]
+                                ]
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+            ELSE IF scope.value = "workgroup" THEN
+                /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
+                    IN      \* if there is a thread that has not reached the opgroupAny, return false
+                        /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
+                                /\  state' = [state EXCEPT ![t] = "workgroup"]
+                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                            ELSE IF \E wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
+                                /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+                                        tid \in Threads |->
+                                            IF tid \in wthreads THEN 
+                                                "ready" 
+                                            ELSE 
+                                                state[tid]
+                                    ]
+                                /\  pc' = [
+                                        tid \in Threads |->
+                                            IF tid \in wthreads THEN 
+                                                pc[tid] + 1
+                                            ELSE 
+                                                pc[tid]
+                                    ]
+                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                            ELSE 
+                                /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE, Index(-1)): wthread \in wthreads })
+                                /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+                                        tid \in Threads |->
+                                            IF tid \in wthreads THEN 
+                                                "ready" 
+                                            ELSE 
+                                                state[tid]
+                                    ]
+                                /\  pc' = [
+                                        tid \in Threads |->
+                                            IF tid \in wthreads THEN 
+                                                pc[tid] + 1
+                                            ELSE 
+                                                pc[tid]
+                                    ]
+                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+            ELSE
+                /\  FALSE
+
 
 OpGroupNonUniformAll(t, result, scope, predicate) ==
     LET mangledResult == Mangle(t, result)
@@ -607,6 +702,56 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
                 /\  FALSE
 
 
+OpGroupNonUniformAny(t, result, scope, predicate) ==
+    LET mangledResult == Mangle(t, result)
+    IN
+        /\  
+            \/  /\  IsVariable(result)
+                \* /\  VarExists(WorkGroupId(t)+1, result)
+            \/  IsIntermediate(result)
+        /\  scope.value \in ScopeOperand
+        /\  IF scope.value = "subgroup" THEN
+                /\  LET active_subgroup_threads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \cap FindCurrentBlock(CFG.node, pc[t]).tangle[WorkGroupId(t) + 1]
+                    IN
+                        IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
+                            /\  state' = [state EXCEPT ![t] = "subgroup"]
+                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                        ELSE IF \E sthread \in active_subgroup_threads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                            /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in active_subgroup_threads})
+                            /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+                                    tid \in Threads |->
+                                        IF tid \in active_subgroup_threads THEN 
+                                            "ready" 
+                                        ELSE 
+                                            state[tid]
+                                ]
+                            /\  pc' = [
+                                    tid \in Threads |->
+                                        IF tid \in active_subgroup_threads THEN 
+                                            pc[tid] + 1
+                                        ELSE 
+                                            pc[tid]
+                                ]
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                        ELSE 
+                            /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in active_subgroup_threads })
+                            /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+                                    tid \in Threads |->
+                                        IF tid \in active_subgroup_threads THEN 
+                                            "ready" 
+                                        ELSE 
+                                            state[tid]
+                                ]
+                            /\  pc' = [
+                                    tid \in Threads |->
+                                        IF tid \in active_subgroup_threads THEN 
+                                            pc[tid] + 1
+                                        ELSE 
+                                            pc[tid]
+                                ]
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+            ELSE
+                /\  FALSE
 
 (* result and pointer are variable *)
 OpAtomicExchange(t, result, pointer, value) ==
@@ -803,8 +948,12 @@ ExecuteInstruction(t) ==
                 OpControlBarrier(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpGroupAll" THEN
                 OpGroupAll(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpGroupAny" THEN
+                OpGroupAny(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpGroupNonUniformAll" THEN
                 OpGroupNonUniformAll(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpGroupNonUniformAny" THEN
+                OpGroupNonUniformAny(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpLoopMerge" THEN
                 OpLoopMerge(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpSelectionMerge" THEN

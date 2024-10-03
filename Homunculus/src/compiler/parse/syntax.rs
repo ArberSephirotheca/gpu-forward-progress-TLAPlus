@@ -128,8 +128,10 @@ pub enum TokenKind {
     AtomicExchangeExpr,
     AtomicCompareExchangeExpr,
     GroupAllExpr,
+    GroupAnyExpr,
     GroupNonUniformAllExpr,
-
+    GroupNonUniformAnyExpr,
+    
     // Type expression
     TypeBoolExpr,
     TypeIntExpr,
@@ -306,8 +308,12 @@ pub enum TokenKind {
     OpAtomicCompareExchange,
     #[regex("OpGroupAll")]
     OpGroupAll,
+    #[regex("OpGroupAny")]
+    OpGroupAny,
     #[regex("OpGroupNonUniformAll")]
     OpGroupNonUniformAll,
+    #[regex("OpGroupNonUniformAny")]
+    OpGroupNonUniformAny,
     // #[regex("Op[A-Za-z]*", |lex|
     //     let inst = lex.slice();
     //     if instruction_not_supported(inst) {

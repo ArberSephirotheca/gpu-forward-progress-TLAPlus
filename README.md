@@ -55,7 +55,9 @@ earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<siz
 - OpAtomicExchange
 - OpAtomicCompareExchange
 - OpGroupAll
+- OpGroupAny
 - OpGroupNonUniformAll
+- OpGroupNonUniformAny
 
 **Note**:
 - The model treats the following instructions as equivalent:

@@ -100,8 +100,12 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_atomic_compare_exchange_expr(p))
     } else if p.at(TokenKind::OpGroupAll) {
         Some(op_group_all_expr(p))
+    } else if p.at(TokenKind::OpGroupAny) {
+        Some(op_group_any_expr(p))
     } else if p.at(TokenKind::OpGroupNonUniformAll) {
         Some(op_group_nonuniform_all_expr(p))
+    } else if p.at(TokenKind::OpGroupNonUniformAny) {
+        Some(op_group_nonuniform_any_expr(p))
     } else if p.at(TokenKind::OpBranch) {
         Some(op_branch_statement(p))
     } else if p.at(TokenKind::OpBranchConditional) {
@@ -803,6 +807,18 @@ fn op_group_all_expr(p: &mut Parser) -> CompletedMarker {
     m.complete(p, TokenKind::GroupAllExpr)
 }
 
+/// example: OpGroupAny %bool %uint_0 %value
+fn op_group_any_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpGroupAny token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::GroupAnyExpr)
+}
+
 /// example: OpGroupNonUniformAll %bool %uint_0 %value
 fn op_group_nonuniform_all_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
@@ -813,6 +829,18 @@ fn op_group_nonuniform_all_expr(p: &mut Parser) -> CompletedMarker {
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::GroupNonUniformAllExpr)
+}
+
+/// example: OpGroupNonUniformAny %bool %uint_0 %value
+fn op_group_nonuniform_any_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpGroupNonUniformAny token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::GroupNonUniformAnyExpr)
 }
 
 fn variable_def(p: &mut Parser) -> Option<CompletedMarker> {

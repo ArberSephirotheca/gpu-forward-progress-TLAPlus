@@ -61,7 +61,9 @@ pub enum InstructionName {
     AtomicExchange,
     AtomicCompareExchange,
     GroupAll,
+    GroupAny,
     GroupNonUniformAll,
+    GroupNonUniformAny,
 }
 
 impl Display for InstructionName {
@@ -95,7 +97,9 @@ impl Display for InstructionName {
             InstructionName::AtomicExchange => write!(f, "OpAtomicExchange"),
             InstructionName::AtomicCompareExchange => write!(f, "OpAtomicCompareExchange"),
             InstructionName::GroupAll => write!(f, "OpGroupAll"),
+            InstructionName::GroupAny => write!(f, "OpGroupAny"),
             InstructionName::GroupNonUniformAll => write!(f, "OpGroupNonUniformAll"),
+            InstructionName::GroupNonUniformAny => write!(f, "OpGroupNonUniformAny"),
         }
     }
 }
