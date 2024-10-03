@@ -56,6 +56,14 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_constant_true_expr(p))
     } else if p.at(TokenKind::OpConstantFalse) {
         Some(op_constant_false_expr(p))
+    } else if p.at(TokenKind::OpLogicalOr){
+        Some(op_logical_or_expr(p))
+    } else if p.at(TokenKind::OpLogicalAnd) {
+        Some(op_logical_and_expr(p))
+    } else if p.at(TokenKind::OpLogicalEqual) {
+        Some(op_logical_equal_expr(p))
+    } else if p.at(TokenKind::OpLogicalNotEqual){
+        Some(op_logical_not_equal_expr(p))
     } else if p.at(TokenKind::OpLogicalNot) {
         Some(op_logical_not_expr(p))
     } else if p.at(TokenKind::OpReturn) {
@@ -402,10 +410,58 @@ fn op_constant_false_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     // skip OpConstantFalse token
     p.bump();
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::ConstantFalseExpr)
+}
+
+
+/// example: OpLogicalOr %bool %14 %15
+fn op_logical_or_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpLogicalOr token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::LogicalOrExpr)
+}
+
+/// example: OpLogicalAnd %bool %14 %15
+fn op_logical_and_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpLogicalAnd token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::LogicalAndExpr)
+}
+
+/// example: OpLogicalEqual %bool %14 %15
+fn op_logical_equal_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpLogicalEqual token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::LogicalEqualExpr)
+}
+
+/// example: OpLogicalNotEqual %bool %14 %15
+fn op_logical_not_equal_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpLogicalNotEqual token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::LogicalNotEqualExpr)
 }
 
 /// example: OpLogicalNot %bool %14

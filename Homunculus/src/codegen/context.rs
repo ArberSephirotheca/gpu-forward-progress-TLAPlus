@@ -270,6 +270,90 @@ impl CodegenCx {
                 let constant_info = VariableInfo::new_const_bool(var_name.clone(), false);
                 self.insert_variable(var_name, constant_info);
             }
+            Expr::LogicalOr(logical_or_expr) => {
+                let result_type = logical_or_expr.result_type().unwrap();
+
+                let spirv_type = match self.lookup_type(result_type.text()) {
+                    Some(ty) => ty,
+                    None => panic!("Type {} not found", result_type),
+                };
+
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
+            Expr::LogicalAnd(logical_and_expr) => {
+                let result_type = logical_and_expr.result_type().unwrap();
+
+                let spirv_type = match self.lookup_type(result_type.text()) {
+                    Some(ty) => ty,
+                    None => panic!("Type {} not found", result_type),
+                };
+
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
+            Expr::LogicalEqual(logical_equal_expr) => {
+                let result_type = logical_equal_expr.result_type().unwrap();
+
+                let spirv_type = match self.lookup_type(result_type.text()) {
+                    Some(ty) => ty,
+                    None => panic!("Type {} not found", result_type),
+                };
+
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
+            Expr::LogicalNotEqual(logical_not_equal_expr) => {
+                let result_type = logical_not_equal_expr.result_type().unwrap();
+
+                let spirv_type = match self.lookup_type(result_type.text()) {
+                    Some(ty) => ty,
+                    None => panic!("Type {} not found", result_type),
+                };
+
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
             Expr::LogicalNot(logical_not_expr) => {
                 let result_type = logical_not_expr.result_type().unwrap();
 
@@ -286,7 +370,6 @@ impl CodegenCx {
                     None,
                     None,
                     InstructionValue::None,
-                    // self.resolve_spirv_type_to_default_value(spirv_type).0,
                 );
 
                 self.insert_variable(var_name, var_info);
@@ -743,6 +826,226 @@ impl CodegenCx {
             Expr::ConstExpr(_) => None,
             Expr::ConstTrueExpr(_) => None,
             Expr::ConstFalseExpr(_) => None,
+            Expr::LogicalOr(logical_and_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
+
+                let first_operand = logical_and_expr.first_operand().unwrap();
+                let second_operand = logical_and_expr.second_operand().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("LogicalOr: Result variable not found");
+                let first_operand_info = self
+                    .lookup_variable(first_operand.text())
+                    .expect("LogicalOr: First operand not found");
+
+                let second_operand_info = self
+                    .lookup_variable(second_operand.text())
+                    .expect("LogicalOr: Second operand not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let first_operand_arg = inst_arg1_builder
+                    .name(first_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&first_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let second_operand_arg = inst_arg2_builder
+                    .name(second_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&second_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(
+                        &second_operand_info.get_storage_class(),
+                    ))
+                    .build()
+                    .unwrap();
+
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::LogicalOr)
+                        .num_args(3)
+                        .push_argument(result_arg)
+                        .push_argument(first_operand_arg)
+                        .push_argument(second_operand_arg),
+                )
+            }
+            Expr::LogicalAnd(logical_and_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
+
+                let first_operand = logical_and_expr.first_operand().unwrap();
+                let second_operand = logical_and_expr.second_operand().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("LogicalAnd: Result variable not found");
+                let first_operand_info = self
+                    .lookup_variable(first_operand.text())
+                    .expect("LogicalAnd: First operand not found");
+
+                let second_operand_info = self
+                    .lookup_variable(second_operand.text())
+                    .expect("LogicalAnd: Second operand not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let first_operand_arg = inst_arg1_builder
+                    .name(first_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&first_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let second_operand_arg = inst_arg2_builder
+                    .name(second_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&second_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(
+                        &second_operand_info.get_storage_class(),
+                    ))
+                    .build()
+                    .unwrap();
+
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::LogicalAnd)
+                        .num_args(3)
+                        .push_argument(result_arg)
+                        .push_argument(first_operand_arg)
+                        .push_argument(second_operand_arg),
+                )
+            }
+            Expr::LogicalEqual(logical_equal_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
+
+                let first_operand = logical_equal_expr.first_operand().unwrap();
+                let second_operand = logical_equal_expr.second_operand().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("LogicalEqual: Result variable not found");
+                let first_operand_info = self
+                    .lookup_variable(first_operand.text())
+                    .expect("LogicalEqual: First operand not found");
+
+                let second_operand_info = self
+                    .lookup_variable(second_operand.text())
+                    .expect("LogicalEqual: Second operand not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let first_operand_arg = inst_arg1_builder
+                    .name(first_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&first_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let second_operand_arg = inst_arg2_builder
+                    .name(second_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&second_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(
+                        &second_operand_info.get_storage_class(),
+                    ))
+                    .build()
+                    .unwrap();
+
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::LogicalEqual)
+                        .num_args(3)
+                        .push_argument(result_arg)
+                        .push_argument(first_operand_arg)
+                        .push_argument(second_operand_arg),
+                )
+            }
+            Expr::LogicalNotEqual(logical_not_equal_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
+
+                let first_operand = logical_not_equal_expr.first_operand().unwrap();
+                let second_operand = logical_not_equal_expr.second_operand().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("LogicalNotEqual: Result variable not found");
+                let first_operand_info = self
+                    .lookup_variable(first_operand.text())
+                    .expect("LogicalNotEqual: First operand not found");
+
+                let second_operand_info = self
+                    .lookup_variable(second_operand.text())
+                    .expect("LogicalNotEqual: Second operand not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let first_operand_arg = inst_arg1_builder
+                    .name(first_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&first_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let second_operand_arg = inst_arg2_builder
+                    .name(second_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&second_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(
+                        &second_operand_info.get_storage_class(),
+                    ))
+                    .build()
+                    .unwrap();
+
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::LogicalNotEqual)
+                        .num_args(3)
+                        .push_argument(result_arg)
+                        .push_argument(first_operand_arg)
+                        .push_argument(second_operand_arg),
+                )
+            }
             Expr::LogicalNot(logical_not_expr) => {
                 let inst_args_builder = InstructionArguments::builder();
                 let result_arg_builder = InstructionArgument::builder();

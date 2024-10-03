@@ -19,10 +19,6 @@ Var(varScope, varName, varValue, index) ==
      value |-> varValue,
      index |-> index]
 
-\* Label(name, pc) == 
-\*     [name |-> name,
-\*      pc |-> pc]
-
 Index(idx) == 
     [realIndex |-> idx]
 
@@ -237,7 +233,7 @@ ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \i
 (* Thread Configuration *)
 InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicAdd" , "OpAtomicSub", "OpGroupAll", "OpGroupNonUniformAll",
 "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpControlBarrier", "OpLoopMerge",
-"OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalNot","OpEqual", "OpNotEqual", "OpLess", "OpLessOrEqual", "OpGreater",
+"OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalOr", "OpLogicalAnd", "OpLogicalEqual", "OpLogicalNotEqual", "OpLogicalNot","OpEqual", "OpNotEqual", "OpLess", "OpLessOrEqual", "OpGreater",
 "OpGreaterOrEqual", "OpAdd", "OpSub", "OpMul"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup", "tangle"}
@@ -445,22 +441,6 @@ StructuredControlFlowPaths(G) == {
         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
     }
 
-\* Return the set of paths from the entry block to block B
-\* B is the index to the opLabel
-\* StructuredControlFlowPathsTo(B) =={
-\*     p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), Len(CFG.node)) :
-\*         /\ p # <<>>(* p is not an empty sequence *)
-\*         /\ p[1] = 1
-\*         /\ p[Len(p)] = B
-\*         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
-\*     }
-\* StructuredControlFlowPathsTo(B) =={
-\*     p \in BoundedSeq(CFG.node, Len(CFG.node)) :
-\*         /\ p # <<>>(* p is not an empty sequence *)
-\*         /\ p[1].opLabelIdx = 1
-\*         /\ p[Len(p)].opLabelIdx = B
-\*         /\ \A i \in 1..(Len(p) - 1) : <<p[i].opLabelIdx, p[i+1].opLabelIdx>> \in CFG.edge
-\*     }
 
 \* fixme: maximum length of the path should be sounded.
 StructuredControlFlowPathsTo(B) =={

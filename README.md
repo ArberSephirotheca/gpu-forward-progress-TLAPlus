@@ -37,6 +37,10 @@ earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<siz
 - OpBranchConditional
 - OpLabel
 - OpLogicalOr
+- OpLogicalAnd
+- OpLogicalEqual
+- OpLogicalNotEqual
+- OpLogicalNot
 - OpEqual
 - OpNotEqual
 - OpLess

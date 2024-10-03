@@ -109,6 +109,10 @@ pub enum TokenKind {
     // ConstantCompositeExpr,
     ConstantTrueExpr,
     ConstantFalseExpr,
+    LogicalOrExpr,
+    LogicalAndExpr,
+    LogicalEqualExpr,
+    LogicalNotEqualExpr,
     LogicalNotExpr,
     LoadExpr,
     AtomicLoadExpr,
@@ -256,6 +260,14 @@ pub enum TokenKind {
     OpConstantTrue,
     #[regex("OpConstantFalse")]
     OpConstantFalse,
+    #[regex("OpLogicalOr")]
+    OpLogicalOr,
+    #[regex("OpLogicalAnd")]
+    OpLogicalAnd,
+    #[regex("OpLogicalEqual")]
+    OpLogicalEqual,
+    #[regex("OpLogicalNotEqual")]
+    OpLogicalNotEqual,
     #[regex("OpLogicalNot")]
     OpLogicalNot,
     #[regex("OpIAdd")]
@@ -296,7 +308,6 @@ pub enum TokenKind {
     OpGroupAll,
     #[regex("OpGroupNonUniformAll")]
     OpGroupNonUniformAll,
-
     // #[regex("Op[A-Za-z]*", |lex|
     //     let inst = lex.slice();
     //     if instruction_not_supported(inst) {

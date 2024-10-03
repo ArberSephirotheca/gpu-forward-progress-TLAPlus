@@ -52,6 +52,15 @@ pub struct ConstExpr(SyntaxNode);
 pub struct ConstTrueExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct ConstFalseExpr(SyntaxNode);
+
+#[derive(Debug, ResultType, BinaryExpr)]
+pub struct LogicalOr(SyntaxNode);
+#[derive(Debug, ResultType, BinaryExpr)]
+pub struct LogicalAnd(SyntaxNode);
+#[derive(Debug, ResultType, BinaryExpr)]
+pub struct LogicalEqual(SyntaxNode);
+#[derive(Debug, ResultType, BinaryExpr)]
+pub struct LogicalNotEqual(SyntaxNode);
 #[derive(Debug, ResultType, UnaryExpr)]
 pub struct LogicalNot(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
@@ -108,6 +117,10 @@ pub enum Expr {
     ConstExpr(ConstExpr),
     ConstTrueExpr(ConstTrueExpr),
     ConstFalseExpr(ConstFalseExpr),
+    LogicalOr(LogicalOr),
+    LogicalAnd(LogicalAnd),
+    LogicalEqual(LogicalEqual),
+    LogicalNotEqual(LogicalNotEqual),
     LogicalNot(LogicalNot),
     AddExpr(AddExpr),
     SubExpr(SubExpr),
@@ -162,6 +175,10 @@ impl Expr {
             // TokenKind::ConstantCompositeExpr => Some(Self::ConstExpr(ConstExpr(node))),
             TokenKind::ConstantTrueExpr => Some(Self::ConstTrueExpr(ConstTrueExpr(node))),
             TokenKind::ConstantFalseExpr => Some(Self::ConstFalseExpr(ConstFalseExpr(node))),
+            TokenKind::LogicalOrExpr => Some(Self::LogicalOr(LogicalOr(node))),
+            TokenKind::LogicalAndExpr => Some(Self::LogicalAnd(LogicalAnd(node))),
+            TokenKind::LogicalEqualExpr => Some(Self::LogicalEqual(LogicalEqual(node))),
+            TokenKind::LogicalNotEqualExpr => Some(Self::LogicalNotEqual(LogicalNotEqual(node))),
             TokenKind::LogicalNotExpr => Some(Self::LogicalNot(LogicalNot(node))),
             TokenKind::AddExpr => Some(Self::AddExpr(AddExpr(node))),
             TokenKind::SubExpr => Some(Self::SubExpr(SubExpr(node))),

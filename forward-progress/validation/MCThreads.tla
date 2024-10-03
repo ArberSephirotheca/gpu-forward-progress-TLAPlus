@@ -62,6 +62,73 @@ ChangeElementAt(var, index, value) ==
         Var(var.scope, var.name, [currentIndex \in DOMAIN var.value |-> IF currentIndex = index THEN value ELSE var.value[currentIndex] ], var.index)
 
 
+OpLogicalOr(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val = TRUE \/ operand2Val = TRUE THEN
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpLogicalAnd(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val = TRUE /\ operand2Val = TRUE THEN
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpLogicalEqual(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val = operand2Val THEN
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpLogicalNotEqual(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                /\  IF operand1Val # operand2Val THEN
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, TRUE, Index(-1))})
+                    ELSE
+                        Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 OpLogicalNot(t, var, operand) ==
     LET workgroupId == WorkGroupId(t)+1
         MangleVar == Mangle(t, var)
@@ -692,6 +759,14 @@ ExecuteInstruction(t) ==
                 OpAtomicAdd(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicSub" THEN
                 OpAtomicSub(t, ThreadArguments[t][pc[t]][1])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpLogicalOr" THEN 
+                OpLogicalOr(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpLogicalAnd" THEN
+                OpLogicalAnd(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpLogicalEqual" THEN
+                OpLogicalEqual(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpLogicalNotEqual" THEN
+                OpLogicalNotEqual(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpLogicalNot" THEN
                 OpLogicalNot(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpEqual" THEN
