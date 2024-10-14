@@ -56,8 +56,10 @@ earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<siz
 - OpAtomicCompareExchange
 - OpGroupAll
 - OpGroupAny
+- OpGroupBroadcast
 - OpGroupNonUniformAll
 - OpGroupNonUniformAny
+- OpControlBarrier
 
 **Note**:
 - The model treats the following instructions as equivalent:

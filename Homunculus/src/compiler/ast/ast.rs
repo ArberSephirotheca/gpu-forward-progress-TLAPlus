@@ -105,6 +105,8 @@ pub struct BranchStatement(SyntaxNode);
 #[derive(Debug)]
 pub struct SwitchStatement(SyntaxNode);
 #[derive(Debug)]
+pub struct ControlBarrierStatement(SyntaxNode);
+#[derive(Debug)]
 pub struct LoopMergeStatement(SyntaxNode);
 #[derive(Debug)]
 pub struct SelectionMergeStatement(SyntaxNode);
@@ -155,6 +157,7 @@ pub enum Stmt {
     BranchConditionalStatement(BranchConditionalStatement),
     BranchStatement(BranchStatement),
     SwitchStatement(SwitchStatement),
+    ControlBarrierStatement(ControlBarrierStatement),
     LoopMergeStatement(LoopMergeStatement),
     SelectionMergeStatement(SelectionMergeStatement),
     Expr(Expr),
@@ -235,6 +238,9 @@ impl Stmt {
             )),
             TokenKind::BranchStatement => Some(Self::BranchStatement(BranchStatement(node))),
             //TokenKind::SwitchStatement => Some(Self::SwitchStatement(SwitchStatement(node))),
+            TokenKind::ControlBarrierStatement => {
+                Some(Self::ControlBarrierStatement(ControlBarrierStatement(node)))
+            }
             TokenKind::LoopMergeStatement => {
                 Some(Self::LoopMergeStatement(LoopMergeStatement(node)))
             }
@@ -804,6 +810,32 @@ impl BranchStatement {
 
 impl SwitchStatement {
     // todo: implement
+}
+
+impl ControlBarrierStatement {
+    pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .find(|x| x.kind() == TokenKind::Ident)
+    }
+
+    pub(crate) fn memory_scope(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn memory_semantics(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
+    }
+    
 }
 
 impl LoopMergeStatement {

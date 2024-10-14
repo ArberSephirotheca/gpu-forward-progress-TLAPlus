@@ -110,6 +110,8 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_branch_statement(p))
     } else if p.at(TokenKind::OpBranchConditional) {
         Some(op_branch_conditional_statement(p))
+    } else if p.at(TokenKind::OpControlBarrier) {
+        Some(op_control_barrier_statement(p))
     } else if p.at(TokenKind::OpLoopMerge) {
         Some(op_loop_merge_statement(p))
     } else if p.at(TokenKind::OpSelectionMerge) {
@@ -692,11 +694,8 @@ fn op_branch_conditional_statement(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     // skip OpBranchConditional token
     p.bump();
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::BranchConditionalStatement)
@@ -707,7 +706,6 @@ fn op_branch_statement(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     // skip OpBranch token
     p.bump();
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::BranchStatement)
@@ -718,14 +716,24 @@ fn op_switch_statement(p: &mut Parser) -> CompletedMarker {
     todo!()
 }
 
+/// example: OpControlBarrier %uint_0 %uint_0 %uint_0
+fn op_control_barrier_statement(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpControlBarrier token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::ControlBarrierStatement)
+}
+
 /// example: OpLoopMerge %51 %52 None
 fn op_loop_merge_statement(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     // skip OpLoopMerge token
     p.bump();
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);

@@ -87,6 +87,7 @@ pub enum TokenKind {
     BranchConditionalStatement,
     BranchStatement,
     SwitchStatement,
+    ControlBarrierStatement,
 
     // Statement
     ExecutionModeStatement,
@@ -298,6 +299,8 @@ pub enum TokenKind {
     OpBranchConditional,
     // #[regex("OpSwitch")]
     // OpSwitch,
+    #[regex("OpControlBarrier")]
+    OpControlBarrier,
     #[regex("OpLoopMerge")]
     OpLoopMerge,
     #[regex("OpSelectionMerge")]

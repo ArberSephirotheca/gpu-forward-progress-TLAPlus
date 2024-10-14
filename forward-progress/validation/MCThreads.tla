@@ -395,7 +395,7 @@ OpAtomicSub(t, pointer) ==
         /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
  OpControlBarrier(t, scope) ==
-    IF scope = "subgroup" THEN \* already waiting at a subgroup barrier
+    IF GetVal(-1, scope) = "subgroup" THEN \* already waiting at a subgroup barrier
         \* find all threads and their corresponding barrier state within the same subgroup
         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
             currentTangle == FindCurrentBlock(CFG.node, pc[t]).tangle[WorkGroupId(t) + 1]
@@ -426,7 +426,7 @@ OpAtomicSub(t, pointer) ==
                     ]
                 /\  UNCHANGED <<threadLocals, globalVars, CFG, MaxPathLength>>
 
-    ELSE IF scope = "workgroup" THEN \* already waiting at a workgroup barrier
+    ELSE IF GetVal(-1, scope) = "workgroup" THEN \* already waiting at a workgroup barrier
         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
         IN
             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread

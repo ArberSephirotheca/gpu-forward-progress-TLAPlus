@@ -767,6 +767,9 @@ impl CodegenCx {
             Stmt::BranchConditionalStatement(_) => {
                 self.increment_inst_position();
             }
+            Stmt::ControlBarrierStatement(_) => {
+                self.increment_inst_position();
+            }
             Stmt::LoopMergeStatement(_) => {
                 self.increment_inst_position();
             }
@@ -2294,6 +2297,47 @@ impl CodegenCx {
                         .build()
                         .unwrap(),
                 )
+            }
+            Stmt::ControlBarrierStatement(control_barrier_stmt) => {
+                let inst_args_builder = InstructionArguments::builder();
+
+                let execution_scope = control_barrier_stmt
+                    .execution_scope()
+                    .expect("ControlBarrier Statement: Execution scope not found");
+                
+                let scope_info = self
+                    .lookup_variable(execution_scope.text())
+                    .expect("ControlBarrier Statement: Scope not found");
+                let scope = scope_info
+                    .const_value
+                    .as_ref()
+                    .expect("ControlBarrier Statement:: Scope is not a constant")
+                    .get_int_value();
+
+                let scope_arg = InstructionArgument::builder()
+                    .name(scope_info.get_var_name())
+                    .value(InstructionValue::String(
+                        ExecutionScope::from(scope).to_string(),
+                    ))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::Literal)
+                    .build()
+                    .unwrap();
+
+                let inst_args = inst_args_builder
+                    .name(InstructionName::ControlBarrier)
+                    .num_args(1)
+                    .push_argument(scope_arg)
+                    .build()
+                    .unwrap();
+
+                Some(Instruction::builder()
+                    .arguments(inst_args)
+                    .name(InstructionName::ControlBarrier)
+                    .scope(ExecutionScope::None)
+                    .position(self.increment_inst_position())
+                    .build()
+                    .unwrap())
             }
             Stmt::LoopMergeStatement(loop_merge_stmt) => {
                 let inst_args_builder = InstructionArguments::builder();
