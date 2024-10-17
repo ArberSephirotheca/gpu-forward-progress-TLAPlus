@@ -889,11 +889,11 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
 OpSwitch(t, selector, default, literals, ids) ==
     /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
             defaultVal == GetVal(-1, default)
-            literalsVal == [l \in literals |-> GetVal(-1, l)]
-            idsVal == [i \in ids |-> GetVal(-1, i)]
+            literalsVal == [idx \in 1..Len(literals) |-> GetVal(-1, literals[idx])]
+            idsVal == [idx \in 1..Len(ids) |-> GetVal(-1, ids[idx])]
             workGroupId == WorkGroupId(t)+1
         IN
-            IF EvalExpr(t, WorkGroupId(t)+1, selector) \in literalsVal THEN
+            IF EvalExpr(t, WorkGroupId(t)+1, selector) \in SeqToSet(literalsVal) THEN
                 LET val == EvalExpr(t, WorkGroupId(t)+1, selector)
                     index == CHOOSE i \in 1..Len(literalsVal): literalsVal[i] = val 
                 IN
@@ -996,8 +996,8 @@ ExecuteInstruction(t) ==
                 OpBranch(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpBranchConditional" THEN
                 OpBranchConditional(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
-            \* ELSE IF ThreadInstructions[t][pc[t]] = "OpSwitch" THEN
-            \*     OpSwitch(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpSwitch" THEN
+                OpSwitch(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3], ThreadArguments[t][pc[t]][4])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpControlBarrier" THEN
                 OpControlBarrier(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpGroupAll" THEN
