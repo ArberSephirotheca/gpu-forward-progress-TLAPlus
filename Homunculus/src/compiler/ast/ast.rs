@@ -65,10 +65,12 @@ pub struct LogicalNotEqual(SyntaxNode);
 pub struct LogicalNot(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
 pub struct AddExpr(SyntaxNode);
-
+#[derive(Debug, ResultType)]
+pub struct AtomicAddExpr(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
 pub struct SubExpr(SyntaxNode);
-
+#[derive(Debug, ResultType)]
+pub struct AtomicSubExpr(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
 pub struct MulExpr(SyntaxNode);
 
@@ -129,7 +131,9 @@ pub enum Expr {
     LogicalNotEqual(LogicalNotEqual),
     LogicalNot(LogicalNot),
     AddExpr(AddExpr),
+    AtomicAddExpr(AtomicAddExpr),
     SubExpr(SubExpr),
+    AtomicSubExpr(AtomicAddExpr),
     MulExpr(MulExpr),
     EqualExpr(EqualExpr),
     NotEqualExpr(NotEqualExpr),
@@ -190,7 +194,9 @@ impl Expr {
             TokenKind::LogicalNotEqualExpr => Some(Self::LogicalNotEqual(LogicalNotEqual(node))),
             TokenKind::LogicalNotExpr => Some(Self::LogicalNot(LogicalNot(node))),
             TokenKind::AddExpr => Some(Self::AddExpr(AddExpr(node))),
+            TokenKind::AtomicAddExpr => Some(Self::AtomicAddExpr(AtomicAddExpr(node))),
             TokenKind::SubExpr => Some(Self::SubExpr(SubExpr(node))),
+            TokenKind::AtomicSubExpr => Some(Self::AtomicAddExpr(AtomicAddExpr(node))),
             TokenKind::MulExpr => Some(Self::MulExpr(MulExpr(node))),
             TokenKind::EqualExpr => Some(Self::EqualExpr(EqualExpr(node))),
             TokenKind::NotEqualExpr => Some(Self::NotEqualExpr(NotEqualExpr(node))),
@@ -237,7 +243,7 @@ impl Stmt {
                 BranchConditionalStatement(node),
             )),
             TokenKind::BranchStatement => Some(Self::BranchStatement(BranchStatement(node))),
-            //TokenKind::SwitchStatement => Some(Self::SwitchStatement(SwitchStatement(node))),
+            TokenKind::SwitchStatement => Some(Self::SwitchStatement(SwitchStatement(node))),
             TokenKind::ControlBarrierStatement => {
                 Some(Self::ControlBarrierStatement(ControlBarrierStatement(node)))
             }
@@ -530,8 +536,82 @@ impl ConstExpr {
 
 impl AddExpr {}
 
+impl AtomicAddExpr {
+    pub(crate) fn pointer(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn memory(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
+    }
+
+    pub(crate) fn memory_semantics(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(3)
+    }
+
+    pub(crate) fn value(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(
+                |x: &rowan::SyntaxToken<crate::compiler::parse::syntax::AsukaLanguage>| {
+                    x.kind() == TokenKind::Ident
+                },
+            )
+            .nth(4)
+    }
+}
 impl SubExpr {}
 
+impl AtomicSubExpr {
+    pub(crate) fn pointer(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn memory(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
+    }
+
+    pub(crate) fn memory_semantics(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(3)
+    }
+
+    pub(crate) fn value(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(
+                |x: &rowan::SyntaxToken<crate::compiler::parse::syntax::AsukaLanguage>| {
+                    x.kind() == TokenKind::Ident
+                },
+            )
+            .nth(4)
+    }
+}
 impl MulExpr {
     pub(crate) fn expr(&self) -> Option<Expr> {
         self.0.children().find_map(Expr::cast)
@@ -595,7 +675,7 @@ impl AtomicExchangeExpr {
     }
 }
 
-impl AtomicCompareExchangeExpr{
+impl AtomicCompareExchangeExpr {
     pub(crate) fn result_type(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
@@ -626,7 +706,7 @@ impl AtomicCompareExchangeExpr{
             .filter(|x| x.kind() == TokenKind::Ident)
             .nth(3)
     }
-    
+
     pub(crate) fn memory_semantics_unequal(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()
@@ -658,7 +738,6 @@ impl AtomicCompareExchangeExpr{
             )
             .nth(6)
     }
-
 }
 impl GroupAllExpr {
     pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
@@ -809,7 +888,47 @@ impl BranchStatement {
 }
 
 impl SwitchStatement {
-    // todo: implement
+    pub(crate) fn selector(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .find(|x| x.kind() == TokenKind::Ident)
+    }
+
+    pub(crate) fn default(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn target_sets(&self) -> Vec<(SyntaxToken, SyntaxToken)> {
+        let mut tokens_iter = self
+            .0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Int || x.kind() == TokenKind::Ident)
+            .peekable();
+
+        let mut result: Vec<(SyntaxToken, SyntaxToken)> = Vec::new();
+
+        // skip selector and default
+        tokens_iter.next();
+        tokens_iter.next();
+
+        while let Some(first) = tokens_iter.next() {
+            if first.kind() == TokenKind::Int {
+                if let Some(second) = tokens_iter.next() {
+                    if second.kind() == TokenKind::Ident {
+                        result.push((first, second));
+                    }
+                }
+            }
+        }
+
+        result
+    }
 }
 
 impl ControlBarrierStatement {
@@ -835,7 +954,6 @@ impl ControlBarrierStatement {
             .filter(|x| x.kind() == TokenKind::Ident)
             .nth(2)
     }
-    
 }
 
 impl LoopMergeStatement {

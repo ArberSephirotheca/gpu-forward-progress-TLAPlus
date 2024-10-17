@@ -56,13 +56,13 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_constant_true_expr(p))
     } else if p.at(TokenKind::OpConstantFalse) {
         Some(op_constant_false_expr(p))
-    } else if p.at(TokenKind::OpLogicalOr){
+    } else if p.at(TokenKind::OpLogicalOr) {
         Some(op_logical_or_expr(p))
     } else if p.at(TokenKind::OpLogicalAnd) {
         Some(op_logical_and_expr(p))
     } else if p.at(TokenKind::OpLogicalEqual) {
         Some(op_logical_equal_expr(p))
-    } else if p.at(TokenKind::OpLogicalNotEqual){
+    } else if p.at(TokenKind::OpLogicalNotEqual) {
         Some(op_logical_not_equal_expr(p))
     } else if p.at(TokenKind::OpLogicalNot) {
         Some(op_logical_not_expr(p))
@@ -90,8 +90,12 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_less_than_equal_expr(p))
     } else if p.at(TokenKind::OpIAdd) {
         Some(op_add_expr(p))
+    } else if p.at(TokenKind::OpAtomicAdd) {
+        Some(op_atomic_add_expr(p))
     } else if p.at(TokenKind::OpISub) {
         Some(op_sub_expr(p))
+    } else if p.at(TokenKind::OpAtomicSub) {
+        Some(op_atomic_sub_expr(p))
     } else if p.at(TokenKind::OpIMul) {
         Some(op_mul_expr(p))
     } else if p.at(TokenKind::OpAtomicExchange) {
@@ -110,17 +114,15 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_branch_statement(p))
     } else if p.at(TokenKind::OpBranchConditional) {
         Some(op_branch_conditional_statement(p))
+    } else if p.at(TokenKind::OpSwitch) {
+        Some(op_switch_statement(p))
     } else if p.at(TokenKind::OpControlBarrier) {
         Some(op_control_barrier_statement(p))
     } else if p.at(TokenKind::OpLoopMerge) {
         Some(op_loop_merge_statement(p))
     } else if p.at(TokenKind::OpSelectionMerge) {
         Some(op_selection_merge_statement(p))
-    }
-    // else if p.at(TokenKind::OpSwitch){
-    //     Some(op_switch_statement(p))
-    // }
-    else if p.at_set(&IGNORED_INSTRUCTION_SET) {
+    } else if p.at_set(&IGNORED_INSTRUCTION_SET) {
         skip_ignored_op(p)
     } else {
         // todo: add more info
@@ -421,7 +423,6 @@ fn op_constant_false_expr(p: &mut Parser) -> CompletedMarker {
     m.complete(p, TokenKind::ConstantFalseExpr)
 }
 
-
 /// example: OpLogicalOr %bool %14 %15
 fn op_logical_or_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
@@ -659,6 +660,34 @@ fn op_add_expr(p: &mut Parser) -> CompletedMarker {
     m.complete(p, TokenKind::AddExpr)
 }
 
+/// example: OpAtomicAdd %uint  %result_ptr %uint_0 %uint_0 %value
+fn op_atomic_add_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpAtomicAdd token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::AtomicAddExpr)
+}
+
+/// example: OpAtomicSub %uint  %result_ptr %uint_0 %uint_0 %value
+fn op_atomic_sub_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpAtomicSub token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::AtomicSubExpr)
+}
+
 /// example: OpISub %int %int_0 %int_1
 fn op_sub_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
@@ -711,9 +740,22 @@ fn op_branch_statement(p: &mut Parser) -> CompletedMarker {
     m.complete(p, TokenKind::BranchStatement)
 }
 
-// fixme: implement switch statement
+// example: OpSwitch %uint_0 %if_end 1 %if_then
 fn op_switch_statement(p: &mut Parser) -> CompletedMarker {
-    todo!()
+    let m = p.start();
+    // skip OpSwitch token
+    p.bump();
+    // Selector
+    p.expect(TokenKind::Ident);
+    // Default
+    p.expect(TokenKind::Ident);
+    // literal, label
+    while !p.at(TokenKind::Newline) {
+        p.expect(TokenKind::Int);
+        p.expect(TokenKind::Ident);
+    }
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::SwitchStatement)
 }
 
 /// example: OpControlBarrier %uint_0 %uint_0 %uint_0
@@ -782,7 +824,7 @@ fn op_atomic_compare_exchange_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     // skip OpAtomicExchange token
     p.bump();
-     
+
     // result type
     p.expect(TokenKind::Ident);
     // pointer

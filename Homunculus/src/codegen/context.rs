@@ -208,7 +208,6 @@ impl CodegenCx {
                     _ => {
                         self.increment_inst_position();
                     }
-                    
                 }
             }
             // example: OpAccessChain
@@ -399,6 +398,30 @@ impl CodegenCx {
                 self.increment_inst_position();
             }
 
+            Expr::AtomicAddExpr(atomic_add_expr) => {
+                let result_type = atomic_add_expr.result_type().unwrap();
+                // let storage_class = add_expr.storage_class().unwrap();
+                // get the actual type of the variable
+                let spirv_type = match self.lookup_type(result_type.text()) {
+                    Some(ty) => ty,
+                    None => panic!("Type {} not found", result_type),
+                };
+
+                // variable expression would be a variable declaration, so its SSA form is the same as the variable name
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    self.resolve_spirv_type_to_default_value(spirv_type).0,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
+
             Expr::SubExpr(sub_expr) => {
                 let result_type = sub_expr.result_type().unwrap();
                 // let storage_class = add_expr.storage_class().unwrap();
@@ -422,6 +445,31 @@ impl CodegenCx {
                 self.insert_variable(var_name, var_info);
                 self.increment_inst_position();
             }
+
+            Expr::AtomicSubExpr(atomic_sub_expr) => {
+                let result_type = atomic_sub_expr.result_type().unwrap();
+                // let storage_class = add_expr.storage_class().unwrap();
+                // get the actual type of the variable
+                let spirv_type = match self.lookup_type(result_type.text()) {
+                    Some(ty) => ty,
+                    None => panic!("Type {} not found", result_type),
+                };
+
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                    // self.resolve_spirv_type_to_default_value(spirv_type).0,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
+
             Expr::MulExpr(mul_expr) => {
                 let result_type = mul_expr.result_type().unwrap();
                 // let storage_class = add_expr.storage_class().unwrap();
@@ -767,6 +815,9 @@ impl CodegenCx {
             Stmt::BranchConditionalStatement(_) => {
                 self.increment_inst_position();
             }
+            Stmt::SwitchStatement(_) => {
+                self.increment_inst_position();
+            }
             Stmt::ControlBarrierStatement(_) => {
                 self.increment_inst_position();
             }
@@ -813,7 +864,7 @@ impl CodegenCx {
                             .scope(VariableScope::cast(&var_expr.storage_class().unwrap()))
                             .build()
                             .unwrap();
-    
+
                         Some(
                             inst_args_builder
                                 .name(InstructionName::Assignment)
@@ -1168,6 +1219,59 @@ impl CodegenCx {
                         .push_argument(second_operand_arg),
                 )
             }
+            Expr::AtomicAddExpr(atomic_add_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
+
+                let pointer = atomic_add_expr.pointer().unwrap();
+                let value = atomic_add_expr.value().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("AtomicAddExpr: Result variable not found");
+                let pointer_info = self
+                    .lookup_variable(pointer.text())
+                    .expect("AtomicAddExpr: pointer not found");
+
+                let value_info = self
+                    .lookup_variable(value.text())
+                    .expect("AtomicAddExpr: value not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let pointer_arg = inst_arg1_builder
+                    .name(pointer_info.get_var_name())
+                    .value(self.construct_instruction_value(&pointer_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&pointer_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let value_arg = inst_arg2_builder
+                    .name(value_info.get_var_name())
+                    .value(self.construct_instruction_value(&value_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&value_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::AtomicAdd)
+                        .num_args(3)
+                        .push_argument(result_arg)
+                        .push_argument(pointer_arg)
+                        .push_argument(value_arg),
+                )
+            }
 
             Expr::SubExpr(sub_expr) => {
                 let inst_args_builder = InstructionArguments::builder();
@@ -1222,6 +1326,59 @@ impl CodegenCx {
                         .push_argument(result_arg)
                         .push_argument(first_operand_arg)
                         .push_argument(second_operand_arg),
+                )
+            }
+            Expr::AtomicSubExpr(atomic_sub_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
+
+                let pointer = atomic_sub_expr.pointer().unwrap();
+                let value = atomic_sub_expr.value().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("AtomicSubExpr: Result variable not found");
+                let pointer_info = self
+                    .lookup_variable(pointer.text())
+                    .expect("AtomicSubExpr: pointer not found");
+
+                let value_info = self
+                    .lookup_variable(value.text())
+                    .expect("AtomicSubExpr: value not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let pointer_arg = inst_arg1_builder
+                    .name(pointer_info.get_var_name())
+                    .value(self.construct_instruction_value(&pointer_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&pointer_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let value_arg = inst_arg2_builder
+                    .name(value_info.get_var_name())
+                    .value(self.construct_instruction_value(&value_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&value_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::AtomicSub)
+                        .num_args(3)
+                        .push_argument(result_arg)
+                        .push_argument(pointer_arg)
+                        .push_argument(value_arg),
                 )
             }
             Expr::MulExpr(mul_expr) => {
@@ -1798,7 +1955,7 @@ impl CodegenCx {
                     .scope(VariableScope::cast(&value_info.get_storage_class()))
                     .build()
                     .unwrap();
-                
+
                 let comparator_arg = comparator_arg_builder
                     .name(comparator_info.get_var_name())
                     .value(self.construct_instruction_value(&comparator_info))
@@ -2298,13 +2455,95 @@ impl CodegenCx {
                         .unwrap(),
                 )
             }
+            Stmt::SwitchStatement(switch_statement) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
+                let mut literal_seq_args: Vec<InstructionArgument> = Vec::new();
+                let mut id_seq_args: Vec<InstructionArgument> = Vec::new();
+                let selector = switch_statement.selector().unwrap();
+                let default_label = switch_statement.default().unwrap();
+                let target_labels = switch_statement.target_sets();
+                let selector_info = self.lookup_variable(selector.text()).unwrap();
+                let default_label_position = self.lookup_label(default_label.text()).unwrap();
+
+                let selector_arg = inst_arg1_builder
+                    .name(selector.text().to_string())
+                    .value(self.construct_instruction_value(&selector_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&selector_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let default_label_arg = inst_arg2_builder
+                    .name(default_label.text().to_string())
+                    .value(InstructionValue::Int(*default_label_position as i32))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::Literal)
+                    .build()
+                    .unwrap();
+                for target_label in target_labels {
+                    let literal = target_label.0.text().parse::<i32>().unwrap();
+                    let literal_arg = InstructionArgument::builder()
+                        .name(target_label.0.text().to_string())
+                        .value(InstructionValue::Int(literal))
+                        .index(IndexKind::Literal(-1))
+                        .scope(VariableScope::Literal)
+                        .build()
+                        .unwrap();
+
+                    let target_label_position = self.lookup_label(target_label.1.text()).unwrap();
+                    let target_label_arg = InstructionArgument::builder()
+                        .name(target_label.1.text().to_string())
+                        .value(InstructionValue::Int(*target_label_position as i32))
+                        .index(IndexKind::Literal(-1))
+                        .scope(VariableScope::Literal)
+                        .build()
+                        .unwrap();
+                    literal_seq_args.push(literal_arg);
+                    id_seq_args.push(target_label_arg);
+                }
+                let inst_args = inst_args_builder
+                    .name(InstructionName::Switch)
+                    .num_args(2)
+                    .push_argument(selector_arg)
+                    .push_argument(default_label_arg)
+                    .build()
+                    .unwrap();
+
+                let vec_args = vec![
+                    InstructionArguments::builder()
+                        .name(InstructionName::Switch)
+                        .num_args(literal_seq_args.len() as u32)
+                        .push_vec_arguments(literal_seq_args)
+                        .build()
+                        .unwrap(),
+                    InstructionArguments::builder()
+                        .name(InstructionName::Switch)
+                        .num_args(id_seq_args.len() as u32)
+                        .push_vec_arguments(id_seq_args)
+                        .build()
+                        .unwrap(),
+                ];
+
+                Some(
+                    Instruction::builder()
+                        .arguments(inst_args)
+                        .vec_arguments(vec_args)
+                        .name(InstructionName::Switch)
+                        .scope(ExecutionScope::None)
+                        .position(self.increment_inst_position())
+                        .build()
+                        .unwrap(),
+                )
+            }
             Stmt::ControlBarrierStatement(control_barrier_stmt) => {
                 let inst_args_builder = InstructionArguments::builder();
 
                 let execution_scope = control_barrier_stmt
                     .execution_scope()
                     .expect("ControlBarrier Statement: Execution scope not found");
-                
+
                 let scope_info = self
                     .lookup_variable(execution_scope.text())
                     .expect("ControlBarrier Statement: Scope not found");
@@ -2331,13 +2570,15 @@ impl CodegenCx {
                     .build()
                     .unwrap();
 
-                Some(Instruction::builder()
-                    .arguments(inst_args)
-                    .name(InstructionName::ControlBarrier)
-                    .scope(ExecutionScope::None)
-                    .position(self.increment_inst_position())
-                    .build()
-                    .unwrap())
+                Some(
+                    Instruction::builder()
+                        .arguments(inst_args)
+                        .name(InstructionName::ControlBarrier)
+                        .scope(ExecutionScope::None)
+                        .position(self.increment_inst_position())
+                        .build()
+                        .unwrap(),
+                )
             }
             Stmt::LoopMergeStatement(loop_merge_stmt) => {
                 let inst_args_builder = InstructionArguments::builder();

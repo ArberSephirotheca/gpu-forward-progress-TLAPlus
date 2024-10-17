@@ -41,6 +41,7 @@ pub enum InstructionName {
     AtomicStore,
     Branch,
     BranchConditional,
+    Switch,
     ControlBarrier,
     Label,
     SelectionMerge,
@@ -57,7 +58,9 @@ pub enum InstructionName {
     GreaterThan,
     GreaterThanEqual,
     Add,
+    AtomicAdd,
     Sub,
+    AtomicSub,
     Mul,
     AtomicExchange,
     AtomicCompareExchange,
@@ -78,6 +81,7 @@ impl Display for InstructionName {
             InstructionName::Store | InstructionName::AtomicStore => write!(f, "OpAtomicStore"),
             InstructionName::Branch => write!(f, "OpBranch"),
             InstructionName::BranchConditional => write!(f, "OpBranchConditional"),
+            InstructionName::Switch => write!(f, "OpSwitch"),
             InstructionName::ControlBarrier => write!(f, "OpControlBarrier"),
             InstructionName::Label => write!(f, "OpLabel"),
             InstructionName::SelectionMerge => write!(f, "OpSelectionMerge"),
@@ -94,7 +98,9 @@ impl Display for InstructionName {
             InstructionName::GreaterThan => write!(f, "OpGreater"),
             InstructionName::GreaterThanEqual => write!(f, "OpGreaterOrEqual"),
             InstructionName::Add => write!(f, "OpAdd"),
+            InstructionName::AtomicAdd => write!(f, "OpAtomicAdd"), 
             InstructionName::Sub => write!(f, "OpSub"),
+            InstructionName::AtomicSub => write!(f, "OpAtomicSub"),
             InstructionName::Mul => write!(f, "OpMul"),
             InstructionName::AtomicExchange => write!(f, "OpAtomicExchange"),
             InstructionName::AtomicCompareExchange => write!(f, "OpAtomicCompareExchange"),
@@ -317,14 +323,13 @@ pub struct InstructionArguments {
 
 impl Display for InstructionArguments {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "<<")?;
         for idx in 0..self.arguments.len() {
             write!(f, "{}", self.arguments[idx])?;
             if idx != self.arguments.len() - 1 {
                 write!(f, ", ")?;
             }
         }
-        write!(f, ">>")
+        Ok(())
     }
 }
 
@@ -334,11 +339,13 @@ pub struct Instruction {
     pub name: InstructionName,
     pub scope: ExecutionScope,
     pub arguments: InstructionArguments,
+    // this is used when some instructions have unddetermined number of arguments (e.g. OpSwitch)
+    pub vec_arguments: Option<Vec<InstructionArguments>>,
 }
 
 #[derive(Debug)]
 pub struct Thread {
-    pub instructions: SmallVec<[Instruction; 10]>,
+    pub instructions: SmallVec<[Instruction; 30]>,
 }
 
 /// `Program` is a struct that holds the program information.
@@ -422,10 +429,23 @@ impl Program {
         // Insert ThreadArguments
         writeln!(writer, r"ThreadArguments == [t \in 1..NumThreads |-> <<")?;
         for (idx, inst) in self.instructions.iter().enumerate() {
+            write!(writer, "<<")?;
+            write!(writer, "{}", inst.arguments)?;
+            if let Some(ref vec_args) = inst.vec_arguments{
+                write!(writer, ", ")?;
+                for (vec_arg_idx, vec_arg) in vec_args.iter().enumerate() {
+                    write!(writer, "<<")?;
+                    write!(writer, "{} ", vec_arg)?;
+                    write!(writer, ">>")?;
+                    if vec_arg_idx != vec_args.len() - 1 {
+                        write!(writer, ", ")?;
+                    }
+                }
+            }
+            write!(writer, ">>")?;
+
             if idx != self.instructions.len() - 1 {
-                writeln!(writer, "{}, ", inst.arguments)?;
-            } else {
-                writeln!(writer, "{}", inst.arguments)?;
+                writeln!(writer, ",")?;
             }
         }
         writeln!(writer, ">>]\n")?;

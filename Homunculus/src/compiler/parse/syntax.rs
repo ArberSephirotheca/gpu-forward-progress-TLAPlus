@@ -118,7 +118,9 @@ pub enum TokenKind {
     LoadExpr,
     AtomicLoadExpr,
     AddExpr,
+    AtomicAddExpr,
     SubExpr,
+    AtomicSubExpr,
     MulExpr,
     EqualExpr,
     NotEqualExpr,
@@ -132,7 +134,7 @@ pub enum TokenKind {
     GroupAnyExpr,
     GroupNonUniformAllExpr,
     GroupNonUniformAnyExpr,
-    
+
     // Type expression
     TypeBoolExpr,
     TypeIntExpr,
@@ -275,8 +277,12 @@ pub enum TokenKind {
     OpLogicalNot,
     #[regex("OpIAdd")]
     OpIAdd,
+    #[regex("OpAtomicIAdd")]
+    OpAtomicAdd,
     #[regex("OpISub")]
     OpISub,
+    #[regex("OpAtomicISub")]
+    OpAtomicSub,
     #[regex("OpIMul")]
     OpIMul,
     #[regex("OpIEqual")]
@@ -297,8 +303,8 @@ pub enum TokenKind {
     OpBranch,
     #[regex("OpBranchConditional")]
     OpBranchConditional,
-    // #[regex("OpSwitch")]
-    // OpSwitch,
+    #[regex("OpSwitch")]
+    OpSwitch,
     #[regex("OpControlBarrier")]
     OpControlBarrier,
     #[regex("OpLoopMerge")]

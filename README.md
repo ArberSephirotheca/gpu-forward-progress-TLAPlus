@@ -35,6 +35,7 @@ earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<siz
 - OPAtomicStore
 - OpBranch
 - OpBranchConditional
+- OpSwitch
 - OpLabel
 - OpLogicalOr
 - OpLogicalAnd
@@ -48,7 +49,9 @@ earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<siz
 - OpGreater
 - GreaterOrEqual
 - OpAdd
+- OpAtomicAdd
 - OpSub
+- OpAtomicSub
 - OpMul
 - OpSelectionMerge
 - OpLoopMerge

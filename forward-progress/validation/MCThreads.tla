@@ -248,6 +248,7 @@ OpGreaterOrEqual(t, var, operand1, operand2) ==
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
+
 OpAdd(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
         MangleVar == Mangle(t, var)
@@ -262,7 +263,36 @@ OpAdd(t, var, operand1, operand2) ==
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
 
+
+OpAtomicAdd(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val + operand2Val, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
 OpSub(t, var, operand1, operand2) ==
+    LET workgroupId == WorkGroupId(t)+1
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workgroupId, mangledOperand1)
+                operand2Val == GetVal(workgroupId, mangledOperand2)
+            IN
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val - operand2Val, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+
+OpAtomicSub(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
         MangleVar == Mangle(t, var)
         mangledOperand1 == Mangle(t, operand1)
@@ -360,7 +390,7 @@ OpAtomicStore(t, pointer, value) ==
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
         /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
-OpAtomicAdd(t, pointer) == 
+OpAtomicIncrement(t, pointer) == 
     LET mangledPointer == Mangle(t, pointer)
     IN
         /\  IsVariable(mangledPointer)
@@ -378,7 +408,7 @@ OpAtomicAdd(t, pointer) ==
         /\  UNCHANGED <<state, CFG, MaxPathLength>>
 
 
-OpAtomicSub(t, pointer) == 
+OpAtomicDecrement(t, pointer) == 
     LET mangledPointer == Mangle(t, pointer)
     IN
         /\  IsVariable(mangledPointer)
@@ -850,11 +880,31 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
         IN
             IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
                 /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, trueLabelVal), CFG.edge)
-                /\  pc' = [pc EXCEPT ![t] = GetVal(-1, trueLabel)]
+                /\  pc' = [pc EXCEPT ![t] = trueLabelVal]
             ELSE
                 /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, falseLabelVal), CFG.edge)
-                /\  pc' = [pc EXCEPT ![t] = GetVal(-1, falseLabel)]
+                /\  pc' = [pc EXCEPT ![t] = falseLabelVal]
     /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+
+OpSwitch(t, selector, default, literals, ids) ==
+    /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
+            defaultVal == GetVal(-1, default)
+            literalsVal == [l \in literals |-> GetVal(-1, l)]
+            idsVal == [i \in ids |-> GetVal(-1, i)]
+            workGroupId == WorkGroupId(t)+1
+        IN
+            IF EvalExpr(t, WorkGroupId(t)+1, selector) \in literalsVal THEN
+                LET val == EvalExpr(t, WorkGroupId(t)+1, selector)
+                    index == CHOOSE i \in 1..Len(literalsVal): literalsVal[i] = val 
+                IN
+                    /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), idsVal[index]), CFG.edge)
+                    /\  pc' = [pc EXCEPT ![t] = idsVal[index]]
+            ELSE
+                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), defaultVal), CFG.edge)
+                /\  pc' = [pc EXCEPT ![t] = defaultVal]
+    /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+
+(* structured loop, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block *)
 
 OpLabel(t, label) ==
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
@@ -900,10 +950,10 @@ ExecuteInstruction(t) ==
                 /\  UNCHANGED <<state, CFG, MaxPathLength>>
             ELSE IF ThreadInstructions[t][pc[t]] = "GetGlobalId" THEN
                 GetGlobalId(t, ThreadArguments[t][pc[t]][1])
-            ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicAdd" THEN
-                OpAtomicAdd(t, ThreadArguments[t][pc[t]][1])
-            ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicSub" THEN
-                OpAtomicSub(t, ThreadArguments[t][pc[t]][1])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicIncrement" THEN
+                OpAtomicIncrement(t, ThreadArguments[t][pc[t]][1])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicDecrement" THEN
+                OpAtomicDecrement(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpLogicalOr" THEN 
                 OpLogicalOr(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpLogicalAnd" THEN
@@ -928,8 +978,12 @@ ExecuteInstruction(t) ==
                 OpGreaterOrEqual(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAdd" THEN
                 OpAdd(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicAdd" THEN
+                OpAtomicAdd(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpSub" THEN
                 OpSub(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicSub" THEN
+                OpAtomicSub(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicExchange" THEN
                 OpAtomicExchange(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicCompareExchange" THEN

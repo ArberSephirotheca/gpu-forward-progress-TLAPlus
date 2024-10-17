@@ -231,15 +231,15 @@ ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
 ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
 
 (* Thread Configuration *)
-InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicAdd" , "OpAtomicSub", "OpGroupAll", "OpGroupAny", "OpGroupNonUniformAll", "OpGroupNonUniformAny",
-"OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpControlBarrier", "OpLoopMerge",
+InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicIncrement" , "OpAtomicDecrement", "OpGroupAll", "OpGroupAny", "OpGroupNonUniformAll", "OpGroupNonUniformAny",
+"OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpSwitch", "OpControlBarrier", "OpLoopMerge",
 "OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalOr", "OpLogicalAnd", "OpLogicalEqual", "OpLogicalNotEqual", "OpLogicalNot",
 "OpEqual", "OpNotEqual", "OpLess", "OpLessOrEqual", "OpGreater", "OpGreaterOrEqual",
-"OpAdd", "OpSub", "OpMul"}
+"OpAdd", "OpAtomicAdd", "OpSub", "OpAtomicSub", "OpMul"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup", "tangle"}
 BlockTypeSet == {"Merge", "None"}
-MemoryOperationSet == {"OpAtomicLoad", "OpAtomicStore", "OpAtomicAdd" , "OpAtomicSub", "OpAtomicCompareExchange" ,"OpAtomicExchange"}
+MemoryOperationSet == {"OpAtomicLoad", "OpAtomicStore", "OpAtomicIncrement" , "OpAtomicDecrement", "OpAtomicAdd" , "OpAtomicSub", "OpAtomicCompareExchange" ,"OpAtomicExchange"}
 
 IsMemoryOperation(inst) == 
     inst \in MemoryOperationSet
@@ -248,10 +248,10 @@ IsMemoryOperation(inst) ==
 INSTANCE ProgramConf
 
 (* Inovactions within a tangle are required to execute tangled instruction concurrently, examples or opGroup operations and opControlBarrier  *)
-TangledInstructionSet == {"OpControlBarrier, OpGroupAll"}
+TangledInstructionSet == {"OpControlBarrier, OpGroupAll", "OpGroupAny", "OpGroupNonUniformAll", "OpGroupNonUniformAny"}
 MergedInstructionSet == {"OpLoopMerge", "OpSelectionMerge"}
-BlockTerminationInstructionSet == {"OpBranch", "OpBranchConditional", "Terminate"}
-BranchInstructionSet == {"OpBranch", "OpBranchConditional"}
+BlockTerminationInstructionSet == {"OpBranch", "OpBranchConditional", "OpSwitch", "Terminate"}
+BranchInstructionSet == {"OpBranch", "OpBranchConditional", "OpSwitch"}
 \* Tangle: 
 Tangle(ts) == 
     [threads |-> ts]

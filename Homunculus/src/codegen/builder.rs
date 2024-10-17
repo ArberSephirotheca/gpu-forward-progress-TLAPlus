@@ -111,6 +111,11 @@ impl InstructionArgumentsBuilder {
         self
     }
 
+    pub fn push_vec_arguments(mut self, arguments: Vec<InstructionArgument>) -> Self {
+        self.arguments.extend(arguments);
+        self
+    }
+
     pub fn build(self) -> Result<InstructionArguments> {
         Ok(InstructionArguments {
             name: self
@@ -136,6 +141,7 @@ pub struct InstructionBuilder {
     name: Option<InstructionName>,
     scope: Option<ExecutionScope>,
     arguments: Option<InstructionArguments>,
+    vec_arguments: Option<Vec<InstructionArguments>>,
 }
 
 impl InstructionBuilder {
@@ -154,6 +160,11 @@ impl InstructionBuilder {
         self
     }
 
+    pub fn vec_arguments(mut self, vec_arguments: Vec<InstructionArguments>) -> Self {
+        self.vec_arguments = Some(vec_arguments);
+        self
+    }
+
     pub fn scope(mut self, scope: ExecutionScope) -> Self {
         self.scope = Some(scope);
         self
@@ -169,6 +180,7 @@ impl InstructionBuilder {
             arguments: self
                 .arguments
                 .ok_or_else(|| eyre!("Arguments are required"))?,
+            vec_arguments: self.vec_arguments,
         })
     }
 }
@@ -181,7 +193,7 @@ impl Thread {
 
 #[derive(Default)]
 pub struct ThreadBuilder {
-    instructions: SmallVec<[Instruction; 10]>,
+    instructions: SmallVec<[Instruction; 30]>,
 }
 
 impl ThreadBuilder {
