@@ -2468,7 +2468,7 @@ impl CodegenCx {
                 let default_label_position = self.lookup_label(default_label.text()).unwrap();
 
                 let selector_arg = inst_arg1_builder
-                    .name(selector.text().to_string())
+                    .name(selector_info.get_var_name())
                     .value(self.construct_instruction_value(&selector_info))
                     .index(IndexKind::Literal(-1))
                     .scope(VariableScope::cast(&selector_info.get_storage_class()))
@@ -2485,7 +2485,7 @@ impl CodegenCx {
                 for target_label in target_labels {
                     let literal = target_label.0.text().parse::<i32>().unwrap();
                     let literal_arg = InstructionArgument::builder()
-                        .name(target_label.0.text().to_string())
+                        .name("".to_string())
                         .value(InstructionValue::Int(literal))
                         .index(IndexKind::Literal(-1))
                         .scope(VariableScope::Literal)
