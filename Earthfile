@@ -1,13 +1,5 @@
 VERSION 0.6
 
-ARG OUT=text
-# ARG SG_SIZE=1
-# ARG WG_SIZE=1
-# ARG NUM_WG=1
-# ARG SCH='HSA'
-ARG INPUT
-ARG LITMUS_TESTS=FALSE
-
 tlaplusbuild-image:
     FROM openjdk:23-slim
     RUN apt-get update && apt-get install -y git bash sudo curl graphviz clang cmake
@@ -21,6 +13,9 @@ tlaplusbuild-image:
     SAVE IMAGE --push czyczy981/tlaplus:latest
 
 tlaplus-image:
+    ARG OUT=text
+    ARG INPUT
+    ARG LITMUS_TESTS=FALSE
     FROM +tlaplusbuild-image
     WORKDIR /workdir
     COPY glslang glslang
@@ -54,7 +49,7 @@ tlaplus-image:
             RUN echo "Running test for ${file}"
             RUN Homunculus/target/release/homunculus "litmus_tests_dis/${file}.txt" "litmus_tests_mc_programs/${file}.tla"
             RUN cp "litmus_tests_mc_programs/${file}.tla" forward-progress/validation/MCProgram.tla
-            RUN tlc forward-progress/validation/MCProgressModel > "litmus_tests_result/${file}.txt"
+            RUN tlc forward-progress/validation/MCProgressModel > "litmus_tests_result/${file}.txt" 2>&1 || true
         END
         SAVE ARTIFACT litmus_tests_result/*.txt AS LOCAL ./build/litmus_tests_result
     ELSE IF [ "$INPUT" = "" ]

@@ -6,6 +6,10 @@
 - [Earthly](https://earthly.dev/get-earthly)
 
 ## Get Started
+First, clone the repo including submodule
+```bash
+git clone --recurse-submodules git@github.com:ArberSephirotheca/gpu-forward-progress-TLAPlus.git -b cfg-for-structured-control-flow
+```
 Make sure you've started the docker service
 ```bash
 systemctl service docker start
@@ -26,19 +30,19 @@ You can check out the file under `example_shader_program` for more info.
 
 ### Scheduler
 you can specify the scheduler for TLA+ model in shader program using following syntax:
-```
+```glsl
 #pragma scheduler(<scheduler name>)
 ```
 Currently we only support two scheduler: **HSA** and **OBE**
 ### Subgroup size
 you can specify the subgroup size for TLA+ model in shader program similar to how you specify the workgroup size:
-```
+```glsl
 layout(tla_subgroup_size = <num>) in;
 ```
 num must be a **non-zero positive integer**
 ### Number of Workgroup
 Similarily, you can specify the number of workgroup for TLA+ model in shader program using:
-```
+```glsl
 layout(tla_num_workgroups = <num>) in;
 ```
 num must be a **non-zero positive integer**.
