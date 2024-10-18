@@ -1,12 +1,12 @@
 VERSION 0.6
 
 ARG OUT=text
-ARG SG_SIZE=1
-ARG WG_SIZE=1
-ARG NUM_WG=1
-ARG SCH='HSA'
-
+# ARG SG_SIZE=1
+# ARG WG_SIZE=1
+# ARG NUM_WG=1
+# ARG SCH='HSA'
 ARG INPUT
+ARG LITMUS_TESTS=FALSE
 
 tlaplusbuild-image:
     FROM openjdk:23-slim
@@ -14,47 +14,67 @@ tlaplusbuild-image:
     RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
     ENV PATH="/root/.cargo/bin:${PATH}"
     RUN git clone https://github.com/pmer/tla-bin.git
-    RUN git clone https://github.com/KhronosGroup/glslang.git
+    # RUN git clone https://github.com/KhronosGroup/glslang.git
     WORKDIR /tla-bin
     RUN ./download_or_update_tla.sh
     RUN sudo ./install.sh
-    WORKDIR /glslang
-    RUN ./update_glslang_sources.py
-    RUN mkdir -p build
-    WORKDIR /glslang/build
-    RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$(pwd)/install" ..
-    RUN make -j4 install
     SAVE IMAGE --push czyczy981/tlaplus:latest
-
 
 tlaplus-image:
     FROM +tlaplusbuild-image
     WORKDIR /workdir
-    IF [ "$INPUT" = "" ]
-        RUN echo "No input file provided"
-    ELSE
-        COPY $INPUT $INPUT
-        RUN /glslang/build/install/bin/glslang -V --target-env vulkan1.1 $INPUT -o $INPUT.spv
-        RUN /glslang/build/install/bin/spirv-dis $INPUT.spv > spirv-asm.txt 2>&1 || true
-        SAVE ARTIFACT spirv-asm.txt AS LOCAL ./build/
-    END
+    COPY glslang glslang
+    WORKDIR /workdir/glslang
+    RUN ./update_glslang_sources.py
+    RUN mkdir -p build
+    WORKDIR /workdir/glslang/build
+    RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$(pwd)/install" ..
+    RUN make -j4 install
+    WORKDIR /workdir
     COPY forward-progress forward-progress
     COPY Homunculus Homunculus
     RUN CARGO_TARGET_DIR=Homunculus/target cargo build --release --manifest-path=Homunculus/Cargo.toml
-    RUN echo $SG_SIZE
-    RUN echo $WG_SIZE
-    RUN echo $NUM_WG
-    RUN echo $SCH
-    RUN Homunculus/target/release/homunculus ./spirv-asm.txt $SG_SIZE $WG_SIZE $NUM_WG $SCH
-    IF [ "$OUT" = "text" ]
-        RUN tlc forward-progress/validation/MCProgressModel  > output.txt 2>&1 || true
-    ELSE IF [ "$OUT" = "dot" ]
-        RUN tlc forward-progress/validation/MCProgressModel -dump dot,actionlabels,colorize output.dot 2>&1 || true 
-    ELSE IF [ "$OUT" = "all" ]
-        RUN tlc forward-progress/validation/MCProgressModel  -dump dot,actionlabels,colorize output.dot 2>&1 || true 
-        RUN tlc forward-progress/validation/MCProgressModel > output.txt 2>&1 || true
+    IF [ "$LITMUS_TESTS" = "TRUE" ]
+        COPY litmus_tests litmus_tests
+        RUN mkdir -p litmus_tests_spv
+        RUN mkdir -p litmus_tests_dis
+        RUN mkdir -p litmus_tests_result
+        RUN mkdir -p litmus_tests_mc_programs
+        FOR file IN $(ls litmus_tests/*.comp | sed 's|.*/||; s/\.comp$//')
+            COPY forward-progress/validation/MCProgram.tla litmus_tests_mc_programs/$file.tla
+        END
+        FOR file IN $(ls litmus_tests/*.comp | sed 's|.*/||; s/\.comp$//')
+            RUN glslang/build/install/bin/glslang -V --target-env vulkan1.3 "litmus_tests/${file}.comp" -o litmus_tests_spv/"${file}.spv"
+        END
+        FOR file IN $(ls litmus_tests_spv/*.spv | sed 's|.*/||; s/\.spv$//')
+            RUN glslang/build/install/bin/spirv-dis "litmus_tests_spv/${file}.spv" > "litmus_tests_dis/${file}.txt"
+        END
+        RUN echo "Running forward progress tests"
+        FOR file IN $(ls litmus_tests_dis/*.txt | sed 's|.*/||; s/\.txt$//')
+            RUN echo "Running test for ${file}"
+            RUN Homunculus/target/release/homunculus "litmus_tests_dis/${file}.txt" "litmus_tests_mc_programs/${file}.tla"
+            RUN cp "litmus_tests_mc_programs/${file}.tla" forward-progress/validation/MCProgram.tla
+            RUN tlc forward-progress/validation/MCProgressModel > "litmus_tests_result/${file}.txt"
+        END
+        SAVE ARTIFACT litmus_tests_result/*.txt AS LOCAL ./build/litmus_tests_result
+    ELSE IF [ "$INPUT" = "" ]
+        RUN echo "No input file provided"
     ELSE
-        RUN echo "Invalid output format"
-    END
+        COPY $INPUT $INPUT
+        RUN glslang/build/install/bin/glslang -V --target-env vulkan1.3 $INPUT -o $INPUT.spv
+        RUN glslang/build/install/bin/spirv-dis $INPUT.spv > spirv-asm.txt 2>&1 || true
+        SAVE ARTIFACT spirv-asm.txt AS LOCAL ./build/
+        RUN Homunculus/target/release/homunculus ./spirv-asm.txt 
+        IF [ "$OUT" = "text" ]
+            RUN tlc forward-progress/validation/MCProgressModel  > output.txt 2>&1 || true
+        ELSE IF [ "$OUT" = "dot" ]
+            RUN tlc forward-progress/validation/MCProgressModel -dump dot,actionlabels,colorize output.dot 2>&1 || true 
+        ELSE IF [ "$OUT" = "all" ]
+            RUN tlc forward-progress/validation/MCProgressModel  -dump dot,actionlabels,colorize output.dot 2>&1 || true 
+            RUN tlc forward-progress/validation/MCProgressModel > output.txt 2>&1 || true
+        ELSE
+            RUN echo "Invalid output format"
+        END
+    END    
     SAVE ARTIFACT output.* AS LOCAL ./build/
     SAVE ARTIFACT forward-progress/validation/MCProgram.tla AS LOCAL ./build/

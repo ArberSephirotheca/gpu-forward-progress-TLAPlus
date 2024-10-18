@@ -65,6 +65,12 @@ pub(crate) static BUILT_IN_VARIABLE_SET: [TokenKind; 9] = [
     TokenKind::SubgroupId,
 ];
 
+pub(crate) static TLA_BUILTIN_SET: [TokenKind; 3] = [
+    TokenKind::Scheduler,
+    TokenKind::TlaNumWorkgroups,
+    TokenKind::TlaSubgroupSize,
+];
+
 // fn instruction_not_supported(instruction: &str) -> bool {
 //     for i in INSTRUCTION_SET.iter() {
 //         if i == &instruction {
@@ -92,6 +98,8 @@ pub enum TokenKind {
     // Statement
     ExecutionModeStatement,
     DecorateStatement,
+    MemberDecorateStatement,
+    DecorateStringStatement,
     ReturnStatement,
     FunctionEndStatement,
     StoreStatement,
@@ -107,7 +115,7 @@ pub enum TokenKind {
     AccessChainExpr,
     LabelExpr,
     ConstantExpr,
-    // ConstantCompositeExpr,
+    ConstantCompositeExpr,
     ConstantTrueExpr,
     ConstantFalseExpr,
     LogicalOrExpr,
@@ -171,11 +179,21 @@ pub enum TokenKind {
     SubgroupId,
     #[regex("SubgroupLocalInvocationId")]
     SubgroupLocalInvocationId,
+    #[regex("%scheduler")]
+    Scheduler,
+    #[regex("%tla_num_workgroups")]
+    TlaNumWorkgroups,
+    #[regex("tla_subgroup_size")]
+    TlaSubgroupSize,
+    #[regex("UserSemantic")]
+    UserSemantic,
 
     #[regex("OpDecorate")]
     OpDecorate,
     #[regex("OpMemberDecorate")]
     OpMemberDecorate,
+    #[regex("OpDecorateString")]
+    OpDecorateString,
     #[regex("OpExecutionMode")]
     OpExecutionMode,
     #[regex("OpCapability")]
@@ -425,7 +443,7 @@ impl fmt::Display for TokenKind {
             Self::OpSGreaterThanEqual => "OpSGreaterThanEqual",
             Self::OpBranch => "OpBranch",
             Self::OpBranchConditional => "OpBranchConditional",
-            // Self::OpSwitch => "OpSwitch",
+            Self::OpSwitch => "OpSwitch",
             Self::OpLoopMerge => "OpLoopMerge",
             Self::OpSelectionMerge => "OpSelectionMerge",
             Self::OpAtomicExchange => "OpAtomicExchange",
@@ -434,6 +452,7 @@ impl fmt::Display for TokenKind {
             Self::OpVariable => "OpVariable",
             Self::OpConstantComposite => "OpConstantComposite",
             Self::OpDecorate => "OpDecorate",
+            Self::OpDecorateString => "OpDecorateString",
             Self::OpTypeBool => "OpTypeBool",
             Self::OpTypeInt => "OpTypeInt",
             Self::OpTypeVector => "OpTypeVector",

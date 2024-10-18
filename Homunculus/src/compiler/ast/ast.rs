@@ -4,7 +4,7 @@ use syntax_node_derive::{BinaryExpr, ResultType, UnaryExpr};
 
 use crate::compiler::parse::symbol_table::{SpirvType, StorageClass};
 use crate::compiler::parse::syntax::{
-    SyntaxElement, SyntaxNode, SyntaxToken, TokenKind, BUILT_IN_VARIABLE_SET,
+    SyntaxElement, SyntaxNode, SyntaxToken, TokenKind, BUILT_IN_VARIABLE_SET, TLA_BUILTIN_SET,
 };
 
 pub trait ResultType {
@@ -27,6 +27,8 @@ pub struct ExecutionMode(SyntaxNode);
 #[derive(Debug)]
 pub struct DecorateStatement(SyntaxNode);
 #[derive(Debug)]
+pub struct DecorateStringStatement(SyntaxNode);
+#[derive(Debug)]
 pub struct VariableRef(SyntaxNode);
 #[derive(Debug)]
 pub struct VariableDef(SyntaxNode);
@@ -48,6 +50,8 @@ pub struct StoreStatement(SyntaxNode);
 pub struct AtomicStoreStatement(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct ConstExpr(SyntaxNode);
+#[derive(Debug, ResultType)]
+pub struct ConstCompositeExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct ConstTrueExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
@@ -117,12 +121,12 @@ pub struct SelectionMergeStatement(SyntaxNode);
 pub enum Expr {
     VariableExpr(VariableExpr),
     TypeExpr(TypeExpr),
-    ExecutionModeExpr(ExecutionMode),
     VariableRef(VariableRef),
     LabelExpr(LabelExpr),
     LoadExpr(LoadExpr),
     AtomicLoadExpr(AtomicLoadExpr),
     ConstExpr(ConstExpr),
+    ConstCompositeExpr(ConstCompositeExpr),
     ConstTrueExpr(ConstTrueExpr),
     ConstFalseExpr(ConstFalseExpr),
     LogicalOr(LogicalOr),
@@ -153,6 +157,7 @@ pub enum Expr {
 pub enum Stmt {
     ExecutionMode(ExecutionMode),
     DecorateStatement(DecorateStatement),
+    DecorateStringStatement(DecorateStringStatement),
     VariableDef(VariableDef),
     StoreStatement(StoreStatement),
     AtomicStoreStatement(AtomicStoreStatement),
@@ -185,7 +190,7 @@ impl Expr {
             TokenKind::LoadExpr => Some(Self::LoadExpr(LoadExpr(node))),
             TokenKind::AtomicLoadExpr => Some(Self::AtomicLoadExpr(AtomicLoadExpr(node))),
             TokenKind::ConstantExpr => Some(Self::ConstExpr(ConstExpr(node))),
-            // TokenKind::ConstantCompositeExpr => Some(Self::ConstExpr(ConstExpr(node))),
+            TokenKind::ConstantCompositeExpr => Some(Self::ConstCompositeExpr(ConstCompositeExpr(node))),
             TokenKind::ConstantTrueExpr => Some(Self::ConstTrueExpr(ConstTrueExpr(node))),
             TokenKind::ConstantFalseExpr => Some(Self::ConstFalseExpr(ConstFalseExpr(node))),
             TokenKind::LogicalOrExpr => Some(Self::LogicalOr(LogicalOr(node))),
@@ -233,6 +238,9 @@ impl Stmt {
             TokenKind::IgnoredOp => None,
             TokenKind::ExecutionModeStatement => Some(Self::ExecutionMode(ExecutionMode(node))),
             TokenKind::DecorateStatement => Some(Self::DecorateStatement(DecorateStatement(node))),
+            TokenKind::DecorateStringStatement => {
+                Some(Self::DecorateStringStatement(DecorateStringStatement(node)))
+            }
             TokenKind::VariableDef => Some(Self::VariableDef(VariableDef(node))),
             TokenKind::ReturnStatement => Some(Self::ReturnStatement(ReturnStatement(node))),
             TokenKind::StoreStatement => Some(Self::StoreStatement(StoreStatement(node))),
@@ -362,6 +370,7 @@ impl TypeExpr {
             .find(|x| x.kind() == TokenKind::OpTypeBool || x.kind() == TokenKind::OpTypeInt)
     }
 }
+
 
 impl VariableExpr {
     pub(crate) fn ty_name(&self) -> Option<SyntaxToken> {
@@ -531,6 +540,32 @@ impl ConstExpr {
             .children_with_tokens()
             .filter_map(|x| x.into_token())
             .find(|x| x.kind() == TokenKind::Int)
+    }
+}
+
+impl ConstCompositeExpr{
+    pub(crate) fn constituents(&self) -> Vec<SyntaxToken> {
+        let mut tokens_iter = self
+            .0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .peekable();
+
+        let mut result: Vec<SyntaxToken> = Vec::new();
+
+        // skip result type
+        tokens_iter.next();
+
+        while let Some(constituent) = tokens_iter.next() {
+            if constituent.kind() == TokenKind::Ident {
+                result.push(constituent);
+            } else{
+                panic!("Invalid constituent {:#?}", constituent);
+            }
+        }
+
+        result
     }
 }
 
@@ -846,6 +881,22 @@ impl DecorateStatement {
             .children_with_tokens()
             .filter_map(|x| x.into_token())
             .find(|x| BUILT_IN_VARIABLE_SET.contains(&x.kind()))
+    }
+}
+
+impl DecorateStringStatement{
+    pub(crate) fn tla_builtin(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .find(|x| TLA_BUILTIN_SET.contains(&x.kind()))
+    }
+
+    pub(crate) fn value(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .find(|x| x.kind() == TokenKind::String)
     }
 }
 

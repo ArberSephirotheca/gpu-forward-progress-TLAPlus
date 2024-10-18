@@ -1,7 +1,7 @@
 use crate::compiler::ast::ast::{BinaryExpr, Expr, ResultType, Root, Stmt, UnaryExpr};
 /// `CodegenCx` is a struct that holds the compilation unit of the codegen.
 use crate::compiler::parse::symbol_table::*;
-use crate::compiler::parse::syntax::SyntaxNode;
+use crate::compiler::parse::syntax::{SyntaxNode, TokenKind};
 
 use super::builder::InstructionArgumentsBuilder;
 use super::common::{
@@ -260,6 +260,10 @@ impl CodegenCx {
 
                 let constant_info = VariableInfo::new_const_int(var_name.clone(), value, *signed);
                 self.insert_variable(var_name, constant_info);
+            }
+            // only support gl_WorkGroupSize for now
+            Expr::ConstCompositeExpr(_const_composite_expr) => {
+                
             }
             Expr::ConstTrueExpr(_) => {
                 let constant_info = VariableInfo::new_const_bool(var_name.clone(), true);
@@ -740,12 +744,6 @@ impl CodegenCx {
             Stmt::ReturnStatement(_) => {
                 self.increment_inst_position();
             }
-
-            // Stmt::ExecutionMode(execution_mode) => {
-            //     let local_size_x = execution_mode.local_size_x().unwrap().text().parse::<i32>().unwrap();
-            //     self.insert_variable("local_size_x".to_string(), VariableInfo::new_const_int("local_size_x".to_string(), local_size_x, false));
-            //     None
-            // }
             Stmt::VariableDef(var_def) => {
                 let var_name = var_def.name().unwrap().text().to_string();
                 let expr = var_def
@@ -783,6 +781,27 @@ impl CodegenCx {
                         InstructionValue::BuiltIn(InstructionBuiltInVariable::cast(built_in_var)),
                     ),
                 );
+            }
+            // This decorate string statement is used to attach TLA+ built-in variables/metadata
+            Stmt::DecorateStringStatement(decorate_string_stmt) => {
+                let tla_builtin = decorate_string_stmt
+                    .tla_builtin()
+                    .expect("DecorateStringStatement: TLA+ built-in not found in decorate string statement");
+                match tla_builtin.kind(){
+                    TokenKind::Scheduler => {
+                        let scheduler = decorate_string_stmt.value().unwrap().text().trim_matches('"').parse::<Scheduler>().expect("DecorateStringStatement: TLA+ Scheduler must be a valid scheduler");
+                        self.scheduler = scheduler;
+                    }
+                    TokenKind::TlaNumWorkgroups => {
+                        let num_workgroup = decorate_string_stmt.value().unwrap().text().trim_matches('"').parse::<u32>().expect("DecorateStringStatement: TLA+ NumWorkgroups must be a number");
+                        self.num_work_group = num_workgroup;
+                    }
+                    TokenKind::TlaSubgroupSize => {
+                        let sub_group_size = decorate_string_stmt.value().unwrap().text().trim_matches('"').parse::<u32>().expect("DecorateStringStatement: TLA+ SubgroupSize must be a number");
+                        self.sub_group_size = sub_group_size;
+                    }
+                    _ => panic!("DecorateStringStatement: Unsupported TLA+ built-in, {:?}", tla_builtin.kind()),
+                }
             }
             // fixme:: does not support OpAccesschain yet
             Stmt::StoreStatement(store_stmt) => {
@@ -904,6 +923,17 @@ impl CodegenCx {
                 None
             }
             Expr::ConstExpr(_) => None,
+            Expr::ConstCompositeExpr(const_composite_expr) => {
+                if var_name != "%gl_WorkGroupSize".to_string() {
+                    panic!("ConstCompositeExpr: Only gl_WorkGroupSize is supported for now, found {:#?}", var_name);
+                }
+                let x = self.lookup_variable(const_composite_expr.constituents()[0].text())
+                .expect("ConstCompositeExpr: x not found in symbol table")
+                .get_constant_int();
+    
+                self.work_group_size = x as u32;
+                None
+            },
             Expr::ConstTrueExpr(_) => None,
             Expr::ConstFalseExpr(_) => None,
             Expr::LogicalOr(logical_and_expr) => {
@@ -2230,7 +2260,6 @@ impl CodegenCx {
     fn generate_code_for_stmt(&mut self, stmt: &Stmt) -> Option<Instruction> {
         match stmt {
             // fixme: handle execution mode
-            Stmt::ExecutionMode(_) => None,
             Stmt::ReturnStatement(_) => {
                 let args = InstructionArguments::builder()
                     .name(InstructionName::Return)
@@ -2248,11 +2277,12 @@ impl CodegenCx {
                 )
             }
 
-            // Stmt::ExecutionMode(execution_mode) => {
-            //     let local_size_x = execution_mode.local_size_x().unwrap().text().parse::<i32>().unwrap();
-            //     self.insert_variable("local_size_x".to_string(), VariableInfo::new_const_int("local_size_x".to_string(), local_size_x, false));
-            //     None
-            // }
+            // for now, we only support local size x
+            Stmt::ExecutionMode(execution_mode) => {
+                let local_size_x = execution_mode.local_size_x().unwrap().text().parse::<u32>().unwrap();
+                self.work_group_size = local_size_x;
+                None
+            }
             Stmt::VariableDef(var_def) => {
                 let inst_builder = Instruction::builder();
                 let var_name = var_def.name().unwrap().text().to_string();
@@ -2278,6 +2308,8 @@ impl CodegenCx {
             }
             // decorate statement is used to attach built-in variables/metadata to a variable
             Stmt::DecorateStatement(_decorate_stmt) => None,
+            // decorate string statement is used to attach tla built-in variables/metadata to a string
+            Stmt::DecorateStringStatement(_op_decorate_string_stmt) => None,
             // fixme:: does not support OpAccesschain yet
             Stmt::StoreStatement(store_stmt) => {
                 let inst_args_builder = InstructionArguments::builder();

@@ -16,15 +16,47 @@ earthly bootstrap
 ```
 Then, run following to see the output
 ```bash
-earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format> --SG_SIZE=<size of subgroup> --WG_SIZE=<workgroup size> --NUM_WG=<number of workgroup> --SCH=<scheduler>
+earthly +tlaplus-image --INPUT=<glsl compute file> --OUT=<format>
 ```
 
+## GLSL
+In our version of GLSL, we add additional syntax to take in TLA+ launch configuration
+such as **Scheduler**, **subgroup size**, and **number of workgroup**.
+You can check out the file under `example_shader_program` for more info.
+
+### Scheduler
+you can specify the scheduler for TLA+ model in shader program using following syntax:
+```
+#pragma scheduler(<scheduler name>)
+```
+Currently we only support two scheduler: **HSA** and **OBE**
+### Subgroup size
+you can specify the subgroup size for TLA+ model in shader program similar to how you specify the workgroup size:
+```
+layout(tla_subgroup_size = <num>) in;
+```
+num must be a **non-zero positive integer**
+### Number of Workgroup
+Similarily, you can specify the number of workgroup for TLA+ model in shader program using:
+```
+layout(tla_num_workgroups = <num>) in;
+```
+num must be a **non-zero positive integer**.
+
 ## Example:
-`earthly -i +tlaplus-image --INPUT example_shader_program/producer_consumer.comp --OUT=all --SG_SIZE=1 --WG_SIZE=1 --NUM_WG=2 --SCH=HSA`
+`earthly -i +tlaplus-image --INPUT example_shader_program/producer_consumer.comp --OUT=all`
 
 ## Command Line Option
 - *format*: text, dot, all
-- *scheduler*: HSA, OBE
+
+## Litmus tests
+We also provides part of litmus tests implemented by Tyler Sorensens, available at https://github.com/tyler-utah/AlloyForwardProgress.
+For convenience, a special command is available to run all the litmus tests:
+```
+earthly +tlaplus-image --LITMUS_TESTS TRUE
+```
+This command will try to run all the litmus tests in the `litmus_tests` directories.
+
 
 ## List of supported SPIR-V Instructions
 - OpVariable
