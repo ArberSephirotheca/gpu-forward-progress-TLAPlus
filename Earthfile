@@ -51,7 +51,7 @@ tlaplus-image:
             RUN cp "litmus_tests_mc_programs/${file}.tla" forward-progress/validation/MCProgram.tla
             RUN tlc forward-progress/validation/MCProgressModel > "litmus_tests_result/${file}.txt" 2>&1 || true
         END
-        SAVE ARTIFACT litmus_tests_result/*.txt AS LOCAL ./build/litmus_tests_result
+        SAVE ARTIFACT litmus_tests_result/*.txt AS LOCAL ./build/litmus_tests_result/
     ELSE IF [ "$INPUT" = "" ]
         RUN echo "No input file provided"
     ELSE
@@ -70,6 +70,6 @@ tlaplus-image:
         ELSE
             RUN echo "Invalid output format"
         END
-    END    
     SAVE ARTIFACT output.* AS LOCAL ./build/
+    END    
     SAVE ARTIFACT forward-progress/validation/MCProgram.tla AS LOCAL ./build/
