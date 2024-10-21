@@ -10,13 +10,6 @@ tlaplusbuild-image:
     WORKDIR /tla-bin
     RUN ./download_or_update_tla.sh
     RUN sudo ./install.sh
-    SAVE IMAGE --push czyczy981/tlaplus:latest
-
-tlaplus-image:
-    ARG OUT=text
-    ARG INPUT
-    ARG LITMUS_TESTS=FALSE
-    FROM +tlaplusbuild-image
     WORKDIR /workdir
     COPY glslang glslang
     WORKDIR /workdir/glslang
@@ -25,6 +18,13 @@ tlaplus-image:
     WORKDIR /workdir/glslang/build
     RUN cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$(pwd)/install" ..
     RUN make -j4 install
+    SAVE IMAGE --push czyczy981/tlaplus:latest
+
+tlaplus-image:
+    ARG OUT=text
+    ARG INPUT
+    ARG LITMUS_TESTS=FALSE
+    FROM +tlaplusbuild-image
     WORKDIR /workdir
     COPY forward-progress forward-progress
     COPY Homunculus Homunculus

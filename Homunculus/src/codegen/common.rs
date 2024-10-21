@@ -339,7 +339,8 @@ pub struct Instruction {
     pub name: InstructionName,
     pub scope: ExecutionScope,
     pub arguments: InstructionArguments,
-    // this is used when some instructions have unddetermined number of arguments (e.g. OpSwitch)
+    // this is used when some instructions 
+    //have undetermined number of arguments (e.g. OpSwitch)
     pub vec_arguments: Option<Vec<InstructionArguments>>,
 }
 

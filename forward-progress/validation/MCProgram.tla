@@ -238,7 +238,6 @@ InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicIncre
 "OpAdd", "OpAtomicAdd", "OpSub", "OpAtomicSub", "OpMul"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup", "tangle"}
-BlockTypeSet == {"Merge", "None"}
 MemoryOperationSet == {"OpAtomicLoad", "OpAtomicStore", "OpAtomicIncrement" , "OpAtomicDecrement", "OpAtomicAdd" , "OpAtomicSub", "OpAtomicCompareExchange" ,"OpAtomicExchange"}
 
 IsMemoryOperation(inst) == 
@@ -255,14 +254,17 @@ BranchInstructionSet == {"OpBranch", "OpBranchConditional", "OpSwitch"}
 \* Tangle: 
 Tangle(ts) == 
     [threads |-> ts]
-\* Block: A contiguous sequence of instructions starting with an OpLabel, ending with a block termination instruction. A block has no additional label or block termination instructions.
+
+
+\* Block: A contiguous sequence of instructions starting with an OpLabel, ending with a block termination instruction. 
+\* A block has no additional label or block termination instructions.
 \* block termination instruction: OpBranch, OpBranchConditional, Terminate
 \* OpLabel is define as a variable that has pc as its value field and its opLabel as its name field
-Block(opLabel, terminatedInstr, tangle, type) == 
+Block(opLabel, terminatedInstr, tangle, merge) == 
     [opLabelIdx |-> opLabel,
     terminatedInstrIdx |-> terminatedInstr,
     tangle |-> tangle,
-    type |-> type]
+    merge |-> merge]
 
 GenerateCFG(blocks, branch) == 
     [node |-> blocks,
@@ -282,7 +284,7 @@ IsOpLabel(instr) ==
     instr = "OpLabel"
 
 IsMergeBlock(block) ==
-    block.type = "Merge"
+    block.merge = TRUE
 
 \* helper function to extract the OpLabel field from the block
 ExtractOpLabelIdxSet(blocks) ==
@@ -327,22 +329,24 @@ MergeInstContainsLabel(mergeInsIdx, opLabel) ==
 
 MergeInstContainsLabelIdx(mergeInsIdx, opLabelIdx) == 
    IF ThreadInstructions[1][mergeInsIdx] = "OpLoopMerge" THEN
-        GetVal(-1, ThreadArguments[1][mergeInsIdx][1]) = opLabelIdx \/ GetVal(-1, ThreadArguments[1][mergeInsIdx][2]) = opLabelIdx
+        GetVal(-1, ThreadArguments[1][mergeInsIdx][1]) = opLabelIdx 
+        \/ GetVal(-1, ThreadArguments[1][mergeInsIdx][2]) = opLabelIdx
     ELSE IF ThreadInstructions[1][mergeInsIdx] = "OpSelectionMerge" THEN
         GetVal(-1, ThreadArguments[1][mergeInsIdx][1]) = opLabelIdx
     ELSE
         FALSE
 
 
-\* lookback funciton that helps to determine if the current block is a merge block
+\* lookback function that helps to determine if the current block is a merge block
 \* startIdx is the pc of the instruction(OpLabel) that starts the current block
 DetermineBlockType(startIdx) ==
     IF \E instIdx \in 1..(startIdx-1):
-        IsMergedInstruction(ThreadInstructions[1][instIdx]) /\ MergeInstContainsLabelIdx(instIdx, startIdx)
+        IsMergedInstruction(ThreadInstructions[1][instIdx]) 
+        /\ MergeInstContainsLabelIdx(instIdx, startIdx)
     THEN 
-        "Merge"
+        TRUE
     ELSE 
-        "None"
+        FALSE
 
 
 \* node is the index to the opLabel
@@ -435,8 +439,6 @@ ValidPaths(startNode, cfg, maxPathLength) ==
 
 \* return a set of all paths in graph G
 StructuredControlFlowPaths(G) == {
-    \* fixme: we need to use ExtractOpLabelIdxSet as node are records, which are non-enumerable
-    \* p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), MaxPathLength) :
     p \in ValidPaths(1, CFG, MaxPathLength) :
         /\ p # <<>>(* p is not an empty sequence *)
         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
@@ -445,8 +447,6 @@ StructuredControlFlowPaths(G) == {
 
 \* fixme: maximum length of the path should be sounded.
 StructuredControlFlowPathsTo(B) =={
-    \* fixme: we need to use ExtractOpLabelIdxSet as node are records, which are non-enumerable
-    \* p \in BoundedSeq(ExtractOpLabelIdxSet(CFG.node), MaxPathLength) :
     p \in ValidPaths(1, CFG, MaxPathLength) :
         /\ p # <<>>(* p is not an empty sequence *)
         /\ p[1] = 1
@@ -468,7 +468,8 @@ StrictlyStructurallyDominates(A, B) ==
 
 
 \* helper function that returns the index of the first OpLabel instruction
-\* We do not need to worry about empty set as we are guaranteed to have at least one OpLabel instruction (entry block)
+\* We do not need to worry about empty set as we are guaranteed to have 
+\* at least one OpLabel instruction (entry block)
 EntryLabel(insts) ==
     Min({idx \in 1..Len(insts) : insts[idx] = "OpLabel"})
     
@@ -476,11 +477,17 @@ EntryLabel(insts) ==
 GenerateBlocks(insts) == 
   [i \in 1..Len(insts) |-> 
      IF IsOpLabel(insts[i]) THEN 
-       LET terminationIndex == Min({j \in i+1..Len(insts) : IsTerminationInstruction(insts[j])} \cup {Len(insts)})
-           tangle == IF i = EntryLabel(insts) THEN [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroup(wg-1)] ELSE [wg \in 1..NumWorkGroups |-> {}]  (* First OpLabel includes all threads as tangle *)
+       LET terminationIndex == Min({j \in i+1..Len(insts) : 
+        IsTerminationInstruction(insts[j])} \cup {Len(insts)})
+           tangle == IF 
+                        i = EntryLabel(insts) 
+                     THEN 
+                        [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroup(wg-1)] 
+                     ELSE 
+                        [wg \in 1..NumWorkGroups |-> {}]
        IN 
             Block(i, terminationIndex, tangle, DetermineBlockType(i))
-     ELSE Block(-1, <<>>, <<>>, "None")
+     ELSE Block(-1, <<>>, <<>>, FALSE)
   ]
 
 
@@ -490,14 +497,21 @@ GenerateBlocks(insts) ==
 \* OpLabel is obtained from the merge instruction and branch instruction
 FindTargetBlocks(startIndex, terminationIndex) == 
     LET
-        mergeInstr == IF terminationIndex > startIndex THEN ThreadInstructions[1][terminationIndex - 1] ELSE <<>>
+        mergeInstr == IF 
+                        terminationIndex > startIndex 
+                      THEN 
+                      ThreadInstructions[1][terminationIndex - 1] 
+                      ELSE 
+                        <<>>
     IN
         IF mergeInstr = "OpLoopMerge" THEN
-            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1]), GetVal(-1, ThreadArguments[1][terminationIndex - 1][2])} \cup 
+            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1]), 
+                GetVal(-1, ThreadArguments[1][terminationIndex - 1][2])} \cup 
                 (IF ThreadInstructions[1][terminationIndex] = "OpBranch" THEN
                     {GetVal(-1, ThreadArguments[1][terminationIndex][1])}
                 ELSE IF ThreadInstructions[1][terminationIndex] = "OpBranchConditional" THEN
-                    {GetVal(-1, ThreadArguments[1][terminationIndex][2]), GetVal(-1, ThreadArguments[1][terminationIndex][3])}
+                    {GetVal(-1, ThreadArguments[1][terminationIndex][2]), 
+                        GetVal(-1, ThreadArguments[1][terminationIndex][3])}
                 ELSE
                     {})
         ELSE IF mergeInstr = "OpSelectionMerge" THEN
@@ -505,14 +519,16 @@ FindTargetBlocks(startIndex, terminationIndex) ==
                 (IF ThreadInstructions[1][terminationIndex] = "OpBranch" THEN
                     {GetVal(-1, ThreadArguments[1][terminationIndex][1])}
                 ELSE IF ThreadInstructions[1][terminationIndex] = "OpBranchConditional" THEN
-                    {GetVal(-1, ThreadArguments[1][terminationIndex][2]), GetVal(-1, ThreadArguments[1][terminationIndex][3])}
+                    {GetVal(-1, ThreadArguments[1][terminationIndex][2]), 
+                        GetVal(-1, ThreadArguments[1][terminationIndex][3])}
                 ELSE
                     {})
         ELSE 
             IF ThreadInstructions[1][terminationIndex] = "OpBranch" THEN
                 {GetVal(-1, ThreadArguments[1][terminationIndex][1])}
             ELSE IF ThreadInstructions[1][terminationIndex] = "OpBranchConditional" THEN
-                {GetVal(-1, ThreadArguments[1][terminationIndex][2]), GetVal(-1, ThreadArguments[1][terminationIndex][3])}
+                {GetVal(-1, ThreadArguments[1][terminationIndex][2]), 
+                    GetVal(-1, ThreadArguments[1][terminationIndex][3])}
             ELSE
                 {}
 
@@ -539,15 +555,17 @@ FindHeaderBlocks(mergeBlock) ==
     {block \in SeqToSet(CFG.node):
         mergeBlock.opLabelIdx \in FindMergeBlocksIdx(block.opLabelIdx, block.terminatedInstrIdx)}
 
-\* Rule 4: If there exists OpKill in the block, then remove thread itself from the tangle of all merge blocks as well as current block
+\* Rule 4: If there exists termination instruction in the block, 
+\* then remove thread itself from the tangle of all merge blocks as well as current block
 \* for every header block that structurally dominates the current block
 TerminateUpdate(wgid, t, currentLabelIdx) ==
     [i \in 1..Len(CFG.node) |->
         IF IsMergeBlock(CFG.node[i]) /\ (\E block \in FindHeaderBlocks(CFG.node[i]) : 
             StrictlyStructurallyDominates(block.opLabelIdx, currentLabelIdx)) 
         THEN
-            \* Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, CFG.node[i].tangle \ {t}, CFG.node[i].type)
-            Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), CFG.node[i].type)
+            Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
+            newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), 
+            CFG.node[i].merge)
         ELSE
             CFG.node[i]
     ] 
@@ -559,19 +577,22 @@ TerminateUpdate(wgid, t, currentLabelIdx) ==
 BranchUpdate(wgid, t, tangle, opLabelIdxSet, choosenBranchIdx) ==
     [i \in 1..Len(CFG.node) |-> 
         IF CFG.node[i].opLabelIdx \in opLabelIdxSet THEN
-            \* rule 2: If a thread reaches a branch instruction and the block it points to has empty tangle, update the tangle of tha block to the tangle of the merge instruction
-            \* And remove the thread itself from the tangle of unchoosen block if that block is not a merge block
+            \* rule 2: If a thread reaches a branch instruction and the block it points to has empty tangle,
+            \* update the tangle of tha block to the tangle of the merge instruction,
+            \* and remove the thread itself from the tangle of unchoosen block if that block is not a merge block
             IF CFG.node[i].tangle[wgid] = {} THEN
                 \* unchoosen block and is not a merge block
-                IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].type # "Merge" THEN
-                    \* Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, tangle \ {t}, CFG.node[i].type)
-                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].type)
+                IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].merge # TRUE THEN
+                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
+                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].merge)
                 ELSE
-                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].type)
-            \* rule 3: If the unchoosen block has non-empty tangle and is not a merge block, remove the thread from the tangle
-            ELSE IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].type # "Merge" THEN
-                \* Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, CFG.node[i].tangle \ {t}, CFG.node[i].type)
-                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].type)
+                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx,
+                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge)
+            \* rule 3: If the unchoosen block has non-empty tangle and is not a merge block,
+            \* remove the thread from the tangle
+            ELSE IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].merge # TRUE THEN
+                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx,
+                    newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].merge)
             ELSE 
                 CFG.node[i]
         ELSE 
@@ -582,9 +603,11 @@ BranchUpdate(wgid, t, tangle, opLabelIdxSet, choosenBranchIdx) ==
 MergeUpdate(wgid, currentLabelIdx, tangle, opLabelIdxSet) ==
     [i \in 1..Len(CFG.node) |-> 
         IF CFG.node[i].opLabelIdx \in opLabelIdxSet THEN
-            \* rule 1: If a thread reaches a merge instruction and the block it points to has empty tangle, update the tangle of tha block to the tangle of the merge instruction
+            \* rule 1: If a thread reaches a merge instruction and the block it points to has empty tangle, 
+            \* update the tangle of tha block to the tangle of the merge instruction
             IF CFG.node[i].tangle[wgid] = {} THEN
-                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].type) 
+                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
+                    newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge) 
             ELSE 
                 CFG.node[i]
         ELSE
@@ -599,7 +622,8 @@ MergeUpdate(wgid, currentLabelIdx, tangle, opLabelIdxSet) ==
 InitCFG == 
     LET blocks == SelectSeq(GenerateBlocks(ThreadInstructions[1]), LAMBDA b: b.opLabelIdx # -1)
         graph == GenerateCFG(blocks, 
-                UNION { {<<blocks[i].opLabelIdx, target>> : target \in FindTargetBlocks(blocks[i].opLabelIdx, blocks[i].terminatedInstrIdx)} : i \in DOMAIN blocks }
+                UNION { {<<blocks[i].opLabelIdx, target>> : 
+                    target \in FindTargetBlocks(blocks[i].opLabelIdx, blocks[i].terminatedInstrIdx)} : i \in DOMAIN blocks }
                 )
     IN 
         /\  CFG = graph

@@ -20,7 +20,6 @@ pub struct CodegenCx {
     work_group_size: u32,
     num_work_group: u32,
     scheduler: Scheduler,
-    // also include built in variable
 }
 
 impl CodegenCx {
@@ -789,15 +788,30 @@ impl CodegenCx {
                     .expect("DecorateStringStatement: TLA+ built-in not found in decorate string statement");
                 match tla_builtin.kind(){
                     TokenKind::Scheduler => {
-                        let scheduler = decorate_string_stmt.value().unwrap().text().trim_matches('"').parse::<Scheduler>().expect("DecorateStringStatement: TLA+ Scheduler must be a valid scheduler");
+                        let scheduler = decorate_string_stmt.value()
+                        .unwrap()
+                        .text()
+                        .trim_matches('"')
+                        .parse::<Scheduler>()
+                        .expect("DecorateStringStatement: TLA+ Scheduler must be a valid scheduler");
                         self.scheduler = scheduler;
                     }
                     TokenKind::TlaNumWorkgroups => {
-                        let num_workgroup = decorate_string_stmt.value().unwrap().text().trim_matches('"').parse::<u32>().expect("DecorateStringStatement: TLA+ NumWorkgroups must be a number");
+                        let num_workgroup = decorate_string_stmt.value()
+                        .unwrap()
+                        .text()
+                        .trim_matches('"')
+                        .parse::<u32>()
+                        .expect("DecorateStringStatement: TLA+ NumWorkgroups must be a number");
                         self.num_work_group = num_workgroup;
                     }
                     TokenKind::TlaSubgroupSize => {
-                        let sub_group_size = decorate_string_stmt.value().unwrap().text().trim_matches('"').parse::<u32>().expect("DecorateStringStatement: TLA+ SubgroupSize must be a number");
+                        let sub_group_size = decorate_string_stmt.value()
+                        .unwrap()
+                        .text()
+                        .trim_matches('"')
+                        .parse::<u32>()
+                        .expect("DecorateStringStatement: TLA+ SubgroupSize must be a number");
                         self.sub_group_size = sub_group_size;
                     }
                     _ => panic!("DecorateStringStatement: Unsupported TLA+ built-in, {:?}", tla_builtin.kind()),
@@ -2707,7 +2721,6 @@ impl CodegenCx {
         }
 
         let global_variables = self.get_global_variables();
-        // fixme: remove the hardcoded values
         program_builder
             .global_var(global_variables)
             .num_work_groups(self.num_work_group)
