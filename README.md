@@ -8,7 +8,7 @@
 ## Get Started
 First, clone the repo including submodule
 ```bash
-git clone --recurse-submodules git@github.com:ArberSephirotheca/gpu-forward-progress-TLAPlus.git -b cfg-for-structured-control-flow
+git clone --recurse-submodules git@github.com:ArberSephirotheca/gpu-forward-progress-TLAPlus.git
 ```
 Make sure you've started the docker service
 ```bash
