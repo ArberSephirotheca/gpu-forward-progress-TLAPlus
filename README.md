@@ -95,7 +95,6 @@ This command will try to run all the litmus tests in the `litmus_tests` director
 - OpAtomicCompareExchange
 - OpGroupAll
 - OpGroupAny
-- OpGroupBroadcast
 - OpGroupNonUniformAll
 - OpGroupNonUniformAny
 - OpControlBarrier
