@@ -592,7 +592,7 @@ BranchUpdate(wgid, t, tangle, opLabelIdxSet, choosenBranchIdx) ==
             \* remove the thread from the tangle
             ELSE IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].merge # TRUE THEN
                 Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx,
-                    newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].merge)
+                newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), CFG.node[i].merge)
             ELSE 
                 CFG.node[i]
         ELSE 
