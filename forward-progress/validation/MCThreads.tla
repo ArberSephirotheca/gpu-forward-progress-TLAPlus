@@ -864,7 +864,7 @@ OpBranch(t, label) ==
             labelVal == GetVal(-1, label)
             workGroupId == WorkGroupId(t)+1
         IN
-            CFG' = GenerateCFG(BranchUpdate(workGroupId, t, curBlock.tangle[workGroupId], {labelVal}, labelVal), CFG.edge) 
+            CFG' = GenerateCFG(BranchUpdate(workGroupId, t, curBlock, curBlock.tangle[workGroupId], {labelVal}, labelVal), CFG.edge) 
         
     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
     /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
@@ -879,10 +879,10 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
             workGroupId == WorkGroupId(t)+1
         IN
             IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
-                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, trueLabelVal), CFG.edge)
+                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, trueLabelVal), CFG.edge)
                 /\  pc' = [pc EXCEPT ![t] = trueLabelVal]
             ELSE
-                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, falseLabelVal), CFG.edge)
+                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, falseLabelVal), CFG.edge)
                 /\  pc' = [pc EXCEPT ![t] = falseLabelVal]
     /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
 
@@ -897,10 +897,10 @@ OpSwitch(t, selector, default, literals, ids) ==
                 LET val == EvalExpr(t, WorkGroupId(t)+1, selector)
                     index == CHOOSE i \in 1..Len(literalsVal): literalsVal[i] = val 
                 IN
-                    /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), idsVal[index]), CFG.edge)
+                    /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), idsVal[index]), CFG.edge)
                     /\  pc' = [pc EXCEPT ![t] = idsVal[index]]
             ELSE
-                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), defaultVal), CFG.edge)
+                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), defaultVal), CFG.edge)
                 /\  pc' = [pc EXCEPT ![t] = defaultVal]
     /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
 

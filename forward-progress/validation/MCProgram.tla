@@ -260,11 +260,12 @@ Tangle(ts) ==
 \* A block has no additional label or block termination instructions.
 \* block termination instruction: OpBranch, OpBranchConditional, Terminate
 \* OpLabel is define as a variable that has pc as its value field and its opLabel as its name field
-Block(opLabel, terminatedInstr, tangle, merge) == 
+Block(opLabel, terminatedInstr, tangle, merge, initialized) == 
     [opLabelIdx |-> opLabel,
     terminatedInstrIdx |-> terminatedInstr,
     tangle |-> tangle,
-    merge |-> merge]
+    merge |-> merge,
+    initialized |-> initialized]
 
 GenerateCFG(blocks, branch) == 
     [node |-> blocks,
@@ -454,7 +455,17 @@ StructuredControlFlowPathsTo(B) =={
         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
     }
 
+StructuredControlFlowPathsFromTo(StartNode, B) == {
+    p \in ValidPaths(StartNode, CFG, MaxPathLength) :
+        /\ p # <<>>  \* p is not an empty sequence
+        /\ p[1] = StartNode
+        /\ p[Len(p)] = B
+        /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
+}
 
+StructurallyReachable(B) == StructuredControlFlowPathsTo(B) # {}
+
+StructurallyReachableFrom(StartNode, B) == StructuredControlFlowPathsFromTo(StartNode, B) # {}
 
 \* A block A structurally dominates a block B if every structured control flow path to B includes A
 \* A and B are the indice to the opLabel
@@ -485,9 +496,10 @@ GenerateBlocks(insts) ==
                         [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroup(wg-1)] 
                      ELSE 
                         [wg \in 1..NumWorkGroups |-> {}]
+            initialization == IF i = EntryLabel(insts) THEN TRUE ELSE FALSE
        IN 
-            Block(i, terminationIndex, tangle, DetermineBlockType(i))
-     ELSE Block(-1, <<>>, <<>>, FALSE)
+            Block(i, terminationIndex, tangle, DetermineBlockType(i), initialization)
+     ELSE Block(-1, <<>>, <<>>, FALSE, FALSE)
   ]
 
 
@@ -565,7 +577,7 @@ TerminateUpdate(wgid, t, currentLabelIdx) ==
         THEN
             Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
             newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), 
-            CFG.node[i].merge)
+            CFG.node[i].merge, CFG.node[i].initialized)
         ELSE
             CFG.node[i]
     ] 
@@ -574,25 +586,27 @@ TerminateUpdate(wgid, t, currentLabelIdx) ==
 \* tangle is the tangle that is going to be updated to the blocks, each workgroup has its own tangle
 \* opLabelIdxSet is the set of indices to the opLabel instructions that are pointed by the branch instruction
 \* choosenBranchIdx is the index to the opLabel instruction that is choosen by the branch instruction
-BranchUpdate(wgid, t, tangle, opLabelIdxSet, choosenBranchIdx) ==
+BranchUpdate(wgid, t, currentBlock, tangle, opLabelIdxSet, chosenBranchIdx) ==
     [i \in 1..Len(CFG.node) |-> 
-        IF CFG.node[i].opLabelIdx \in opLabelIdxSet THEN
+        IF  StructurallyReachableFrom(currentBlock.opLabelIdx, CFG.node[i].opLabelIdx) 
+            /\ currentBlock.opLabelIdx # CFG.node[i].opLabelIdx 
+            /\ CFG.node[i].opLabelIdx <= chosenBranchIdx THEN
             \* rule 2: If a thread reaches a branch instruction and the block it points to has empty tangle,
             \* update the tangle of tha block to the tangle of the merge instruction,
             \* and remove the thread itself from the tangle of unchoosen block if that block is not a merge block
-            IF CFG.node[i].tangle[wgid] = {} THEN
+            IF CFG.node[i].initialized = FALSE THEN
                 \* unchoosen block and is not a merge block
-                IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].merge # TRUE THEN
+                IF CFG.node[i].opLabelIdx # chosenBranchIdx /\ CFG.node[i].merge # TRUE THEN
                     Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
-                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].merge)
+                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].merge, TRUE)
                 ELSE
                     Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx,
-                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge)
+                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge, TRUE)
             \* rule 3: If the unchoosen block has non-empty tangle and is not a merge block,
             \* remove the thread from the tangle
-            ELSE IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].merge # TRUE THEN
+            ELSE IF CFG.node[i].opLabelIdx # chosenBranchIdx /\ CFG.node[i].merge # TRUE /\ CFG.node[i].initialized = TRUE THEN
                 Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx,
-                newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), CFG.node[i].merge)
+                newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), CFG.node[i].merge, TRUE)
             ELSE 
                 CFG.node[i]
         ELSE 
@@ -605,9 +619,9 @@ MergeUpdate(wgid, currentLabelIdx, tangle, opLabelIdxSet) ==
         IF CFG.node[i].opLabelIdx \in opLabelIdxSet THEN
             \* rule 1: If a thread reaches a merge instruction and the block it points to has empty tangle, 
             \* update the tangle of tha block to the tangle of the merge instruction
-            IF CFG.node[i].tangle[wgid] = {} THEN
+            IF CFG.node[i].initialized = FALSE THEN
                 Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
-                    newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge) 
+                    newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge, TRUE) 
             ELSE 
                 CFG.node[i]
         ELSE
