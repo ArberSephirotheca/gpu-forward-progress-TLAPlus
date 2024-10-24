@@ -44,6 +44,20 @@ cleanIntermediateVar(t) ==
      /\  state' = [state EXCEPT ![tid] = State]
     
 
+\* Update the state of the thread when there is an update in the tangle, especially if a thread is removed from the tangle
+\* This function tries to update the state of the thread to "ready" if it is waiting at tangled instruction and all threads within the subgroup have reached the same block
+\* within the tangle are having the same pc number. Otherwise, it keeps the state as it is.
+StateUpdate(wgid, t, newCFG) ==
+    [thread \in Threads |-> 
+        IF \E i \in 1..Len(newCFG.node) : 
+            /\ thread \in newCFG.node[i].tangle[wgid] 
+            /\ \A tid \in newCFG.node[i].tangle[wgid] : pc[tid] = pc[thread] /\ ThreadInstructions[1][pc[tid]] \in TangledInstructionSet
+        THEN 
+            "ready"
+        ELSE
+            state[thread]
+    ]
+
 Assignment(t, vars) == 
     /\  LET workgroupId == WorkGroupId(t)+1
             AssGlobalVars == {var \in vars : var.scope = "global"} 
@@ -864,10 +878,14 @@ OpBranch(t, label) ==
             labelVal == GetVal(-1, label)
             workGroupId == WorkGroupId(t)+1
         IN
-            CFG' = GenerateCFG(BranchUpdate(workGroupId, t, curBlock, curBlock.tangle[workGroupId], {labelVal}, labelVal), CFG.edge) 
+            LET newCFG == GenerateCFG(BranchUpdate(workGroupId, t, curBlock, curBlock.tangle[workGroupId], {labelVal}, labelVal), CFG.edge) 
+                newState == StateUpdate(workGroupId, t, newCFG)
+            IN 
+                /\  CFG' = newCFG
+                /\  state' = newState
         
     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
-    /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+    /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength>>
 
 (* condition is an expression, trueLabel and falseLabel are integer representing pc *)
 OpBranchConditional(t, condition, trueLabel, falseLabel) ==
@@ -879,12 +897,20 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
             workGroupId == WorkGroupId(t)+1
         IN
             IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
-                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, trueLabelVal), CFG.edge)
+                /\  LET newCFG == GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, trueLabelVal), CFG.edge)
+                        newState == StateUpdate(workGroupId, t, newCFG)
+                    IN
+                        /\  CFG' = newCFG
+                        /\  state' = newState
                 /\  pc' = [pc EXCEPT ![t] = trueLabelVal]
             ELSE
-                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, falseLabelVal), CFG.edge)
+                /\  LET newCFG == GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, falseLabelVal), CFG.edge)
+                        newState == StateUpdate(workGroupId, t, newCFG)
+                    IN
+                        /\  CFG' = newCFG
+                        /\  state' = newState
                 /\  pc' = [pc EXCEPT ![t] = falseLabelVal]
-    /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+    /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength>>
 
 OpSwitch(t, selector, default, literals, ids) ==
     /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
@@ -897,12 +923,20 @@ OpSwitch(t, selector, default, literals, ids) ==
                 LET val == EvalExpr(t, WorkGroupId(t)+1, selector)
                     index == CHOOSE i \in 1..Len(literalsVal): literalsVal[i] = val 
                 IN
-                    /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), idsVal[index]), CFG.edge)
+                    /\  LET newCFG == GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), idsVal[index]), CFG.edge)
+                            newState == StateUpdate(workGroupId, t, newCFG)
+                        IN
+                            /\  CFG' = newCFG
+                            /\  state' = newState
                     /\  pc' = [pc EXCEPT ![t] = idsVal[index]]
             ELSE
-                /\  CFG' = GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), defaultVal), CFG.edge)
+                /\  LET newCFG == GenerateCFG(BranchUpdate(workGroupId, t, FindCurrentBlock(CFG.node, pc[t]), FindCurrentBlock(CFG.node, pc[t]).tangle[workGroupId], SeqToSet(idsVal), defaultVal), CFG.edge)
+                        newState == StateUpdate(workGroupId, t, newCFG)
+                    IN
+                        /\  CFG' = newCFG
+                        /\  state' = newState
                 /\  pc' = [pc EXCEPT ![t] = defaultVal]
-    /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+    /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength>>
 
 (* structured loop, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block *)
 
@@ -916,9 +950,13 @@ OpLoopMerge(t, mergeLabel, continueTarget) ==
     LET currBlock == FindBlockByTerminationIns(CFG.node, pc[t]+1)
         workGroupId == WorkGroupId(t)+1
     IN 
-        /\  CFG' = GenerateCFG(MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel), GetVal(-1, continueTarget)}), CFG.edge)
+        /\  LET newCFG == GenerateCFG(MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel), GetVal(-1, continueTarget)}), CFG.edge)
+                newState == StateUpdate(workGroupId, t, newCFG)
+            IN
+                /\  CFG' = newCFG
+                /\  state' = newState
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+        /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength>>
 
 (* structured switch/if, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block  *)
 OpSelectionMerge(t, mergeLabel) ==
@@ -926,9 +964,13 @@ OpSelectionMerge(t, mergeLabel) ==
     LET currBlock == FindBlockByTerminationIns(CFG.node, pc[t]+1)
         workGroupId == WorkGroupId(t)+1
     IN
-        /\  CFG' = GenerateCFG(MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel)}), CFG.edge)
+        /\  LET newCFG == GenerateCFG(MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel)}), CFG.edge)
+                newState == StateUpdate(workGroupId, t, newCFG)
+            IN
+                /\  CFG' = newCFG
+                /\  state' = newState
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+        /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength>>
 
 \* zheyuan chen: update tangle
 Terminate(t) ==
