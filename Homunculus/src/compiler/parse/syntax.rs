@@ -183,7 +183,7 @@ pub enum TokenKind {
     Scheduler,
     #[regex("%tla_num_workgroups")]
     TlaNumWorkgroups,
-    #[regex("tla_subgroup_size")]
+    #[regex("%tla_subgroup_size")]
     TlaSubgroupSize,
     #[regex("UserSemantic")]
     UserSemantic,
