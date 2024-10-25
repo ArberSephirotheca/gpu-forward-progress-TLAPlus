@@ -4,13 +4,12 @@ LOCAL INSTANCE Naturals
 LOCAL INSTANCE Sequences
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
-VARIABLES pc, state, threadLocals, globalVars, CFG, MaxPathLength
+VARIABLES pc, state, threadLocals, globalVars, CFG, MaxPathLength, validPaths
 
 (* Thread Configuration *)
 INSTANCE  MCProgram
 
 ThreadState == {"ready", "workgroup", "subgroup", "terminated"}
-
 (* Thread variables and functions start here *)
 threadVars == <<pc, state>>
 
@@ -107,7 +106,7 @@ OpLogicalOr(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 OpLogicalAnd(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -124,7 +123,7 @@ OpLogicalAnd(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 OpLogicalEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -141,7 +140,7 @@ OpLogicalEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 OpLogicalNotEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -158,7 +157,7 @@ OpLogicalNotEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 OpLogicalNot(t, var, operand) ==
     LET workgroupId == WorkGroupId(t)+1
         MangleVar == Mangle(t, var)
@@ -171,7 +170,7 @@ OpLogicalNot(t, var, operand) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 
 OpEqual(t, var, operand1, operand2) ==
@@ -189,7 +188,7 @@ OpEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 
 OpNotEqual(t, var, operand1, operand2) ==
@@ -207,7 +206,7 @@ OpNotEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 
 OpLess(t, var, operand1, operand2) ==
@@ -225,7 +224,7 @@ OpLess(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 OpLessOrEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -242,7 +241,7 @@ OpLessOrEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 OpGreater(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -259,7 +258,7 @@ OpGreater(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 OpGreaterOrEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -276,7 +275,7 @@ OpGreaterOrEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 
 OpAdd(t, var, operand1, operand2) ==
@@ -291,7 +290,7 @@ OpAdd(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val + operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 
 OpAtomicAdd(t, var, operand1, operand2) ==
@@ -306,7 +305,7 @@ OpAtomicAdd(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val + operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 OpSub(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -320,7 +319,7 @@ OpSub(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val - operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 OpAtomicSub(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -334,7 +333,7 @@ OpAtomicSub(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val - operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 OpMul(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -348,7 +347,7 @@ OpMul(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val * operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, globalVars, CFG, MaxPathLength, validPaths>>
 
 
 GetGlobalId(t, result) ==
@@ -361,7 +360,7 @@ GetGlobalId(t, result) ==
             \/  IsIntermediate(result)
         /\  Assignment(t, {Var(result.scope, result.name, GlobalInvocationId(t), Index(-1))})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, MaxPathLength>>
+        /\  UNCHANGED <<state, MaxPathLength, validPaths>>
 
 
 \* It does not handle the situation where result is an index to array
@@ -402,7 +401,7 @@ OpAtomicLoad(t, result, pointer) ==
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, Index(-1))})  
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, MaxPathLength>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength, validPaths>>
 
 OpAtomicStore(t, pointer, value) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -418,7 +417,7 @@ OpAtomicStore(t, pointer, value) ==
                     ELSE
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, EvalExpr(t, WorkGroupId(t)+1, value), pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, MaxPathLength>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength, validPaths>>
 
 OpAtomicIncrement(t, pointer) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -435,7 +434,7 @@ OpAtomicIncrement(t, pointer) ==
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value + 1, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, MaxPathLength>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength, validPaths>>
 
 
 OpAtomicDecrement(t, pointer) == 
@@ -452,7 +451,7 @@ OpAtomicDecrement(t, pointer) ==
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value - 1, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, MaxPathLength>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength, validPaths>>
 
  OpControlBarrier(t, scope) ==
     IF GetVal(-1, scope) = "subgroup" THEN \* already waiting at a subgroup barrier
@@ -465,7 +464,7 @@ OpAtomicDecrement(t, pointer) ==
             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
             ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                 /\  state' = [state EXCEPT ![t] = "subgroup"]
-                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
             \* if all threads in the subgroup are waiting at the barrier, release them
             ELSE 
                 \* release all barrier in the subgroup, marking state as ready
@@ -484,7 +483,7 @@ OpAtomicDecrement(t, pointer) ==
                             ELSE 
                                 pc[tid]
                     ]
-                /\  UNCHANGED <<threadLocals, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
 
     ELSE IF GetVal(-1, scope) = "workgroup" THEN \* already waiting at a workgroup barrier
         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
@@ -492,7 +491,7 @@ OpAtomicDecrement(t, pointer) ==
             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
             IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
             \* if all threads in the subgroup are waiting at the barrier, release them
             ELSE 
                 \* release all barrier in the subgroup, marking state as ready
@@ -511,7 +510,7 @@ OpAtomicDecrement(t, pointer) ==
                             ELSE 
                                 pc[tid]
                     ]
-                /\  UNCHANGED <<threadLocals, globalVars, CFG, MaxPathLength>>
+                /\  UNCHANGED <<threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
     ELSE    
         FALSE
 
@@ -534,7 +533,7 @@ OpGroupAll(t, result, scope, predicate) ==
                         \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
                         ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -551,7 +550,7 @@ OpGroupAll(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
                         ELSE 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -568,13 +567,13 @@ OpGroupAll(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
             ELSE IF scope.value = "workgroup" THEN 
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
                     IN      \* if there is a thread that has not reached the opgroupAll, return false
                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
                                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
                             ELSE IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -591,7 +590,7 @@ OpGroupAll(t, result, scope, predicate) ==
                                             ELSE 
                                                 pc[tid]
                                     ]
-                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
                             ELSE 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE, Index(-1)): wthread \in wthreads })
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -608,7 +607,7 @@ OpGroupAll(t, result, scope, predicate) ==
                                             ELSE 
                                                 pc[tid]
                                     ]
-                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
             ELSE
                 /\  FALSE
 
@@ -631,7 +630,7 @@ OpGroupAny(t, result, scope, predicate) ==
                         \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
                         ELSE IF \E sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -648,7 +647,7 @@ OpGroupAny(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
                         ELSE 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as
@@ -665,13 +664,13 @@ OpGroupAny(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
             ELSE IF scope.value = "workgroup" THEN
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
                     IN      \* if there is a thread that has not reached the opgroupAny, return false
                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
                                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                                /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
                             ELSE IF \E wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -688,7 +687,7 @@ OpGroupAny(t, result, scope, predicate) ==
                                             ELSE 
                                                 pc[tid]
                                     ]
-                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
                             ELSE 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE, Index(-1)): wthread \in wthreads })
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -705,7 +704,7 @@ OpGroupAny(t, result, scope, predicate) ==
                                             ELSE 
                                                 pc[tid]
                                     ]
-                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                                /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
             ELSE
                 /\  FALSE
 
@@ -723,7 +722,7 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
                     IN
                         IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
                         ELSE IF \A sthread \in active_subgroup_threads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in active_subgroup_threads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -740,7 +739,7 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
                         ELSE 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in active_subgroup_threads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -757,7 +756,7 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
             ELSE
                 /\  FALSE
 
@@ -775,7 +774,7 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
                     IN
                         IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength>>
+                            /\  UNCHANGED <<pc, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
                         ELSE IF \E sthread \in active_subgroup_threads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in active_subgroup_threads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -792,7 +791,7 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
                         ELSE 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in active_subgroup_threads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -809,7 +808,7 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength>>
+                            /\ UNCHANGED <<globalVars, CFG, MaxPathLength, validPaths>>
             ELSE
                 /\  FALSE
 
@@ -839,7 +838,7 @@ OpAtomicExchange(t, result, pointer, value) ==
                 ELSE
                     Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, MaxPathLength>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength, validPaths>>
 
 (* result and pointer are variable, compare and value are literal *)
 OpAtomicCompareExchange(t, result, pointer, value, comparator) ==
@@ -879,7 +878,7 @@ OpAtomicCompareExchange(t, result, pointer, value, comparator) ==
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, CFG, MaxPathLength>>
+        /\  UNCHANGED <<state, CFG, MaxPathLength, validPaths>>
 
 
 (* zheyuan chen: invocation is escaped from reconvergence if: 
@@ -900,7 +899,7 @@ OpBranch(t, label) ==
                 /\  CFG' = newCFG
                 /\  state' = newState   
     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
-    /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength>>
+    /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength, validPaths>>
 
 (* condition is an expression, trueLabel and falseLabel are integer representing pc *)
 OpBranchConditional(t, condition, trueLabel, falseLabel) ==
@@ -925,7 +924,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
                         /\  CFG' = newCFG
                         /\  state' = newState  
                 /\  pc' = [pc EXCEPT ![t] = falseLabelVal]
-    /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+    /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength, validPaths>>
 
 OpSwitch(t, selector, default, literals, ids) ==
     /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
@@ -951,13 +950,13 @@ OpSwitch(t, selector, default, literals, ids) ==
                         /\  CFG' = newCFG
                         /\  state' = newState  
                 /\  pc' = [pc EXCEPT ![t] = defaultVal]
-    /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength>>
+    /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength, validPaths>>
 
 (* structured loop, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block *)
 
 OpLabel(t, label) ==
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-    /\  UNCHANGED <<state, threadLocals, globalVars, CFG, MaxPathLength>>
+    /\  UNCHANGED <<state, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
 
 (* structured loop, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block *)
 OpLoopMerge(t, mergeLabel, continueTarget) ==
@@ -967,7 +966,7 @@ OpLoopMerge(t, mergeLabel, continueTarget) ==
     IN 
         /\  CFG' = GenerateCFG(MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel), GetVal(-1, continueTarget)}), CFG.edge)
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+        /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength, validPaths>>
 
 (* structured switch/if, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block  *)
 OpSelectionMerge(t, mergeLabel) ==
@@ -977,7 +976,7 @@ OpSelectionMerge(t, mergeLabel) ==
     IN
         /\  CFG' = GenerateCFG(MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel)}), CFG.edge)
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength>>
+        /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength, validPaths>>
 
 \* zheyuan chen: update tangle
 Terminate(t) ==
@@ -985,7 +984,7 @@ Terminate(t) ==
     IN
         /\  CFG' = GenerateCFG(TerminateUpdate(workgroupId, t, FindBlockByTerminationIns(CFG.node, pc[t]).opLabelIdx), CFG.edge)
         /\  state' = [state EXCEPT ![t] = "terminated"]
-        /\  UNCHANGED <<pc, threadLocals, globalVars, MaxPathLength>>
+        /\  UNCHANGED <<pc, threadLocals, globalVars, MaxPathLength, validPaths>>
 
 ExecuteInstruction(t) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -996,7 +995,7 @@ ExecuteInstruction(t) ==
             ELSE IF ThreadInstructions[t][pc[t]] = "Assignment" THEN
                 /\  Assignment(t, {Mangle(t,ThreadArguments[t][pc[t]][1])})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, CFG, MaxPathLength>>
+                /\  UNCHANGED <<state, CFG, MaxPathLength, validPaths>>
             ELSE IF ThreadInstructions[t][pc[t]] = "GetGlobalId" THEN
                 GetGlobalId(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicIncrement" THEN
@@ -1066,7 +1065,7 @@ ExecuteInstruction(t) ==
             ELSE
                 FALSE
         ELSE 
-            /\ UNCHANGED << threadVars, threadLocals, globalVars, CFG, MaxPathLength>>
+            /\ UNCHANGED << threadVars, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
 
 
 (* This property ensures all the instructions in all threads are bounded to the instruction set *)

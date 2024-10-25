@@ -6,11 +6,10 @@ LOCAL INSTANCE FiniteSets
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES globalVars, threadLocals, CFG, MaxPathLength
+VARIABLES globalVars, threadLocals, CFG, MaxPathLength, validPaths
 (* Layout Configuration *)
 
 Threads == {tid : tid \in 1..NumThreads}
-
 
 (* Variable *)
 Var(varScope, varName, varValue, index) == 
@@ -244,6 +243,9 @@ IsMemoryOperation(inst) ==
     inst \in MemoryOperationSet
 (* Program *)
 
+
+EntryLabel == Min({idx \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][idx] = "OpLabel"})
+
 INSTANCE ProgramConf
 
 (* Inovactions within a tangle are required to execute tangled instruction concurrently, examples or opGroup operations and opControlBarrier  *)
@@ -316,6 +318,12 @@ FindBlockbyOpLabelIdx(blocks, index) ==
 (* Helper function to find the block that ends with the given index to termination instruction *)
 FindBlockByTerminationIns(blocks, index) == 
     CHOOSE block \in SeqToSet(blocks): block.terminatedInstrIdx = index
+
+\* helper function that returns the index of the first OpLabel instruction
+\* We do not need to worry about empty set as we are guaranteed to have 
+\* at least one OpLabel instruction (entry block)
+\* EntryLabel(insts) ==
+\*     Min({idx \in 1..Len(insts) : insts[idx] = "OpLabel"})
 
 
 \* function to determine if the merge instruction contains the given label as operand
@@ -396,7 +404,7 @@ DFS(node, cfg, visited, finished, backEdges) ==
 \* Node is the index to the opLabel
 IdentifyLoops(cfg) ==
     LET
-        startNode == 1 \* Start from the entry block
+        startNode == EntryLabel \* Start from the entry block
         result == DFS(startNode, cfg, {}, {}, {})
     IN
     result.backEdges
@@ -428,7 +436,8 @@ SuggestedPathLength(cfg) ==
 
 RECURSIVE GeneratePaths(_, _, _)
 GeneratePaths(node, cfg, length) ==
-  IF length = 0 THEN {<<>>}
+  IF length = 0 THEN
+    {<<>>}
   ELSE
     LET 
       successors == {n \in ExtractOpLabelIdxSet(cfg.node) : <<node, n>> \in cfg.edge}
@@ -436,28 +445,33 @@ GeneratePaths(node, cfg, length) ==
     IN
     {<<node>> \o path : path \in subpaths}
 
-ValidPaths(startNode, cfg, maxPathLength) == 
-    UNION {GeneratePaths(startNode, cfg, len) : len \in 1..MaxPathLength}
+\* ValidPaths(startNode, cfg, maxPathLength) == 
+\*     UNION {GeneratePaths(startNode, cfg, len) : len \in 1..maxPathLength}
 
+\* only generate paths that are valid and size of maxPathLength
+ValidPaths(startNode, cfg, maxPathLength) == 
+    GeneratePaths(startNode, cfg, maxPathLength)
 \* return a set of all paths in graph G
-StructuredControlFlowPaths(G) == {
-    p \in ValidPaths(1, CFG, MaxPathLength) :
+\* this should only be used as Init phase as validPath does not change during execution
+StructuredControlFlowPaths(cfg, maxPathLength) == {
+    p \in ValidPaths(EntryLabel, cfg, maxPathLength) :
         /\ p # <<>>(* p is not an empty sequence *)
-        /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
+        /\ p[1] = EntryLabel
+        /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in cfg.edge
     }
 
 
 \* fixme: maximum length of the path should be sounded.
 StructuredControlFlowPathsTo(B) =={
-    p \in ValidPaths(1, CFG, MaxPathLength) :
+    p \in validPaths:
         /\ p # <<>>(* p is not an empty sequence *)
-        /\ p[1] = 1
+        /\ p[1] = EntryLabel
         /\ p[Len(p)] = B
         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
     }
 
 StructuredControlFlowPathsFromTo(StartNode, B) == {
-    p \in ValidPaths(StartNode, CFG, MaxPathLength) :
+    p \in validPaths:
         /\ p # <<>>  \* p is not an empty sequence
         /\ p[1] = StartNode
         /\ p[Len(p)] = B
@@ -478,12 +492,6 @@ StrictlyStructurallyDominates(A, B) ==
     /\ StructurallyDominates(A, B)
     /\ A # B
 
-
-\* helper function that returns the index of the first OpLabel instruction
-\* We do not need to worry about empty set as we are guaranteed to have 
-\* at least one OpLabel instruction (entry block)
-EntryLabel(insts) ==
-    Min({idx \in 1..Len(insts) : insts[idx] = "OpLabel"})
     
 \* Generate blocks from the instructions
 GenerateBlocks(insts) == 
@@ -492,12 +500,12 @@ GenerateBlocks(insts) ==
        LET terminationIndex == Min({j \in i+1..Len(insts) : 
            IsTerminationInstruction(insts[j])} \cup {Len(insts)})
            tangle == IF 
-                        i = EntryLabel(insts) 
+                        i = EntryLabel
                      THEN 
                         [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroup(wg-1)] 
                      ELSE 
                         [wg \in 1..NumWorkGroups |-> {}]
-           initialization == IF i = EntryLabel(insts) THEN [wg \in 1..NumWorkGroups |-> TRUE] ELSE [wg \in 1..NumWorkGroups |-> FALSE]
+           initialization == IF i = EntryLabel THEN [wg \in 1..NumWorkGroups |-> TRUE] ELSE [wg \in 1..NumWorkGroups |-> FALSE]
            mergeSet == IF ThreadInstructions[1][terminationIndex-1] = "OpLoopMerge" THEN
                     {GetVal(-1, ThreadArguments[1][terminationIndex-1][1]), GetVal(-1, ThreadArguments[1][terminationIndex-1][2])}
                 ELSE IF ThreadInstructions[1][terminationIndex-1] = "OpSelectionMerge" THEN
@@ -646,8 +654,12 @@ InitCFG ==
                     target \in FindTargetBlocks(blocks[i].opLabelIdx, blocks[i].terminatedInstrIdx)} : i \in DOMAIN blocks }
                 )
     IN 
-        /\  CFG = graph
-        /\  MaxPathLength = SuggestedPathLength(graph)
+        /\  LET maxPathLength == SuggestedPathLength(graph) 
+            IN
+                /\  CFG = graph
+                /\  MaxPathLength = maxPathLength
+                /\  validPaths = StructuredControlFlowPaths(graph, maxPathLength)
+
 
 (* Global Variables *)
 
