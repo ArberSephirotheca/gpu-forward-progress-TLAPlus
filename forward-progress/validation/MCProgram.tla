@@ -689,11 +689,11 @@ FindMergeBlocksIdx(startIndex, terminationIndex) ==
 
 
 \* Rule 4: If there exists termination instruction in the block, 
-\* then remove thread itself from the tangle of all merge blocks as well as current block
-\* for every header block that structurally dominates the current block
+\* Simply remove the thread from the tangle of all blocks as the thread has terminated.
 TerminateUpdate(wgid, t, currentLabelIdx) ==
     [i \in 1..Len(CFG.node) |->
-        IF IsMergeBlock(CFG.node[i]) /\ StrictlyStructurallyDominates(FindHeaderBlock(CFG.node[i]).opLabelIdx, currentLabelIdx)
+        \* IF IsMergeBlock(CFG.node[i]) /\ StrictlyStructurallyDominates(FindHeaderBlock(CFG.node[i]).opLabelIdx, currentLabelIdx)
+        IF TRUE
         THEN
             Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
             newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), 
