@@ -924,7 +924,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
                         /\  CFG' = newCFG
                         /\  state' = newState  
                 /\  pc' = [pc EXCEPT ![t] = falseLabelVal]
-    /\  UNCHANGED <<state, threadLocals, globalVars, MaxPathLength, validPaths>>
+    /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength, validPaths>>
 
 OpSwitch(t, selector, default, literals, ids) ==
     /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])

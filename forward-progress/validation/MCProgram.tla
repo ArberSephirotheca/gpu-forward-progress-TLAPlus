@@ -60,6 +60,8 @@ IsIntermediate(var) ==
     /\ IsVar(var)
     /\ var.scope = "intermediate"
 
+Inter(S) ==
+  { x \in UNION S : \A t \in S : x \in t }
 Range(f) == { f[x] : x \in DOMAIN f }
 Max(S) == CHOOSE s \in S : \A t \in S : s >= t
 Min(S) == CHOOSE s \in S : \A t \in S : s <= t
@@ -261,38 +263,18 @@ Tangle(ts) ==
 \* Block: A contiguous sequence of instructions starting with an OpLabel, ending with a block termination instruction. 
 \* A block has no additional label or block termination instructions.
 \* block termination instruction: OpBranch, OpBranchConditional, Terminate
-\* OpLabel is define as a variable that has pc as its value field and its opLabel as its name field
-Block(opLabel, terminatedInstr, tangle, merge, initialized, mergeSet) == 
+\* OpLabel is define as a variable thatGeneratePaths has pc as its value field and its opLabel as its name field
+Block(opLabel, terminatedInstr, tangle, merge, initialized, mergeSeq) == 
     [opLabelIdx |-> opLabel,
     terminatedInstrIdx |-> terminatedInstr,
     tangle |-> tangle,
     merge |-> merge,
     initialized |-> initialized,
-    mergeSet |-> mergeSet]
+    mergeSeq |-> mergeSeq]
 
 GenerateCFG(blocks, branch) == 
     [node |-> blocks,
     edge |-> branch]
-
-
-IsTerminationInstruction(instr) ==
-    instr \in BlockTerminationInstructionSet
-
-IsBranchInstruction(instr) ==
-    instr \in BranchInstructionSet
-
-IsMergedInstruction(instr) ==
-    instr \in MergedInstructionSet
-
-IsOpLabel(instr) ==
-    instr = "OpLabel"
-
-IsMergeBlock(block) ==
-    block.merge = TRUE
-
-\* helper function to extract the OpLabel field from the block
-ExtractOpLabelIdxSet(blocks) ==
-    {blocks[blockIdx].opLabelIdx : blockIdx \in 1..Len(blocks)}
 
 \* make non-order-sensitive sequence becomes enumerable
 SeqToSet(seq) == { seq[i]: i \in 1..Len(seq) }
@@ -303,10 +285,17 @@ newSeqOfSets(seq, idx, newSet) == [seq EXCEPT ![idx] = newSet]
 \* BoundedSeq: return a set of all sequences of length at most n, this helps to make the sequence enumerable
 BoundedSeq(S, N) == UNION { [1..n -> S]: n \in 0..N}
 
-(* Helper function to find the block that contains the given index *)
-FindCurrentBlock(blocks, index) == 
-    CHOOSE block \in SeqToSet(blocks): block.opLabelIdx <= index /\ block.terminatedInstrIdx >= index
 
+\* helper function to extract the OpLabel field from the block
+ExtractOpLabelIdxSet(blocks) ==
+    {blocks[blockIdx].opLabelIdx : blockIdx \in 1..Len(blocks)}
+
+        
+
+\* mergeBlock is the current merge block,
+\* return set of header blocks for current merge block
+FindHeaderBlock(mergeBlock) == 
+    CHOOSE block \in SeqToSet(CFG.node) : mergeBlock.opLabelIdx \in SeqToSet(block.mergeSeq)
 \* (* Helper function to find the block that starts with the given name to OpLabel *)
 \* FindBlockbyOpLabel(blocks, name) == 
 \*     CHOOSE k \in 1..Len(blocks) : \E j \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][j] = "OpLabel" /\ GetVal(ThreadArguments[1][blocks[k].opLabelIdx]) = j
@@ -347,6 +336,49 @@ MergeInstContainsLabelIdx(mergeInsIdx, opLabelIdx) ==
         FALSE
 
 
+IsTerminationInstruction(instr) ==
+    instr \in BlockTerminationInstructionSet
+
+IsBranchInstruction(instr) ==
+    instr \in BranchInstructionSet
+
+IsMergedInstruction(instr) ==
+    instr \in MergedInstructionSet
+
+IsOpLabel(instr) ==
+    instr = "OpLabel"
+
+IsMergeBlock(block) ==
+    block.merge = TRUE
+
+IsHeaderBlock(block) ==
+    block.mergeSeq # <<>>
+
+IsLoopHeaderBlock(block) ==
+    /\ IsHeaderBlock(block)
+    /\ Len(block.mergeSeq) = 2
+
+IsContinueBlockOf(currentBlock, headerBlock) ==
+    /\ IsLoopHeaderBlock(headerBlock)
+    /\ IsMergeBlock(currentBlock)
+    /\ headerBlock.mergeSeq[2] = currentBlock.opLabelIdx
+
+(* Helper function to find the block that contains the given index *)
+FindCurrentBlock(blocks, index) == 
+    CHOOSE block \in SeqToSet(blocks): block.opLabelIdx <= index /\ block.terminatedInstrIdx >= index
+
+IndexOfNode(nodeId) ==
+  CHOOSE i \in 1..Len(CFG.node) : CFG.node[i].opLabelIdx = nodeId
+
+IsBackEdge(node, target) ==
+    IF  node.opLabelIdx > target.opLabelIdx THEN \* target is before current node (back edge)
+        FALSE
+    ELSE 
+        /\  IsHeaderBlock(target)  \* target block is a header block
+        /\  Len(target.mergeSeq) = 2 \* target merge instruction is OpLoopMerge
+        /\  node.opLabelIdx = target.mergeSeq[2] \* node is in the merge set
+
+
 \* lookback function that helps to determine if the current block is a merge block
 \* startIdx is the pc of the instruction(OpLabel) that starts the current block
 DetermineBlockType(startIdx) ==
@@ -357,7 +389,6 @@ DetermineBlockType(startIdx) ==
         TRUE
     ELSE 
         FALSE
-
 
 \* node is the index to the opLabel
 RECURSIVE DFS(_, _, _, _, _)
@@ -434,29 +465,102 @@ SuggestedPathLength(cfg) ==
         nodeCount * (2 ^ loopDepth)
 
 
-RECURSIVE GeneratePaths(_, _, _)
-GeneratePaths(node, cfg, length) ==
-  IF length = 0 THEN
-    {<<>>}
+(* Helper function to handle back edges *)
+BackEdgeCheck(node, target, cfg, activeHeaders, loopStack) ==
+  \* If the target is a loop header, ensure that the loop header is still in the stack
+  IF IsBackEdge(node, target) THEN
+    \* /\ target \in activeHeaders  \* Ensure loop header is still active
+    /\ \E i \in 1..Len(loopStack) : loopStack[i] = target.opLabelIdx
   ELSE
-    LET 
-      successors == {n \in ExtractOpLabelIdxSet(cfg.node) : <<node, n>> \in cfg.edge}
-      subpaths == UNION {GeneratePaths(s, cfg, length - 1) : s \in successors}
+    TRUE
+
+
+(* Note: currently GeneratePaths function is not used as it severely affects the performance when length is long *)
+RECURSIVE GeneratePaths(_, _, _, _)
+GeneratePaths(node, cfg, length, visitedLoopHeader) ==
+  IF length = 0 THEN
+    {<<node.opLabelIdx>>}
+  ELSE 
+    LET
+    \* We do not want to visit the same loop header twice via a back edge
+    \* So whenever we visit a continue block, we add the corresponding header block to the visited set
+     newVisitedLoopHeader == 
+        IF IsMergeBlock(node) = TRUE THEN
+            LET headerBlock == FindHeaderBlock(node) IN
+                IF IsContinueBlockOf(node, headerBlock) THEN
+                     visitedLoopHeader \union {headerBlock.opLabelIdx}
+                ELSE
+                     visitedLoopHeader
+        ELSE 
+            visitedLoopHeader
+      successors == {n \in SeqToSet(cfg.node) : <<node.opLabelIdx, n.opLabelIdx>> \in cfg.edge}
+      \* we only allow visited node to be visited again if we are in a loop
+      filteredSuccessors == {
+          s \in successors :
+            \* Doing so we can gaurentee that we are not going to visit the back edge twice
+            /\ s.opLabelIdx \notin visitedLoopHeader
+      }
+      subpaths == UNION {GeneratePaths(s, cfg, length - 1, newVisitedLoopHeader) : s \in filteredSuccessors}
+      result == {<<node.opLabelIdx>> \o path : path \in subpaths}
     IN
-    {<<node>> \o path : path \in subpaths}
+      result
 
-\* ValidPaths(startNode, cfg, maxPathLength) == 
-\*     UNION {GeneratePaths(startNode, cfg, len) : len \in 1..maxPathLength}
-
-\* only generate paths that are valid and size of maxPathLength
 ValidPaths(startNode, cfg, maxPathLength) == 
-    GeneratePaths(startNode, cfg, maxPathLength)
-\* return a set of all paths in graph G
+    UNION {GeneratePaths(startNode, cfg, len, {}) : len \in 1..maxPathLength}
+
+
+
+Successors(n) == { m \in ExtractOpLabelIdxSet(CFG.node) : <<n, m>> \in CFG.edge }
+Predecessors(n) == { m \in ExtractOpLabelIdxSet(CFG.node) : <<m, n>> \in CFG.edge }
+
+RECURSIVE Reachable(_, _, _)
+
+Reachable(currentNode, targetNode, visited) ==
+  IF currentNode = targetNode THEN
+    TRUE
+  ELSE IF currentNode \in visited THEN
+    FALSE
+  ELSE
+    LET
+      newVisited == visited \cup {currentNode}
+    IN
+      \E n \in Successors(currentNode) : Reachable(n, targetNode, newVisited)
+
+InitDom == [ n \in 1..Len(CFG.node) |-> IF CFG.node[n].opLabelIdx = EntryLabel THEN {EntryLabel} ELSE {} ]
+
+
+ComputeDom(dom) ==
+  [ n \in 1..Len(CFG.node)|-> 
+      LET
+        nodeId == CFG.node[n].opLabelIdx
+        preds == Predecessors(nodeId)
+        predDoms == { dom[IndexOfNode(p)] : p \in preds }
+        interPreDoms == Inter(predDoms)
+      IN
+        IF preds = {}
+        THEN 
+            {nodeId}
+        ELSE
+            {nodeId} \cup interPreDoms
+  ]
+
+RECURSIVE DominationSequence(_)
+
+DominationSequence(k) ==
+    IF k = 0 THEN 
+        InitDom
+    ELSE
+        ComputeDom(DominationSequence(k - 1))
+
+dom == DominationSequence(Len(CFG.node) + 1)
+
+\* return a set of all paths in graph G from start block to end block
 \* this should only be used as Init phase as validPath does not change during execution
 StructuredControlFlowPaths(cfg, maxPathLength) == {
-    p \in ValidPaths(EntryLabel, cfg, maxPathLength) :
+    p \in ValidPaths(cfg.node[1], cfg, maxPathLength) :
         /\ p # <<>>(* p is not an empty sequence *)
         /\ p[1] = EntryLabel
+        /\ p[Len(p)] = cfg.node[Len(cfg.node)].opLabelIdx
         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in cfg.edge
     }
 
@@ -465,32 +569,38 @@ StructuredControlFlowPaths(cfg, maxPathLength) == {
 StructuredControlFlowPathsTo(B) =={
     p \in validPaths:
         /\ p # <<>>(* p is not an empty sequence *)
-        /\ p[1] = EntryLabel
-        /\ p[Len(p)] = B
+        /\ \E idx \in 1..Len(p) : p[idx] = B
         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
     }
 
 StructuredControlFlowPathsFromTo(StartNode, B) == {
     p \in validPaths:
         /\ p # <<>>  \* p is not an empty sequence
-        /\ p[1] = StartNode
-        /\ p[Len(p)] = B
+        /\ \E startIdx, endIdx \in 1..Len(p) :
+            /\ p[startIdx] = StartNode
+            /\ p[endIdx] = B
+            /\ startIdx < endIdx
         /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
 }
 
-StructurallyReachable(B) == StructuredControlFlowPathsTo(B) # {}
+StructurallyReachable(B) == Reachable(EntryLabel, B, {})
 
-StructurallyReachableFrom(StartNode, B) == StructuredControlFlowPathsFromTo(StartNode, B) # {}
+StructurallyReachableFrom(currentNode, targetNode) == 
+    Reachable(currentNode, targetNode, {})
+
+
+\* StructurallyReachableFrom(StartNode, B) == StructuredControlFlowPathsFromTo(StartNode, B) # {}
 
 \* A block A structurally dominates a block B if every structured control flow path to B includes A
 \* A and B are the indice to the opLabel
-StructurallyDominates(A, B) == \A p \in StructuredControlFlowPathsTo(B) : \E i \in 1..Len(p) : p[i] = A
+StructurallyDominates(A, B) == A \in dom[IndexOfNode(B)]
+\* StructurallyDominates(A, B) == \A p \in StructuredControlFlowPathsTo(B) : \E i \in 1..Len(p) : p[i] = A
 
 \* A block A strictly structurally dominates a block B if A structurally dominates B and A != B
 \* A and B are the indice to the opLabel
 StrictlyStructurallyDominates(A, B) == 
-    /\ StructurallyDominates(A, B)
     /\ A # B
+    /\ StructurallyDominates(A, B)
 
     
 \* Generate blocks from the instructions
@@ -506,16 +616,16 @@ GenerateBlocks(insts) ==
                      ELSE 
                         [wg \in 1..NumWorkGroups |-> {}]
            initialization == IF i = EntryLabel THEN [wg \in 1..NumWorkGroups |-> TRUE] ELSE [wg \in 1..NumWorkGroups |-> FALSE]
-           mergeSet == IF ThreadInstructions[1][terminationIndex-1] = "OpLoopMerge" THEN
-                    {GetVal(-1, ThreadArguments[1][terminationIndex-1][1]), GetVal(-1, ThreadArguments[1][terminationIndex-1][2])}
+           mergeSeq == IF ThreadInstructions[1][terminationIndex-1] = "OpLoopMerge" THEN
+                    <<GetVal(-1, ThreadArguments[1][terminationIndex-1][1]), GetVal(-1, ThreadArguments[1][terminationIndex-1][2])>>
                 ELSE IF ThreadInstructions[1][terminationIndex-1] = "OpSelectionMerge" THEN
-                    {GetVal(-1, ThreadArguments[1][terminationIndex-1][1])}
+                    <<GetVal(-1, ThreadArguments[1][terminationIndex-1][1])>>
                 ELSE
-                    {}
+                    <<>>
         
        IN 
-            Block(i, terminationIndex, tangle, DetermineBlockType(i), initialization, mergeSet)
-     ELSE Block(-1, <<>>, <<>>, FALSE, <<>>, {})
+            Block(i, terminationIndex, tangle, DetermineBlockType(i), initialization, mergeSeq)
+     ELSE Block(-1, <<>>, <<>>, FALSE, <<>>, <<>>)
   ]
 
 
@@ -577,23 +687,17 @@ FindMergeBlocksIdx(startIndex, terminationIndex) ==
         ELSE 
             {}
 
-\* mergeBlock is the current merge block,
-\* return set of header blocks for current merge block
-FindHeaderBlocks(mergeBlock) == 
-    {block \in SeqToSet(CFG.node):
-        mergeBlock.opLabelIdx \in FindMergeBlocksIdx(block.opLabelIdx, block.terminatedInstrIdx)}
 
 \* Rule 4: If there exists termination instruction in the block, 
 \* then remove thread itself from the tangle of all merge blocks as well as current block
 \* for every header block that structurally dominates the current block
 TerminateUpdate(wgid, t, currentLabelIdx) ==
     [i \in 1..Len(CFG.node) |->
-        IF IsMergeBlock(CFG.node[i]) /\ (\E block \in FindHeaderBlocks(CFG.node[i]) : 
-            StrictlyStructurallyDominates(block.opLabelIdx, currentLabelIdx)) 
+        IF IsMergeBlock(CFG.node[i]) /\ StrictlyStructurallyDominates(FindHeaderBlock(CFG.node[i]).opLabelIdx, currentLabelIdx)
         THEN
             Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
             newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), 
-            CFG.node[i].merge, CFG.node[i].initialized, CFG.node[i].mergeSet)
+            CFG.node[i].merge, CFG.node[i].initialized, CFG.node[i].mergeSeq)
         ELSE
             CFG.node[i]
     ] 
@@ -615,17 +719,17 @@ BranchUpdate(wgid, t, currentBlock, tangle, opLabelIdxSet, chosenBranchIdx) ==
             \* and remove the thread itself from the tangle of unchoosen block if that block is not a merge block for current block
             IF CFG.node[i].initialized[wgid] = FALSE THEN
                 \* unchoosen block and is not a merge block
-                IF CFG.node[i].opLabelIdx # chosenBranchIdx /\  CFG.node[i].opLabelIdx \notin  currentBlock.mergeSet THEN
+                IF CFG.node[i].opLabelIdx # chosenBranchIdx /\  CFG.node[i].opLabelIdx \notin SeqToSet(currentBlock.mergeSeq) THEN
                     Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
-                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].merge, [CFG.node[i].initialized EXCEPT ![wgid] = TRUE], CFG.node[i].mergeSet)
+                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].merge, [CFG.node[i].initialized EXCEPT ![wgid] = TRUE], CFG.node[i].mergeSeq)
                 ELSE
                     Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx,
-                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge, [CFG.node[i].initialized EXCEPT ![wgid] = TRUE], CFG.node[i].mergeSet)
+                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge, [CFG.node[i].initialized EXCEPT ![wgid] = TRUE], CFG.node[i].mergeSeq)
             \* rule 3: If the unchoosen block is initialized and is not a merge block for current block,
             \* remove the thread from the tangle
-            ELSE IF CFG.node[i].opLabelIdx # chosenBranchIdx /\ CFG.node[i].opLabelIdx \notin currentBlock.mergeSet /\ CFG.node[i].initialized[wgid] = TRUE THEN
+            ELSE IF CFG.node[i].opLabelIdx # chosenBranchIdx /\ CFG.node[i].opLabelIdx \notin SeqToSet(currentBlock.mergeSeq) /\ CFG.node[i].initialized[wgid] = TRUE THEN
                 Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx,
-                newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), CFG.node[i].merge, CFG.node[i].initialized, CFG.node[i].mergeSet)
+                newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), CFG.node[i].merge, CFG.node[i].initialized, CFG.node[i].mergeSeq)
             ELSE 
                 CFG.node[i]
         ELSE 
@@ -640,7 +744,7 @@ MergeUpdate(wgid, currentLabelIdx, tangle, opLabelIdxSet) ==
             \* update the tangle of tha block to the tangle of the merge instruction
             IF CFG.node[i].initialized[wgid] = FALSE THEN
                 Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
-                    newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge, [CFG.node[i].initialized EXCEPT ![wgid] = TRUE], CFG.node[i].mergeSet) 
+                    newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge, [CFG.node[i].initialized EXCEPT ![wgid] = TRUE], CFG.node[i].mergeSeq) 
             ELSE 
                 CFG.node[i]
         ELSE
@@ -658,7 +762,7 @@ InitCFG ==
             IN
                 /\  CFG = graph
                 /\  MaxPathLength = maxPathLength
-                /\  validPaths = StructuredControlFlowPaths(graph, maxPathLength)
+                /\  validPaths = {}\*StructuredControlFlowPaths(graph, maxPathLength)
 
 
 (* Global Variables *)
