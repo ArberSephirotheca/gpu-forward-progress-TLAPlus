@@ -190,7 +190,9 @@ impl Expr {
             TokenKind::LoadExpr => Some(Self::LoadExpr(LoadExpr(node))),
             TokenKind::AtomicLoadExpr => Some(Self::AtomicLoadExpr(AtomicLoadExpr(node))),
             TokenKind::ConstantExpr => Some(Self::ConstExpr(ConstExpr(node))),
-            TokenKind::ConstantCompositeExpr => Some(Self::ConstCompositeExpr(ConstCompositeExpr(node))),
+            TokenKind::ConstantCompositeExpr => {
+                Some(Self::ConstCompositeExpr(ConstCompositeExpr(node)))
+            }
             TokenKind::ConstantTrueExpr => Some(Self::ConstTrueExpr(ConstTrueExpr(node))),
             TokenKind::ConstantFalseExpr => Some(Self::ConstFalseExpr(ConstFalseExpr(node))),
             TokenKind::LogicalOrExpr => Some(Self::LogicalOr(LogicalOr(node))),
@@ -371,7 +373,6 @@ impl TypeExpr {
     }
 }
 
-
 impl VariableExpr {
     pub(crate) fn ty_name(&self) -> Option<SyntaxToken> {
         self.0
@@ -543,7 +544,7 @@ impl ConstExpr {
     }
 }
 
-impl ConstCompositeExpr{
+impl ConstCompositeExpr {
     pub(crate) fn constituents(&self) -> Vec<SyntaxToken> {
         let mut tokens_iter = self
             .0
@@ -560,7 +561,7 @@ impl ConstCompositeExpr{
         while let Some(constituent) = tokens_iter.next() {
             if constituent.kind() == TokenKind::Ident {
                 result.push(constituent);
-            } else{
+            } else {
                 panic!("Invalid constituent {:#?}", constituent);
             }
         }
@@ -884,7 +885,7 @@ impl DecorateStatement {
     }
 }
 
-impl DecorateStringStatement{
+impl DecorateStringStatement {
     pub(crate) fn tla_builtin(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()

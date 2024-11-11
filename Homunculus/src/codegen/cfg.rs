@@ -1,0 +1,652 @@
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Display,
+};
+
+use crate::codegen::common::{InstructionValue, MERGE_INSTRUCTIONS, TERMINATION_INSTRUCTIONS};
+
+use super::common::{Instruction, InstructionName};
+
+#[derive(Debug, PartialEq, Clone)]
+pub(crate) enum ConstructType {
+    Selection,
+    Loop,
+    Continue,
+    Switch,
+    Case,
+    None,
+}
+
+impl Display for ConstructType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Selection => write!(f, "Selection"),
+            Self::Loop => write!(f, "Loop"),
+            Self::Continue => write!(f, "Continue"),
+            Self::Switch => write!(f, "Switch"),
+            Self::Case => write!(f, "Case"),
+            Self::None => write!(f, "None"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ControlFlowConstruct {
+    construct_type: ConstructType,
+    header_block: u32,
+    merge_block: i32,
+    continue_target: i32,
+    blocks: HashSet<u32>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Node {
+    op_label_idx: u32,
+    termination_inst_idx: u32,
+    tangle: Vec<HashSet<u32>>,
+    merge: bool,
+    initialize: Vec<bool>,
+    construct_type: ConstructType,
+    merge_block: i32,
+    continue_block: i32,
+    default_block: i32,
+    case_blocks: Vec<i32>,
+}
+
+#[derive(Eq, Hash, PartialEq, Debug)]
+pub(crate) struct Edge(u32, u32);
+
+#[derive(Debug)]
+pub(crate) struct CFG {
+    pub(crate) nodes: Vec<Node>,
+    pub(crate) edges: HashSet<Edge>,
+    successors: HashMap<u32, HashSet<u32>>,
+    predecessors: HashMap<u32, HashSet<u32>>,
+    dominated: HashMap<u32, HashSet<u32>>,
+    post_dominated: HashMap<u32, HashSet<u32>>,
+    constructs: Vec<ControlFlowConstruct>,
+}
+
+impl CFG {
+    pub(crate) fn new() -> Self {
+        Self {
+            nodes: vec![],
+            edges: HashSet::new(),
+            successors: HashMap::new(),
+            predecessors: HashMap::new(),
+            dominated: HashMap::new(),
+            post_dominated: HashMap::new(),
+            constructs: vec![],
+        }
+    }
+    pub(crate) fn generate_cfg(
+        instructions: &Vec<Instruction>,
+        num_work_groups: u32,
+        work_group_size: u32,
+    ) -> Self {
+        let mut cfg = CFG::new();
+        let nodes: Vec<Node> =
+            Self::generate_blocks(instructions, num_work_groups, work_group_size);
+        cfg.generate_edges(instructions, &nodes);
+        cfg.nodes = nodes;
+        cfg.dominated = Self::compute_dominated_blocks(&cfg, cfg.nodes[0].op_label_idx);
+        cfg.post_dominated =
+            Self::compute_post_dominated_blocks(&cfg, cfg.nodes.last().unwrap().op_label_idx);
+        cfg.generate_constructs();
+        cfg
+    }
+
+    fn generate_blocks(
+        instructions: &Vec<Instruction>,
+        num_work_groups: u32,
+        work_group_size: u32,
+    ) -> Vec<Node> {
+        let mut current_block_idx = 0;
+        let mut nodes: Vec<Node> = vec![];
+        for (idx, instruction) in instructions.iter().enumerate() {
+            if instruction.name == InstructionName::Label {
+                // find the nearest termination instruction
+                let (termination_inst_idx, termination_inst) = instructions
+                    .iter()
+                    .enumerate()
+                    .find(|(inst_idx, inst)| {
+                        *inst_idx > idx && TERMINATION_INSTRUCTIONS.contains(&inst.name)
+                    })
+                    .expect("CFG: unable to find termination instruction");
+
+                let tangle = {
+                    // entry block
+                    if current_block_idx == 0 {
+                        (0..num_work_groups)
+                            .map(|workgroup_id| {
+                                (1..=work_group_size)
+                                    .map(move |local_tid| {
+                                        workgroup_id * work_group_size + local_tid
+                                    })
+                                    .collect::<HashSet<u32>>()
+                            })
+                            .collect()
+                    } else {
+                        vec![]
+                    }
+                };
+
+                let initialized = {
+                    if current_block_idx == 0 {
+                        (0..num_work_groups).map(|_| true).collect::<Vec<bool>>()
+                    } else {
+                        (0..num_work_groups).map(|_| false).collect::<Vec<bool>>()
+                    }
+                };
+
+                let construct_type = {
+                    match instructions[termination_inst_idx - 1].name {
+                        InstructionName::SelectionMerge => {
+                            if termination_inst.name == InstructionName::BranchConditional {
+                                ConstructType::Selection
+                            } else if termination_inst.name == InstructionName::Switch {
+                                ConstructType::Switch
+                            } else {
+                                ConstructType::None
+                            }
+                        }
+                        InstructionName::LoopMerge => ConstructType::Loop,
+                        _ => ConstructType::None,
+                    }
+                };
+
+                let merge_block = {
+                    if MERGE_INSTRUCTIONS.contains(&instructions[termination_inst_idx - 1].name) {
+                        instructions[termination_inst_idx - 1].arguments.arguments[0]
+                            .value
+                            .parse()
+                            .unwrap() as i32
+                    } else {
+                        -1
+                    }
+                };
+
+                let continue_block = {
+                    if instructions[termination_inst_idx - 1].name == InstructionName::LoopMerge {
+                        instructions[termination_inst_idx - 1].arguments.arguments[1]
+                            .value
+                            .parse()
+                            .unwrap() as i32
+                    } else {
+                        -1
+                    }
+                };
+
+
+                let (default_block, case_blocks) = Self::find_switch_default_targets(
+                    current_block_idx as u32,
+                    termination_inst_idx as u32,
+                    instructions,
+                );
+
+                nodes.push(Node {
+                    op_label_idx: (idx + 1) as u32,
+                    termination_inst_idx: (termination_inst_idx + 1) as u32,
+                    tangle,
+                    merge: false,
+                    initialize: initialized,
+                    construct_type,
+                    merge_block,
+                    continue_block,
+                    default_block,
+                    case_blocks: case_blocks.into_iter().collect(),
+                });
+                current_block_idx += 1;
+            }
+        }
+        nodes
+    }
+
+    fn generate_edges(&mut self, instructions: &Vec<Instruction>, nodes: &Vec<Node>) {
+        for node in nodes.iter() {
+            let source = node.op_label_idx;
+            let targets = Self::find_target_blocks(
+                node.op_label_idx - 1,
+                node.termination_inst_idx - 1,
+                instructions,
+            );
+            for &target in &targets {
+                self.add_edge(source, target);
+            }
+        }
+    }
+
+    fn generate_constructs(&mut self) {
+        let nodes = self.nodes.clone();
+        // 1. Identify loop constructs
+        for node in &nodes {
+            if node.construct_type == ConstructType::Loop {
+                self.identify_loop_construct(
+                    node.op_label_idx,
+                    node.merge_block as u32,
+                    node.continue_block as u32,
+                );
+                self.identify_continue_construct(node.continue_block as u32, Self::find_back_edge_block(&self, node.op_label_idx).unwrap());
+            } else if node.construct_type == ConstructType::Selection {
+                self.identify_selection_construct(node.op_label_idx, node.merge_block as u32);
+            } else if node.construct_type == ConstructType::Switch {
+                self.identify_switch_construct(node.op_label_idx, node.merge_block as u32);
+                for target in &node.case_blocks
+                {
+                    self.identify_case_construct(*target as u32, node.merge_block as u32);
+                }
+                self.identify_case_construct(node.default_block as u32, node.merge_block as u32);
+            }
+        }
+    }
+
+    fn identify_selection_construct(&mut self, header: u32, merge_block: u32) {
+        let mut selection_blocks = HashSet::new();
+
+        // Get all blocks dominated by the header
+        if let Some(dominated_blocks) = self.dominated.get(&header) {
+            for &block in dominated_blocks {
+                if !self
+                    .dominated
+                    .get(&merge_block)
+                    .unwrap_or(&HashSet::new())
+                    .contains(&block)
+                {
+                    selection_blocks.insert(block);
+                }
+            }
+        }
+
+        self.constructs.push(ControlFlowConstruct {
+            construct_type: ConstructType::Selection,
+            header_block: header,
+            merge_block: merge_block as i32,
+            continue_target: -1,
+            blocks: selection_blocks,
+        });
+    }
+
+    fn identify_loop_construct(&mut self, header: u32, merge_block: u32, continue_target: u32) {
+        let mut loop_blocks = HashSet::new();
+
+        if let Some(dominated_blocks) = self.dominated.get(&header) {
+            for &block in dominated_blocks {
+                if !self
+                    .dominated
+                    .get(&continue_target)
+                    .unwrap_or(&HashSet::new())
+                    .contains(&block)
+                    && !self
+                        .dominated
+                        .get(&merge_block)
+                        .unwrap_or(&HashSet::new())
+                        .contains(&block)
+                {
+                    loop_blocks.insert(block);
+                }
+            }
+        }
+
+        self.constructs.push(ControlFlowConstruct {
+            construct_type: ConstructType::Loop,
+            header_block: header,
+            merge_block: merge_block as i32,
+            continue_target: continue_target as i32,
+            blocks: loop_blocks,
+        });
+    }
+
+    fn identify_continue_construct(&mut self, continue_target: u32, back_edge_block: u32) {
+        let mut continue_blocks = HashSet::new();
+
+        if let Some(dominated_blocks) = self.dominated.get(&continue_target) {
+            if let Some(post_dominated_blocks) = self.post_dominated.get(&back_edge_block) {
+                for &block in dominated_blocks {
+                    if post_dominated_blocks.contains(&block) {
+                        continue_blocks.insert(block);
+                    }
+                }
+            }
+        }
+
+        self.constructs.push(ControlFlowConstruct {
+            construct_type: ConstructType::Continue,
+            header_block: continue_target,
+            merge_block: -1,
+            continue_target: back_edge_block as i32,
+            blocks: continue_blocks,
+        });
+    }
+
+    fn identify_switch_construct(&mut self, header: u32, merge_block: u32) {
+        let mut switch_blocks = HashSet::new();
+
+        if let Some(dominated_blocks) = self.dominated.get(&header) {
+            for &block in dominated_blocks {
+                if !self
+                    .dominated
+                    .get(&merge_block)
+                    .unwrap_or(&HashSet::new())
+                    .contains(&block)
+                {
+                    switch_blocks.insert(block);
+                }
+            }
+        }
+
+        self.constructs.push(ControlFlowConstruct {
+            construct_type: ConstructType::Switch,
+            header_block: header,
+            merge_block: merge_block as i32,
+            continue_target: -1,
+            blocks: switch_blocks,
+        });
+    }
+
+    fn identify_case_construct(&mut self, target_block: u32, merge_block: u32) {
+        let mut case_blocks = HashSet::new();
+
+        if let Some(dominated_blocks) = self.dominated.get(&target_block) {
+            for &block in dominated_blocks {
+                if !self
+                    .dominated
+                    .get(&merge_block)
+                    .unwrap_or(&HashSet::new())
+                    .contains(&block)
+                {
+                    case_blocks.insert(block);
+                }   
+            }
+        }
+
+        self.constructs.push(ControlFlowConstruct {
+            construct_type: ConstructType::Case,
+            header_block: target_block,
+            merge_block: merge_block as i32,
+            continue_target: -1,
+            blocks: case_blocks,
+        });
+    }
+
+
+    fn find_switch_default_targets(
+        op_label_idx: u32,
+        termination_inst_idx: u32,
+        instructions: &Vec<Instruction>,
+    ) -> (i32, HashSet<i32>) {
+        let mut targets = HashSet::new();
+        if termination_inst_idx <= op_label_idx {
+            return (-1, targets);
+        }
+        let mut default_block = -1;
+        let inst = &instructions[termination_inst_idx as usize];
+        match inst.name {
+            InstructionName::Switch => {
+                default_block = inst.arguments.arguments[1].value.parse().unwrap() as i32;
+                if let Some(cases) = &inst.vec_arguments {
+                    for case in cases {
+                        targets.insert(case.arguments[1].value.parse().unwrap() as i32);
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        (default_block, targets)
+    }
+
+
+    fn find_target_blocks(
+        op_label_idx: u32,
+        termination_inst_idx: u32,
+        instructions: &Vec<Instruction>,
+    ) -> HashSet<u32> {
+        let mut targets = HashSet::new();
+        if termination_inst_idx <= op_label_idx {
+            return targets;
+        }
+        let merge_inst = &instructions[termination_inst_idx as usize - 1];
+        let inst = &instructions[termination_inst_idx as usize];
+        match inst.name {
+            InstructionName::Branch => {
+                targets.insert(inst.arguments.arguments[0].value.parse().unwrap());
+            }
+            InstructionName::BranchConditional => {
+                targets.insert(inst.arguments.arguments[1].value.parse().unwrap());
+                targets.insert(inst.arguments.arguments[2].value.parse().unwrap());
+            }
+            InstructionName::Switch => {
+                let default_block = inst.arguments.arguments[1].value.parse().unwrap();
+                targets.insert(default_block);
+                if let Some(cases) = &inst.vec_arguments {
+                    for case in cases {
+                        targets.insert(case.arguments[1].value.parse().unwrap());
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        if MERGE_INSTRUCTIONS.contains(&merge_inst.name) {
+            match merge_inst.name {
+                InstructionName::SelectionMerge => {
+                    let merge_block = merge_inst.arguments.arguments[0].value.parse().unwrap();
+                    targets.insert(merge_block);
+                }
+                InstructionName::LoopMerge => {
+                    let merge_block = merge_inst.arguments.arguments[0].value.parse().unwrap();
+                    let continue_block = merge_inst.arguments.arguments[1].value.parse().unwrap();
+                    targets.insert(merge_block);
+                    targets.insert(continue_block);
+                }
+                _ => {}
+            }
+        }
+
+        targets
+    }
+
+    fn find_back_edge_block(cfg: &CFG, header: u32) -> Option<u32> {
+    
+        for edge in &cfg.edges {
+            // Check if `to` has a lower op_label_idx than `from`
+            if edge.0 > edge.1 && edge.1 == header {
+                // If true, `from` is a back-edge block
+                return Some(edge.0);
+            }
+        }
+        None
+    }
+
+
+    fn add_edge(&mut self, from: u32, to: u32) {
+        self.edges.insert(Edge(from, to));
+        self.successors.entry(from).or_default().insert(to);
+        self.predecessors.entry(to).or_default().insert(from);
+    }
+
+    fn reverse(&self) -> Self {
+        let mut reversed_cfg = CFG::new();
+        for (&node, succs) in &self.successors {
+            for &succ in succs {
+                reversed_cfg.add_edge(succ, node);
+            }
+        }
+        reversed_cfg.nodes = self.nodes.clone();
+        reversed_cfg
+    }
+
+    fn traverse_tree(
+        node: u32,
+        dom_tree: &HashMap<u32, Vec<u32>>,
+        dominated_blocks: &mut HashMap<u32, HashSet<u32>>,
+    ) {
+        if let Some(children) = dom_tree.get(&node) {
+            for &child in children {
+                dominated_blocks.get_mut(&node).unwrap().insert(child);
+    
+                // Recursively populate the dominated nodes for each child
+                Self::traverse_tree(child, dom_tree, dominated_blocks);
+    
+                // Extend parent’s dominated set with child’s dominated set
+                if let Some(child_dominated) = dominated_blocks.get(&child).cloned(){
+                    dominated_blocks.get_mut(&node).unwrap().extend(child_dominated);
+                }
+            }
+        }
+    }
+    fn compute_dominators(cfg: &CFG, start_node: u32) -> HashMap<u32, HashSet<u32>> {
+        let mut dom = HashMap::new();
+
+        // Initialize each node's dominator set to all nodes, except start node, which only dominates itself.
+        for node in &cfg.nodes {
+            let initial_set: HashSet<u32> = if node.op_label_idx == start_node {
+                HashSet::from([start_node])
+            } else {
+                HashSet::from(
+                    cfg.nodes
+                        .iter()
+                        .map(|n| n.op_label_idx)
+                        .into_iter()
+                        .collect::<HashSet<u32>>(),
+                )
+            };
+            dom.insert(node.op_label_idx, initial_set);
+        }
+
+        let mut changed = true;
+        while changed {
+            changed = false;
+            for node in &cfg.nodes {
+                if node.op_label_idx == start_node {
+                    continue; // Start node dominates only itself
+                }
+
+                // Compute the new dominator set: intersection of dominators of all predecessors
+                let preds = &cfg.predecessors[&node.op_label_idx];
+                let mut new_dom: HashSet<u32> = cfg
+                    .nodes
+                    .iter()
+                    .map(|n| n.op_label_idx)
+                    .into_iter()
+                    .collect(); // Start with all nodes
+
+                for &pred in preds {
+                    if let Some(pred_dom) = dom.get(&pred) {
+                        new_dom = new_dom.intersection(pred_dom).cloned().collect();
+                    }
+                }
+                new_dom.insert(node.op_label_idx); // Add the node itself
+
+                // Update and check for changes
+                if dom.get(&node.op_label_idx) != Some(&new_dom) {
+                    dom.insert(node.op_label_idx, new_dom);
+                    changed = true;
+                }
+            }
+        }
+        dom
+    }
+
+// Build the dominator tree from the dominator sets
+fn compute_dominator_tree(dom: &HashMap<u32, HashSet<u32>>, start_node: u32) -> HashMap<u32, Vec<u32>> {
+    let mut dom_tree = HashMap::new();
+
+    for (&node, dominators) in dom {
+        let immediate_dom = dominators
+            .iter()
+            .filter(|&&dom_node| dom_node != node)
+            .max_by_key(|&&dom_node| dom.get(&dom_node).unwrap_or(&HashSet::new()).len());
+
+        if let Some(&imm_dom) = immediate_dom {
+            dom_tree.entry(imm_dom).or_insert_with(Vec::new).push(node);
+        }
+    }
+
+    dom_tree
+}
+
+    fn compute_dominated_blocks(cfg: &CFG, start_node: u32) -> HashMap<u32, HashSet<u32>> {
+        // Step 1: Compute dominators of each node
+        let dominators = Self::compute_dominators(cfg, start_node);
+
+        // Step 2: Build the dominator tree from dominators
+        let dom_tree = Self::compute_dominator_tree(&dominators, start_node);
+
+        // Step 3: Traverse the dominator tree to compute dominated blocks for each node
+        let mut dominated_blocks = HashMap::new();
+        for &node in dominators.keys() {
+            dominated_blocks.insert(node, HashSet::new());
+        }
+
+        // Start traversal from the start node
+        Self::traverse_tree(start_node, &dom_tree, &mut dominated_blocks);
+
+        dominated_blocks
+    }
+
+    fn compute_post_dominators(cfg: &CFG, exit_node: u32) -> HashMap<u32, HashSet<u32>> {
+        let reversed_cfg = cfg.reverse();
+        println!("reversed cfg: {:#?}", reversed_cfg);
+        Self::compute_dominators(&reversed_cfg, exit_node)
+    }
+
+    fn compute_post_dominator_tree(
+        post_dom: &HashMap<u32, HashSet<u32>>,
+        exit_node: u32,
+    ) -> HashMap<u32, Vec<u32>> {
+        let mut post_dom_tree = HashMap::new();
+
+        for (&node, post_dominators) in post_dom {
+            // The immediate post-dominator of `node` is the closest post-dominator that is not itself
+            let immediate_post_dom = post_dominators
+                .iter()
+                .filter(|&&post_dom_node| post_dom_node != node) // Exclude the node itself
+                .max_by_key(|&&dom_node| post_dom.get(&dom_node).unwrap_or(&HashSet::new()).len());// Closest post-dominator
+
+            if let Some(&imm_post_dom) = immediate_post_dom {
+                post_dom_tree
+                    .entry(imm_post_dom)
+                    .or_insert_with(Vec::new)
+                    .push(node);
+            }
+        }
+
+        post_dom_tree
+    }
+
+    fn compute_post_dominated_blocks(cfg: &CFG, exit_node: u32) -> HashMap<u32, HashSet<u32>> {
+        // Step 1: Compute post-dominators of each node
+        let post_dominators = Self::compute_post_dominators(cfg, exit_node);
+
+        // Step 2: Build the post-dominator tree from post-dominators
+        let post_dom_tree = Self::compute_post_dominator_tree(&post_dominators, exit_node);
+
+        // Step 3: Traverse the post-dominator tree to compute post-dominated blocks for each node
+        let mut post_dominated_blocks = HashMap::new();
+        for &node in post_dominators.keys() {
+            post_dominated_blocks.insert(node, HashSet::new());
+        }
+
+
+        // Start traversal from the exit node
+        Self::traverse_tree(exit_node, &post_dom_tree, &mut post_dominated_blocks);
+
+        post_dominated_blocks
+    }
+}
+
+mod test {
+    use super::*;
+    #[test]
+    fn test_edge() {}
+
+    #[test]
+    fn test_node() {}
+
+    #[test]
+    fn test_dominators() {}
+
+    #[test]
+    fn test_post_dominators() {}
+}

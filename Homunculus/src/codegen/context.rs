@@ -261,9 +261,7 @@ impl CodegenCx {
                 self.insert_variable(var_name, constant_info);
             }
             // only support gl_WorkGroupSize for now
-            Expr::ConstCompositeExpr(_const_composite_expr) => {
-                
-            }
+            Expr::ConstCompositeExpr(_const_composite_expr) => {}
             Expr::ConstTrueExpr(_) => {
                 let constant_info = VariableInfo::new_const_bool(var_name.clone(), true);
                 self.insert_variable(var_name, constant_info);
@@ -783,38 +781,46 @@ impl CodegenCx {
             }
             // This decorate string statement is used to attach TLA+ built-in variables/metadata
             Stmt::DecorateStringStatement(decorate_string_stmt) => {
-                let tla_builtin = decorate_string_stmt
-                    .tla_builtin()
-                    .expect("DecorateStringStatement: TLA+ built-in not found in decorate string statement");
-                match tla_builtin.kind(){
+                let tla_builtin = decorate_string_stmt.tla_builtin().expect(
+                    "DecorateStringStatement: TLA+ built-in not found in decorate string statement",
+                );
+                match tla_builtin.kind() {
                     TokenKind::Scheduler => {
-                        let scheduler = decorate_string_stmt.value()
-                        .unwrap()
-                        .text()
-                        .trim_matches('"')
-                        .parse::<Scheduler>()
-                        .expect("DecorateStringStatement: TLA+ Scheduler must be a valid scheduler");
+                        let scheduler = decorate_string_stmt
+                            .value()
+                            .unwrap()
+                            .text()
+                            .trim_matches('"')
+                            .parse::<Scheduler>()
+                            .expect(
+                                "DecorateStringStatement: TLA+ Scheduler must be a valid scheduler",
+                            );
                         self.scheduler = scheduler;
                     }
                     TokenKind::TlaNumWorkgroups => {
-                        let num_workgroup = decorate_string_stmt.value()
-                        .unwrap()
-                        .text()
-                        .trim_matches('"')
-                        .parse::<u32>()
-                        .expect("DecorateStringStatement: TLA+ NumWorkgroups must be a number");
+                        let num_workgroup = decorate_string_stmt
+                            .value()
+                            .unwrap()
+                            .text()
+                            .trim_matches('"')
+                            .parse::<u32>()
+                            .expect("DecorateStringStatement: TLA+ NumWorkgroups must be a number");
                         self.num_work_group = num_workgroup;
                     }
                     TokenKind::TlaSubgroupSize => {
-                        let sub_group_size = decorate_string_stmt.value()
-                        .unwrap()
-                        .text()
-                        .trim_matches('"')
-                        .parse::<u32>()
-                        .expect("DecorateStringStatement: TLA+ SubgroupSize must be a number");
+                        let sub_group_size = decorate_string_stmt
+                            .value()
+                            .unwrap()
+                            .text()
+                            .trim_matches('"')
+                            .parse::<u32>()
+                            .expect("DecorateStringStatement: TLA+ SubgroupSize must be a number");
                         self.sub_group_size = sub_group_size;
                     }
-                    _ => panic!("DecorateStringStatement: Unsupported TLA+ built-in, {:?}", tla_builtin.kind()),
+                    _ => panic!(
+                        "DecorateStringStatement: Unsupported TLA+ built-in, {:?}",
+                        tla_builtin.kind()
+                    ),
                 }
             }
             // fixme:: does not support OpAccesschain yet
@@ -941,13 +947,14 @@ impl CodegenCx {
                 if var_name != "%gl_WorkGroupSize".to_string() {
                     panic!("ConstCompositeExpr: Only gl_WorkGroupSize is supported for now, found {:#?}", var_name);
                 }
-                let x = self.lookup_variable(const_composite_expr.constituents()[0].text())
-                .expect("ConstCompositeExpr: x not found in symbol table")
-                .get_constant_int();
-    
+                let x = self
+                    .lookup_variable(const_composite_expr.constituents()[0].text())
+                    .expect("ConstCompositeExpr: x not found in symbol table")
+                    .get_constant_int();
+
                 self.work_group_size = x as u32;
                 None
-            },
+            }
             Expr::ConstTrueExpr(_) => None,
             Expr::ConstFalseExpr(_) => None,
             Expr::LogicalOr(logical_and_expr) => {
@@ -2293,7 +2300,12 @@ impl CodegenCx {
 
             // for now, we only support local size x
             Stmt::ExecutionMode(execution_mode) => {
-                let local_size_x = execution_mode.local_size_x().unwrap().text().parse::<u32>().unwrap();
+                let local_size_x = execution_mode
+                    .local_size_x()
+                    .unwrap()
+                    .text()
+                    .parse::<u32>()
+                    .unwrap();
                 self.work_group_size = local_size_x;
                 None
             }
@@ -2457,12 +2469,12 @@ impl CodegenCx {
                 let true_label_position = self.lookup_label(true_label.text()).unwrap();
                 let false_label_position = self.lookup_label(false_label.text()).unwrap();
 
-                let info = self.lookup_variable(condition.text()).unwrap();
+                let condition_info = self.lookup_variable(condition.text()).unwrap();
                 let condition_arg = inst_arg1_builder
-                    .name(condition.text().to_string())
-                    .value(self.construct_instruction_value(&info))
+                    .name(condition_info.get_var_name())
+                    .value(self.construct_instruction_value(&condition_info))
                     .index(IndexKind::Literal(-1))
-                    .scope(VariableScope::cast(&info.get_storage_class()))
+                    .scope(VariableScope::cast(&condition_info.get_storage_class()))
                     .build()
                     .unwrap();
 

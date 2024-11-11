@@ -14,7 +14,7 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         op_execution_mode_stmt(p)
     } else if p.at(TokenKind::OpDecorate) {
         op_decorate_stmt(p)
-    } else if p.at(TokenKind::OpDecorateString){
+    } else if p.at(TokenKind::OpDecorateString) {
         op_decorate_string_stmt(p)
     }
     // else if p.at(TokenKind::OpFunction) {
@@ -50,10 +50,10 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_label_expr(p))
     } else if p.at(TokenKind::OpConstant) {
         Some(op_constant_expr(p))
-    } 
+    }
     // else if p.at(TokenKind::OpConstantComposite) {
     //     Some(op_constant_composite_expr(p))
-    // } 
+    // }
     else if p.at(TokenKind::OpConstantTrue) {
         Some(op_constant_true_expr(p))
     } else if p.at(TokenKind::OpConstantFalse) {
@@ -203,7 +203,10 @@ fn op_decorate_string_stmt(p: &mut Parser) -> Option<CompletedMarker> {
     let m = p.start();
     // skip OpDecorateString token
     p.bump();
-    if p.at(TokenKind::Scheduler) || p.at(TokenKind::TlaNumWorkgroups) || p.at(TokenKind::TlaSubgroupSize){
+    if p.at(TokenKind::Scheduler)
+        || p.at(TokenKind::TlaNumWorkgroups)
+        || p.at(TokenKind::TlaSubgroupSize)
+    {
         p.bump();
     } else {
         while !p.at(TokenKind::Newline) {

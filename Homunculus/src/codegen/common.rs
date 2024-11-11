@@ -1,5 +1,6 @@
 //! common is used to stored the common program information(e.g. number of blocks, subgroup size, thread numbers,...) in the codegen module.
 
+use super::cfg::CFG;
 use super::constant::Constant;
 use crate::compiler::parse::symbol_table::{
     BuiltInVariable, ConstantInfo, StorageClass, VariableInfo,
@@ -16,7 +17,7 @@ use std::str::FromStr;
 static LAYOUT_CONFIG_HINT: &str = "(* Layout Configuration *)";
 static PROGRAM_HINT: &str = "(* Program *)";
 static GLOBAL_VARIABLES_HINT: &str = "(* Global Variables *)";
-
+static CFG_HINT: &str = "(* CFG *)";
 #[derive(Debug)]
 pub enum BinaryExpr {
     Add,
@@ -70,6 +71,15 @@ pub enum InstructionName {
     GroupNonUniformAny,
 }
 
+pub(crate) static TERMINATION_INSTRUCTIONS: [InstructionName; 4] = [
+    InstructionName::Branch,
+    InstructionName::BranchConditional,
+    InstructionName::Switch,
+    InstructionName::Return,
+];
+
+pub(crate) static MERGE_INSTRUCTIONS: [InstructionName; 2] =
+    [InstructionName::SelectionMerge, InstructionName::LoopMerge];
 impl Display for InstructionName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -98,7 +108,7 @@ impl Display for InstructionName {
             InstructionName::GreaterThan => write!(f, "OpGreater"),
             InstructionName::GreaterThanEqual => write!(f, "OpGreaterOrEqual"),
             InstructionName::Add => write!(f, "OpAdd"),
-            InstructionName::AtomicAdd => write!(f, "OpAtomicAdd"), 
+            InstructionName::AtomicAdd => write!(f, "OpAtomicAdd"),
             InstructionName::Sub => write!(f, "OpSub"),
             InstructionName::AtomicSub => write!(f, "OpAtomicSub"),
             InstructionName::Mul => write!(f, "OpMul"),
@@ -112,7 +122,7 @@ impl Display for InstructionName {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum VariableScope {
     Intermediate,
     Local,
@@ -228,7 +238,7 @@ impl InstructionBuiltInVariable {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum IndexKind {
     Literal(i32),
     Variable(String),
@@ -273,6 +283,16 @@ impl Display for InstructionValue {
     }
 }
 
+impl InstructionValue {
+    pub(crate) fn parse(&self) -> Result<u32> {
+        match self {
+            InstructionValue::Int(value) => Ok(*value as u32),
+            InstructionValue::UInt(value) => Ok(*value),
+            _ => Err(eyre!("Invalid value type")),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Scheduler {
     OBE,
@@ -297,7 +317,7 @@ impl FromStr for Scheduler {
         }
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InstructionArgument {
     pub name: String,
     pub scope: VariableScope,
@@ -314,7 +334,7 @@ impl Display for InstructionArgument {
         )
     }
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InstructionArguments {
     pub name: InstructionName,
     pub num_args: u32,
@@ -333,13 +353,13 @@ impl Display for InstructionArguments {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Instruction {
     pub position: u32,
     pub name: InstructionName,
     pub scope: ExecutionScope,
     pub arguments: InstructionArguments,
-    // this is used when some instructions 
+    // this is used when some instructions
     //have undetermined number of arguments (e.g. OpSwitch)
     pub vec_arguments: Option<Vec<InstructionArguments>>,
 }
@@ -370,6 +390,17 @@ pub struct Program {
 }
 
 impl Program {
+    fn write_cfg(&self, writer: &mut BufWriter<File>) -> Result<()> {
+        let cfg = CFG::generate_cfg(
+            &self.instructions.to_vec(),
+            self.num_work_groups,
+            self.work_group_size,
+        );
+        println!("CFG == {:#?}", cfg);
+
+        Ok(())
+        // todo!("Implement CFG generation");
+    }
     fn write_layout(&self, writer: &mut BufWriter<File>) -> Result<()> {
         // Write layout information to the lines
         writeln!(writer, "SubgroupSize == {}", self.subgroup_size)?;
@@ -432,7 +463,7 @@ impl Program {
         for (idx, inst) in self.instructions.iter().enumerate() {
             write!(writer, "<<")?;
             write!(writer, "{}", inst.arguments)?;
-            if let Some(ref vec_args) = inst.vec_arguments{
+            if let Some(ref vec_args) = inst.vec_arguments {
                 write!(writer, ", ")?;
                 for (vec_arg_idx, vec_arg) in vec_args.iter().enumerate() {
                     write!(writer, "<<")?;
@@ -477,6 +508,8 @@ impl Program {
             } else if line.trim() == PROGRAM_HINT {
                 found_program = true;
                 self.write_program(&mut writer)?;
+            } else if line.trim() == CFG_HINT {
+                self.write_cfg(&mut writer)?;
             } else {
                 writeln!(writer, "{}", line)?;
             }
