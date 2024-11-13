@@ -887,19 +887,21 @@ OpAtomicCompareExchange(t, result, pointer, value, comparator) ==
 3. The invocation executes OpReturn or OpReturnValue. Escaping in this manner only affects relations in the current function.
 4. Executing OpBranch or OpBranchConditional causes an invocation to branch to the Merge Block or Continue Target for a merge instruction instance that strictly dominates I.
 *)
+\* Block with OpBranch as termination instruction is not part of construct
+\* Hence, we do not need to update the CFG and state
 OpBranch(t, label) ==
-    /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
-            targetBlock == FindBlockbyOpLabelIdx(CFG.node, GetVal(-1, label))
-            labelVal == GetVal(-1, label)
-            workGroupId == WorkGroupId(t)+1
-        IN
-            LET newCFG == GenerateCFG(BranchUpdate(workGroupId, t, curBlock, curBlock.tangle[workGroupId], {labelVal}, labelVal), CFG.edge) 
-                newState == StateUpdate(workGroupId, t, newCFG)
-            IN 
-                /\  CFG' = newCFG
-                /\  state' = newState   
+    \* /\  LET curBlock == FindCurrentBlock(CFG.node, pc[t])
+    \*         targetBlock == FindBlockbyOpLabelIdx(CFG.node, GetVal(-1, label))
+    \*         labelVal == GetVal(-1, label)
+    \*         workGroupId == WorkGroupId(t)+1
+    \*     IN
+            \* LET newCFG == GenerateCFG(BranchUpdate(workGroupId, t, curBlock, curBlock.tangle[workGroupId], {labelVal}, labelVal), CFG.edge) 
+            \*     newState == StateUpdate(workGroupId, t, newCFG)
+            \* IN 
+            \*     /\  CFG' = newCFG
+            \*     /\  state' = newState   
     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
-    /\  UNCHANGED <<threadLocals, globalVars, MaxPathLength, validPaths>>
+    /\  UNCHANGED <<CFG, state, threadLocals, globalVars, MaxPathLength, validPaths>>
 
 (* condition is an expression, trueLabel and falseLabel are integer representing pc *)
 OpBranchConditional(t, condition, trueLabel, falseLabel) ==
