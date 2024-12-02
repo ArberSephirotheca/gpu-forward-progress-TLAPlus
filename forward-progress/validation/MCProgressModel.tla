@@ -3,7 +3,7 @@ EXTENDS Integers, Naturals, Sequences, MCThreads, TLC
 
 VARIABLES fairExecutionSet, selected, runningThread
 
-vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, CFG, MaxPathLength, validPaths>>
+vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, Blocks>>
 
 
 InitState ==

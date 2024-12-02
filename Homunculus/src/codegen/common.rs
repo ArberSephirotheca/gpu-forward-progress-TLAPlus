@@ -396,10 +396,8 @@ impl Program {
             self.num_work_groups,
             self.work_group_size,
         );
-        println!("CFG == {:#?}", cfg);
-
+        writeln!(writer, "{}", cfg)?;
         Ok(())
-        // todo!("Implement CFG generation");
     }
     fn write_layout(&self, writer: &mut BufWriter<File>) -> Result<()> {
         // Write layout information to the lines
