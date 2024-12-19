@@ -30,6 +30,7 @@ tlaplus-image:
     COPY Homunculus Homunculus
     RUN CARGO_TARGET_DIR=Homunculus/target cargo build --release --manifest-path=Homunculus/Cargo.toml
     IF [ "$LITMUS_TESTS" = "TRUE" ]
+        
         COPY litmus_tests litmus_tests
         RUN mkdir -p litmus_tests_spv
         RUN mkdir -p litmus_tests_dis

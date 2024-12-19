@@ -267,7 +267,7 @@ Tangle(ts) ==
 \* A block has no additional label or block termination instructions.
 \* block termination instruction: OpBranch, OpBranchConditional, Terminate
 \* OpLabel is define as a variable thatGeneratePaths has pc as its value field and its opLabel as its name field
-Block(opLabel, terminatedInstr, tangle, merge, initialized, constructType, mergeBlock, continueBlock, caseBlocks) == 
+Block(opLabel, terminatedInstr, tangle, merge, initialized, constructType, mergeBlock, continueBlock, defaultBlock, caseBlocks) == 
     [opLabelIdx |-> opLabel,
     terminatedInstrIdx |-> terminatedInstr,
     tangle |-> tangle,
@@ -276,6 +276,7 @@ Block(opLabel, terminatedInstr, tangle, merge, initialized, constructType, merge
     constructType |-> constructType,
     mergeBlock |-> mergeBlock,
     continueBlock |-> continueBlock,
+    defaultBlock |-> defaultBlock,
     caseBlocks |-> caseBlocks]
 
 \* GenerateCFG(blocks, branch) == 
@@ -706,11 +707,13 @@ DetermineBlockType(startIdx) ==
 \* find blocks witihin the same construct, if current block does not belong to any construct, return itself instead
 \* This function is useful because it helps to determine the blocks that are being affeced by the change of tangle of current block
 BlocksInSameConstruct(blockIdx) ==
-    IF \e c \in ControlFlowConstructs : blockIdx \in c.blocks
-    THEN
-        c.blocks
-    ELSE
-        {blockIdx}
+    LET matchingConstruct == {c \in ControlFlowConstructs : blockIdx \in c.blocks}
+    IN 
+        IF matchingConstruct /= {}
+        THEN 
+            UNION {c.blocks : c \in matchingConstruct}
+        ELSE 
+            {blockIdx}
 
 \* BlocksInSameConstruct(blockIdx, blocks) ==
 \*   LET headerIdx == FindHeaderBlockForConstruct(blockIdx, blocks)
@@ -840,9 +843,16 @@ TerminateUpdate(wgid, t, currentLabelIdx) ==
         \* IF IsMergeBlock(Blocks[i]) /\ StrictlyStructurallyDominates(FindHeaderBlock(Blocks[i]).opLabelIdx, currentLabelIdx)
         IF TRUE
         THEN
-            Block(Blocks[i].opLabelIdx, Blocks[i].terminatedInstrIdx, 
-            newSeqOfSets(Blocks[i].tangle, wgid, Blocks[i].tangle[wgid] \{t}), 
-            Blocks[i].merge, Blocks[i].initialized, Blocks[i].constructType, Blocks[i].mergeBlock, Blocks[i].continueBlock, Blocks[i].caseBlocks)
+            Block(Blocks[i].opLabelIdx,
+                Blocks[i].terminatedInstrIdx, 
+                newSeqOfSets(Blocks[i].tangle, wgid, Blocks[i].tangle[wgid] \{t}), 
+                Blocks[i].merge,
+                Blocks[i].initialized,
+                Blocks[i].constructType,
+                Blocks[i].mergeBlock,
+                Blocks[i].continueBlock,
+                Blocks[i].defaultBlock,
+                Blocks[i].caseBlocks)
         ELSE
             Blocks[i]
     ] 
@@ -857,7 +867,7 @@ BranchUpdate(wgid, t, currentBlock, tangle, opLabelIdxSet, chosenBranchIdx) ==
     IN 
         [i \in 1..Len(Blocks) |-> 
             IF  
-                /\ Blocks[i] \in blocksWithinConstruct
+                /\ Blocks[i].opLabelIdx \in blocksWithinConstruct
             \* keep this order to avoid performance issue
             \* /\ Blocks[i].opLabelIdx <= chosenBranchIdx 
             \* /\ currentBlock.opLabelIdx # Blocks[i].opLabelIdx 
@@ -869,17 +879,40 @@ BranchUpdate(wgid, t, currentBlock, tangle, opLabelIdxSet, chosenBranchIdx) ==
                 IF Blocks[i].initialized[wgid] = FALSE THEN
                 \* unchoosen block and is not a merge block
                     IF Blocks[i].opLabelIdx # chosenBranchIdx /\  Blocks[i].opLabelIdx # currentBlock.mergeBlock THEN
-                        Block(Blocks[i].opLabelIdx, Blocks[i].terminatedInstrIdx, 
-                            newSeqOfSets(Blocks[i].tangle, wgid, tangle \{t}), Blocks[i].merge, [Blocks[i].initialized EXCEPT ![wgid] = TRUE], Blocks[i].constructType, Blocks[i].mergeBlock, Blocks[i].continueBlock, Blocks[i].caseBlocks)
+                        Block(Blocks[i].opLabelIdx,
+                            Blocks[i].terminatedInstrIdx,
+                            newSeqOfSets(Blocks[i].tangle, wgid, tangle \{t}),
+                            Blocks[i].merge,
+                            [Blocks[i].initialized EXCEPT ![wgid] = TRUE], 
+                            Blocks[i].constructType,
+                            Blocks[i].mergeBlock,
+                            Blocks[i].continueBlock,
+                            Blocks[i].defaultBlock,
+                            Blocks[i].caseBlocks)
                     ELSE
-                        Block(Blocks[i].opLabelIdx, Blocks[i].terminatedInstrIdx,
-                            newSeqOfSets(Blocks[i].tangle, wgid, tangle), Blocks[i].merge, [Blocks[i].initialized EXCEPT ![wgid] = TRUE], Blocks[i].constructType, Blocks[i].mergeBlock, Blocks[i].continueBlock, Blocks[i].caseBlocks)
+                        Block(Blocks[i].opLabelIdx,
+                            Blocks[i].terminatedInstrIdx,
+                            newSeqOfSets(Blocks[i].tangle, wgid, tangle), 
+                            Blocks[i].merge, [Blocks[i].initialized EXCEPT ![wgid] = TRUE],
+                            Blocks[i].constructType,
+                            Blocks[i].mergeBlock,
+                            Blocks[i].continueBlock,
+                            Blocks[i].defaultBlock,
+                            Blocks[i].caseBlocks)
             \* FIXME: current scope for rule 3 is too huge as it may remove itself from further blocks, try to frame the scope within the construct
             \* rule 3: If the unchoosen block is initialized and is not a merge block for current block,
             \* remove the thread from the tangle
                 ELSE IF Blocks[i].opLabelIdx # chosenBranchIdx /\ Blocks[i].opLabelIdx # currentBlock.mergeBlock /\ Blocks[i].initialized[wgid] = TRUE THEN
-                    Block(Blocks[i].opLabelIdx, Blocks[i].terminatedInstrIdx,
-                    newSeqOfSets(Blocks[i].tangle, wgid, Blocks[i].tangle[wgid] \{t}), Blocks[i].merge, Blocks[i].initialized, Blocks[i].constructType, Blocks[i].mergeBlock, Blocks[i].continueBlock, Blocks[i].caseBlocks)
+                    Block(Blocks[i].opLabelIdx, 
+                        Blocks[i].terminatedInstrIdx,
+                        newSeqOfSets(Blocks[i].tangle, wgid, Blocks[i].tangle[wgid] \{t}), 
+                        Blocks[i].merge,
+                        Blocks[i].initialized,
+                        Blocks[i].constructType,
+                        Blocks[i].mergeBlock,
+                        Blocks[i].continueBlock,
+                        Blocks[i].defaultBlock,
+                        Blocks[i].caseBlocks)
                 ELSE 
                     Blocks[i]
             ELSE 
@@ -893,8 +926,16 @@ MergeUpdate(wgid, currentLabelIdx, tangle, opLabelIdxSet) ==
             \* rule 1: If a thread reaches a merge instruction and the block it points to has empty tangle, 
             \* update the tangle of tha block to the tangle of the merge instruction
             IF Blocks[i].initialized[wgid] = FALSE THEN
-                Block(Blocks[i].opLabelIdx, Blocks[i].terminatedInstrIdx, 
-                    newSeqOfSets(Blocks[i].tangle, wgid, tangle), Blocks[i].merge, [Blocks[i].initialized EXCEPT ![wgid] = TRUE], Blocks[i].constructType, Blocks[i].mergeBlock, Blocks[i].continueBlock, Blocks[i].caseBlocks) 
+                Block(Blocks[i].opLabelIdx, 
+                    Blocks[i].terminatedInstrIdx, 
+                    newSeqOfSets(Blocks[i].tangle, wgid, tangle),
+                    Blocks[i].merge,
+                    [Blocks[i].initialized EXCEPT ![wgid] = TRUE],
+                    Blocks[i].constructType,
+                    Blocks[i].mergeBlock,
+                    Blocks[i].continueBlock,
+                    Blocks[i].defaultBlock,
+                    Blocks[i].caseBlocks) 
             ELSE 
                 Blocks[i]
         ELSE

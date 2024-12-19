@@ -890,18 +890,18 @@ OpAtomicCompareExchange(t, result, pointer, value, comparator) ==
 \* Block with OpBranch as termination instruction is not part of construct
 \* Hence, we do not need to update the Blocks and state
 OpBranch(t, label) ==
-    \* /\  LET curBlock == FindCurrentBlock(Blocks, pc[t])
-    \*         targetBlock == FindBlockbyOpLabelIdx(Blocks, GetVal(-1, label))
-    \*         labelVal == GetVal(-1, label)
-    \*         workGroupId == WorkGroupId(t)+1
-    \*     IN
-            \* LET newBlocks == GenerateBlocks(BranchUpdate(workGroupId, t, curBlock, curBlock.tangle[workGroupId], {labelVal}, labelVal), BlocksEdges) 
-            \*     newState == StateUpdate(workGroupId, t, newBlocks)
-            \* IN 
-            \*     /\  Blocks' = newBlocks
-            \*     /\  state' = newState   
+    /\  LET curBlock == FindCurrentBlock(Blocks, pc[t])
+            targetBlock == FindBlockbyOpLabelIdx(Blocks, GetVal(-1, label))
+            labelVal == GetVal(-1, label)
+            workGroupId == WorkGroupId(t)+1
+        IN
+            LET newBlocks == BranchUpdate(workGroupId, t, curBlock, curBlock.tangle[workGroupId], {labelVal}, labelVal)
+                newState == StateUpdate(workGroupId, t, newBlocks)
+            IN 
+                /\  Blocks' = newBlocks
+                /\  state' = newState   
     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
-    /\  UNCHANGED <<Blocks, state, threadLocals, globalVars>>
+    /\  UNCHANGED <<(*Blocks, state, *)threadLocals, globalVars>>
 
 (* condition is an expression, trueLabel and falseLabel are integer representing pc *)
 OpBranchConditional(t, condition, trueLabel, falseLabel) ==

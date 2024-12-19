@@ -318,7 +318,10 @@ impl CFG {
                             })
                             .collect()
                     } else {
-                        vec![]
+                        (0..num_work_groups)
+                        .map(|workgroup_id| {
+                            HashSet::new()
+                        }).collect()
                     }
                 };
 
