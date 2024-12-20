@@ -901,7 +901,7 @@ OpBranch(t, label) ==
                 /\  Blocks' = newBlocks
                 /\  state' = newState   
     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
-    /\  UNCHANGED <<(*Blocks, state, *)threadLocals, globalVars>>
+    /\  UNCHANGED <<threadLocals, globalVars>>
 
 (* condition is an expression, trueLabel and falseLabel are integer representing pc *)
 OpBranchConditional(t, condition, trueLabel, falseLabel) ==
@@ -913,14 +913,23 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
             workGroupId == WorkGroupId(t)+1
         IN
             IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
-                /\  LET newBlocks == BranchUpdate(workGroupId, t, FindCurrentBlock(Blocks, pc[t]), FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, trueLabelVal)
+                /\  LET newBlocks == BranchUpdate(workGroupId,
+                                                    t,
+                                                    FindCurrentBlock(Blocks, pc[t]), 
+                                                    FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId], 
+                                                    {trueLabelVal, falseLabelVal}, trueLabelVal)
                         newState == StateUpdate(workGroupId, t, newBlocks)
                     IN
                         /\  Blocks' = newBlocks
                         /\  state' = newState   
                 /\  pc' = [pc EXCEPT ![t] = trueLabelVal]
             ELSE
-                /\  LET newBlocks == BranchUpdate(workGroupId, t, FindCurrentBlock(Blocks, pc[t]), FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId], {trueLabelVal, falseLabelVal}, falseLabelVal)
+                /\  LET newBlocks == BranchUpdate(workGroupId,
+                                                    t,
+                                                    FindCurrentBlock(Blocks, pc[t]),
+                                                    FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId],
+                                                    {trueLabelVal, falseLabelVal},
+                                                    falseLabelVal)
                         newState == StateUpdate(workGroupId, t, newBlocks)
                     IN
                         /\  Blocks' = newBlocks
@@ -928,6 +937,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
                 /\  pc' = [pc EXCEPT ![t] = falseLabelVal]
     /\  UNCHANGED <<threadLocals, globalVars>>
 
+\* zheyuan: need more tests
 OpSwitch(t, selector, default, literals, ids) ==
     /\  LET curBlock == FindCurrentBlock(Blocks, pc[t])
             defaultVal == GetVal(-1, default)
@@ -939,7 +949,12 @@ OpSwitch(t, selector, default, literals, ids) ==
                 LET val == EvalExpr(t, WorkGroupId(t)+1, selector)
                     index == CHOOSE i \in 1..Len(literalsVal): literalsVal[i] = val 
                 IN
-                    /\  LET newBlocks == BranchUpdate(workGroupId, t, FindCurrentBlock(Blocks, pc[t]), FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId], SeqToSet(idsVal), idsVal[index])
+                    /\  LET newBlocks == BranchUpdate(workGroupId,
+                                                        t,
+                                                        FindCurrentBlock(Blocks, pc[t]),
+                                                        FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId],
+                                                        SeqToSet(idsVal),
+                                                        idsVal[index])
                             newState == StateUpdate(workGroupId, t, newBlocks)
                         IN
                             /\  Blocks' = newBlocks
@@ -955,7 +970,6 @@ OpSwitch(t, selector, default, literals, ids) ==
     /\  UNCHANGED <<threadLocals, globalVars>>
 
 (* structured loop, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block *)
-
 OpLabel(t, label) ==
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
     /\  UNCHANGED <<state, threadLocals, globalVars, Blocks>>
@@ -982,11 +996,14 @@ OpSelectionMerge(t, mergeLabel) ==
 
 \* zheyuan chen: update tangle
 Terminate(t) ==
-    LET workgroupId == WorkGroupId(t)+1
+    LET workGroupId == WorkGroupId(t)+1
     IN
-        /\  Blocks' = TerminateUpdate(workgroupId, t, FindBlockByTerminationIns(Blocks, pc[t]).opLabelIdx)
-        /\  state' = [state EXCEPT ![t] = "terminated"]
-        /\  UNCHANGED <<pc, threadLocals, globalVars>>
+        LET newBlocks == TerminateUpdate(workGroupId, t, FindBlockByTerminationIns(Blocks, pc[t]).opLabelIdx)
+            newState == StateUpdate(workGroupId, t, newBlocks)
+        IN 
+            /\  Blocks' = newBlocks
+            /\  state' = [newState EXCEPT ![t] = "terminated"]
+            /\  UNCHANGED <<pc, threadLocals, globalVars>>
 
 ExecuteInstruction(t) ==
     LET workgroupId == WorkGroupId(t)+1

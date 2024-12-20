@@ -283,7 +283,6 @@ impl CFG {
         cfg.post_dominated =
             Self::compute_post_dominated_blocks(&cfg, cfg.nodes.last().unwrap().op_label_idx);
         cfg.generate_constructs();
-        println!("CFG: {:#?}", cfg);
         cfg
     }
 
@@ -719,17 +718,19 @@ impl CFG {
                 }
 
                 // Compute the new dominator set: intersection of dominators of all predecessors
-                let preds = &cfg.predecessors[&node.op_label_idx];
+                let preds = cfg.predecessors.get(&node.op_label_idx);
                 let mut new_dom: HashSet<u32> = cfg
                     .nodes
                     .iter()
                     .map(|n| n.op_label_idx)
                     .into_iter()
                     .collect(); // Start with all nodes
-
-                for &pred in preds {
-                    if let Some(pred_dom) = dom.get(&pred) {
-                        new_dom = new_dom.intersection(pred_dom).cloned().collect();
+                // in case some node does not have predecessors
+                if let Some(valid_preds) = preds{
+                    for &pred in valid_preds {
+                        if let Some(pred_dom) = dom.get(&pred) {
+                            new_dom = new_dom.intersection(pred_dom).cloned().collect();
+                        }
                     }
                 }
                 new_dom.insert(node.op_label_idx); // Add the node itself
