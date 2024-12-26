@@ -1,5 +1,6 @@
 //! common is used to stored the common program information(e.g. number of blocks, subgroup size, thread numbers,...) in the codegen module.
 
+use super::back::write;
 use super::cfg::CFG;
 use super::constant::Constant;
 use crate::compiler::parse::symbol_table::{
@@ -397,6 +398,41 @@ impl Program {
             self.work_group_size,
         );
         writeln!(writer, "{}", cfg)?;
+        self.write_dynamic_blocks(writer, &cfg)?;
+        Ok(())
+    }
+
+    fn write_dynamic_blocks(&self, writer: &mut BufWriter<File>, cfg: &CFG) -> Result<()> {
+        writeln!(writer, "InitDB == DynamicExeuctionGraphSet = {{")?;
+        // each node has different op_label_idx, so we can safely unwrap the result
+        let node = cfg
+            .nodes
+            .iter()
+            .min_by(|x, y| x.op_label_idx.cmp(&y.op_label_idx))
+            .unwrap();
+
+        let current_threads = node
+            .tangle
+            .iter()
+            .map(|s| {
+                format!(
+                    "{{{}}}",
+                    s.iter()
+                        .map(|t| t.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
+            })
+            .collect::<Vec<_>>();
+        let current_threads = current_threads.join(", ");
+        let empty_set_per_wg = vec!["{}"; self.num_work_groups as usize].join(", ");
+        writeln!(
+            writer,
+            "DynamicExecutionGraph(<<{}>>, <<{}>>, <<{}>>, <<{}>>, <<{}>>)",
+            current_threads, node.op_label_idx, current_threads, empty_set_per_wg, empty_set_per_wg
+        )?;
+
+        writeln!(writer, "}}")?;
         Ok(())
     }
     fn write_layout(&self, writer: &mut BufWriter<File>) -> Result<()> {

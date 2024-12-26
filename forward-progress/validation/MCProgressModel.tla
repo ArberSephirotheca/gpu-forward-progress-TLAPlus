@@ -105,6 +105,7 @@ Spec ==
 EventuallyAlwaysTerminated ==
     \* \A t \in Threads: <>[](pc[t] = Len(ThreadInstructions[t]))
     \A t \in Threads: <>[](state[t] = "terminated")
+    
 Liveness == 
     /\  EventuallyAlwaysTerminated
 

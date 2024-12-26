@@ -3,9 +3,9 @@
 #extension GL_KHR_memory_scope_semantics : enable
 #extension GL_KHR_shader_subgroup_vote : enable
 #extension GL_KHR_shader_subgroup_basic : enable
-layout(local_size_x = 2) in;
-layout(tla_subgroup_size = 2) in;
-layout(tla_num_workgroups = 2) in;
+layout(local_size_x = 4) in;
+layout(tla_subgroup_size = 4) in;
+layout(tla_num_workgroups = 1) in;
 
 
 layout(std430, binding = 0) buffer Lock {
@@ -13,15 +13,14 @@ layout(std430, binding = 0) buffer Lock {
 };
 
 void main() {
-    bool done = false;
-    uint old = 1;
+    bool done = true;
     uint gid = gl_GlobalInvocationID.x;
     for (uint i = 0; i < 10; i++) {
-        if (gid < i){
-            subgroupAll(done);
+        if(i == 0 && gid == 3) {
+            return;
         }
+
+        if (i == 2)
+            subgroupAll(done);
     }
-    do {
-        old = atomicExchange(lock, 1);
-    } while (old != 0);
 }

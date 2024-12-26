@@ -5,7 +5,10 @@ use std::{
 
 use crate::codegen::common::{InstructionValue, MERGE_INSTRUCTIONS, TERMINATION_INSTRUCTIONS};
 
-use super::{back::write, common::{Instruction, InstructionName}};
+use super::{
+    back::write,
+    common::{Instruction, InstructionName},
+};
 
 #[derive(Debug, PartialEq, Clone)]
 pub(crate) enum ConstructType {
@@ -41,9 +44,9 @@ struct ControlFlowConstruct {
 
 #[derive(Debug, Clone)]
 pub(crate) struct Node {
-    op_label_idx: u32,
+    pub(crate) op_label_idx: u32,
     termination_inst_idx: u32,
-    tangle: Vec<HashSet<u32>>,
+    pub(crate) tangle: Vec<HashSet<u32>>,
     merge: bool,
     initialize: Vec<bool>,
     construct_type: ConstructType,
@@ -74,10 +77,10 @@ impl Display for ControlFlowConstruct {
         writeln!(f, "mergeBlock |-> {},", self.merge_block)?;
         writeln!(f, "continueTarget |-> {},", self.continue_target)?;
         writeln!(f, "blocks |-> {{")?;
-        for (idx, block) in self.blocks.iter().enumerate(){
-            if idx != self.blocks.len() - 1{
+        for (idx, block) in self.blocks.iter().enumerate() {
+            if idx != self.blocks.len() - 1 {
                 writeln!(f, "{},", block)?;
-            } else{
+            } else {
                 writeln!(f, "{}", block)?;
             }
         }
@@ -87,34 +90,38 @@ impl Display for ControlFlowConstruct {
     }
 }
 
-impl Display for Node{
+impl Display for Node {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "[")?;
         writeln!(f, "opLabelIdx |-> {},", self.op_label_idx)?;
         writeln!(f, "terminatedInstrIdx |-> {},", self.termination_inst_idx)?;
         writeln!(f, "tangle |-> <<")?;
-        for (idx, tangle) in self.tangle.iter().enumerate(){
+        for (idx, tangle) in self.tangle.iter().enumerate() {
             write!(f, "{{")?;
-            for (t_idx, t) in tangle.iter().enumerate(){
-                if t_idx != tangle.len() - 1{
+            for (t_idx, t) in tangle.iter().enumerate() {
+                if t_idx != tangle.len() - 1 {
                     write!(f, "{},", t)?;
-                } else{
+                } else {
                     write!(f, "{}", t)?;
                 }
             }
-            if idx != self.tangle.len() - 1{
+            if idx != self.tangle.len() - 1 {
                 writeln!(f, "}},")?;
-            } else{
+            } else {
                 writeln!(f, "}}")?;
             }
         }
         writeln!(f, ">>,")?;
-        writeln!(f, "merge |-> {},", if self.merge { "TRUE" } else { "FALSE" })?;
+        writeln!(
+            f,
+            "merge |-> {},",
+            if self.merge { "TRUE" } else { "FALSE" }
+        )?;
         writeln!(f, "initialized |-> <<")?;
-        for (idx, init) in self.initialize.iter().enumerate(){
-            if idx != self.initialize.len() - 1{
+        for (idx, init) in self.initialize.iter().enumerate() {
+            if idx != self.initialize.len() - 1 {
                 writeln!(f, "{},", if *init { "TRUE" } else { "FALSE" })?;
-            } else{
+            } else {
                 writeln!(f, "{}", if *init { "TRUE" } else { "FALSE" })?;
             }
         }
@@ -124,10 +131,10 @@ impl Display for Node{
         writeln!(f, "continueBlock |-> {},", self.continue_block)?;
         writeln!(f, "defaultBlock |-> {},", self.default_block)?;
         writeln!(f, "caseBlocks |-> <<")?;
-        for (idx, case) in self.case_blocks.iter().enumerate(){
-            if idx != self.case_blocks.len() - 1{
+        for (idx, case) in self.case_blocks.iter().enumerate() {
+            if idx != self.case_blocks.len() - 1 {
                 writeln!(f, "{},", case)?;
-            } else{
+            } else {
                 writeln!(f, "{}", case)?;
             }
         }
@@ -136,15 +143,15 @@ impl Display for Node{
         Ok(())
     }
 }
-impl Display for CFG{
+impl Display for CFG {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // write edges
         writeln!(f, "CFGEdges == {{")?;
-        for (idx, edge) in self.edges.iter().enumerate(){
-            if idx != self.edges.len() - 1{
-            writeln!(f, "<<{}, {}>>, ", edge.0, edge.1)?;
-            } else{
-                writeln!(f, "<<{}, {}>>", edge.0, edge.1)?; 
+        for (idx, edge) in self.edges.iter().enumerate() {
+            if idx != self.edges.len() - 1 {
+                writeln!(f, "<<{}, {}>>, ", edge.0, edge.1)?;
+            } else {
+                writeln!(f, "<<{}, {}>>", edge.0, edge.1)?;
             }
         }
         writeln!(f, "}}")?;
@@ -153,17 +160,17 @@ impl Display for CFG{
         writeln!(f, "CFGSuccessors == {{")?;
         for (idx, (node, successor)) in self.successors.iter().enumerate() {
             writeln!(f, "<<{}, {{", node)?;
-            for (s_idx, s) in successor.iter().enumerate(){
-                if s_idx != successor.len() - 1{
+            for (s_idx, s) in successor.iter().enumerate() {
+                if s_idx != successor.len() - 1 {
                     write!(f, "{},", s)?;
-                } else{
+                } else {
                     write!(f, "{}", s)?;
                 }
             }
             write!(f, "}}")?;
-            if idx != self.successors.len() - 1{
+            if idx != self.successors.len() - 1 {
                 writeln!(f, ">>,")?;
-            } else{
+            } else {
                 writeln!(f, ">>")?;
             }
         }
@@ -173,17 +180,17 @@ impl Display for CFG{
         writeln!(f, "CFGPredecessors == {{")?;
         for (idx, (node, predecessor)) in self.predecessors.iter().enumerate() {
             writeln!(f, "<<{}, {{", node)?;
-            for (p_idx, p) in predecessor.iter().enumerate(){
-                if p_idx != predecessor.len() - 1{
+            for (p_idx, p) in predecessor.iter().enumerate() {
+                if p_idx != predecessor.len() - 1 {
                     write!(f, "{},", p)?;
-                } else{
+                } else {
                     write!(f, "{}", p)?;
                 }
             }
             write!(f, "}}")?;
-            if idx != self.predecessors.len() - 1{
+            if idx != self.predecessors.len() - 1 {
                 writeln!(f, ">>,")?;
-            } else{
+            } else {
                 writeln!(f, ">>")?;
             }
         }
@@ -194,17 +201,17 @@ impl Display for CFG{
         for (idx, (node, dom)) in self.dominated.iter().enumerate() {
             writeln!(f, "[node |-> {},", node)?;
             writeln!(f, "dominated |-> {{")?;
-            for (d_idx, d) in dom.iter().enumerate(){
-                if d_idx != dom.len() - 1{
+            for (d_idx, d) in dom.iter().enumerate() {
+                if d_idx != dom.len() - 1 {
                     write!(f, "{},", d)?;
-                } else{
+                } else {
                     write!(f, "{}", d)?;
                 }
             }
             write!(f, "}}")?;
-            if idx != self.dominated.len() - 1{
+            if idx != self.dominated.len() - 1 {
                 writeln!(f, "],")?;
-            } else{
+            } else {
                 writeln!(f, "]")?;
             }
         }
@@ -215,17 +222,17 @@ impl Display for CFG{
         for (idx, (node, p_dom)) in self.post_dominated.iter().enumerate() {
             writeln!(f, "[node |-> {},", node)?;
             writeln!(f, "postDominated |-> {{")?;
-            for (p_idx, p) in p_dom.iter().enumerate(){
-                if p_idx != p_dom.len() - 1{
+            for (p_idx, p) in p_dom.iter().enumerate() {
+                if p_idx != p_dom.len() - 1 {
                     write!(f, "{},", p)?;
-                } else{
+                } else {
                     write!(f, "{}", p)?;
                 }
             }
             write!(f, "}}")?;
-            if idx != self.post_dominated.len() - 1{
+            if idx != self.post_dominated.len() - 1 {
                 writeln!(f, "],")?;
-            } else{
+            } else {
                 writeln!(f, "]")?;
             }
         }
@@ -233,11 +240,11 @@ impl Display for CFG{
 
         // write control flow construct
         writeln!(f, "ControlFlowConstructs == {{")?;
-        for (idx, construct) in self.constructs.iter().enumerate(){
+        for (idx, construct) in self.constructs.iter().enumerate() {
             write!(f, "{}", construct)?;
-            if idx != self.constructs.len() - 1{
+            if idx != self.constructs.len() - 1 {
                 writeln!(f, ",")?;
-            } else{
+            } else {
                 writeln!(f, "")?;
             }
         }
@@ -245,11 +252,11 @@ impl Display for CFG{
 
         // write blocks
         writeln!(f, "InitBlocks == \n Blocks = <<")?;
-        for (idx, block) in self.nodes.iter().enumerate(){
+        for (idx, block) in self.nodes.iter().enumerate() {
             write!(f, "{}", block)?;
-            if idx != self.nodes.len() - 1{
+            if idx != self.nodes.len() - 1 {
                 writeln!(f, ",")?;
-            } else{
+            } else {
                 writeln!(f, "")?;
             }
         }
@@ -318,9 +325,8 @@ impl CFG {
                             .collect()
                     } else {
                         (0..num_work_groups)
-                        .map(|workgroup_id| {
-                            HashSet::new()
-                        }).collect()
+                            .map(|workgroup_id| HashSet::new())
+                            .collect()
                     }
                 };
 
@@ -370,7 +376,6 @@ impl CFG {
                     }
                 };
 
-
                 let (default_block, case_blocks) = Self::find_switch_default_targets(
                     current_block_idx as u32,
                     termination_inst_idx as u32,
@@ -419,13 +424,15 @@ impl CFG {
                     node.merge_block as u32,
                     node.continue_block as u32,
                 );
-                self.identify_continue_construct(node.continue_block as u32, Self::find_back_edge_block(&self, node.op_label_idx).unwrap());
+                self.identify_continue_construct(
+                    node.continue_block as u32,
+                    Self::find_back_edge_block(&self, node.op_label_idx).unwrap(),
+                );
             } else if node.construct_type == ConstructType::Selection {
                 self.identify_selection_construct(node.op_label_idx, node.merge_block as u32);
             } else if node.construct_type == ConstructType::Switch {
                 self.identify_switch_construct(node.op_label_idx, node.merge_block as u32);
-                for target in &node.case_blocks
-                {
+                for target in &node.case_blocks {
                     self.identify_case_construct(*target as u32, node.merge_block as u32);
                 }
                 self.identify_case_construct(node.default_block as u32, node.merge_block as u32);
@@ -462,6 +469,7 @@ impl CFG {
     fn identify_loop_construct(&mut self, header: u32, merge_block: u32, continue_target: u32) {
         let mut loop_blocks = HashSet::new();
 
+        // zheyuan: for now we are not considering explicit continue instruction, so the back edge block is the continue target
         if let Some(dominated_blocks) = self.dominated.get(&header) {
             for &block in dominated_blocks {
                 if !self
@@ -548,7 +556,7 @@ impl CFG {
                     .contains(&block)
                 {
                     case_blocks.insert(block);
-                }   
+                }
             }
         }
 
@@ -560,7 +568,6 @@ impl CFG {
             blocks: case_blocks,
         });
     }
-
 
     fn find_switch_default_targets(
         op_label_idx: u32,
@@ -587,7 +594,6 @@ impl CFG {
 
         (default_block, targets)
     }
-
 
     fn find_target_blocks(
         op_label_idx: u32,
@@ -640,7 +646,6 @@ impl CFG {
     }
 
     fn find_back_edge_block(cfg: &CFG, header: u32) -> Option<u32> {
-    
         for edge in &cfg.edges {
             // Check if `to` has a lower op_label_idx than `from`
             if edge.0 > edge.1 && edge.1 == header {
@@ -650,7 +655,6 @@ impl CFG {
         }
         None
     }
-
 
     fn add_edge(&mut self, from: u32, to: u32) {
         self.edges.insert(Edge(from, to));
@@ -679,13 +683,16 @@ impl CFG {
         if let Some(children) = dom_tree.get(&node) {
             for &child in children {
                 dominated_blocks.get_mut(&node).unwrap().insert(child);
-    
+
                 // Recursively populate the dominated nodes for each child
                 Self::traverse_tree(child, dom_tree, dominated_blocks);
-    
+
                 // Extend parent’s dominated set with child’s dominated set
-                if let Some(child_dominated) = dominated_blocks.get(&child).cloned(){
-                    dominated_blocks.get_mut(&node).unwrap().extend(child_dominated);
+                if let Some(child_dominated) = dominated_blocks.get(&child).cloned() {
+                    dominated_blocks
+                        .get_mut(&node)
+                        .unwrap()
+                        .extend(child_dominated);
                 }
             }
         }
@@ -725,8 +732,8 @@ impl CFG {
                     .map(|n| n.op_label_idx)
                     .into_iter()
                     .collect(); // Start with all nodes
-                // in case some node does not have predecessors
-                if let Some(valid_preds) = preds{
+                                // in case some node does not have predecessors
+                if let Some(valid_preds) = preds {
                     for &pred in valid_preds {
                         if let Some(pred_dom) = dom.get(&pred) {
                             new_dom = new_dom.intersection(pred_dom).cloned().collect();
@@ -745,23 +752,26 @@ impl CFG {
         dom
     }
 
-// Build the dominator tree from the dominator sets
-fn compute_dominator_tree(dom: &HashMap<u32, HashSet<u32>>, start_node: u32) -> HashMap<u32, Vec<u32>> {
-    let mut dom_tree = HashMap::new();
+    // Build the dominator tree from the dominator sets
+    fn compute_dominator_tree(
+        dom: &HashMap<u32, HashSet<u32>>,
+        start_node: u32,
+    ) -> HashMap<u32, Vec<u32>> {
+        let mut dom_tree = HashMap::new();
 
-    for (&node, dominators) in dom {
-        let immediate_dom = dominators
-            .iter()
-            .filter(|&&dom_node| dom_node != node)
-            .max_by_key(|&&dom_node| dom.get(&dom_node).unwrap_or(&HashSet::new()).len());
+        for (&node, dominators) in dom {
+            let immediate_dom = dominators
+                .iter()
+                .filter(|&&dom_node| dom_node != node)
+                .max_by_key(|&&dom_node| dom.get(&dom_node).unwrap_or(&HashSet::new()).len());
 
-        if let Some(&imm_dom) = immediate_dom {
-            dom_tree.entry(imm_dom).or_insert_with(Vec::new).push(node);
+            if let Some(&imm_dom) = immediate_dom {
+                dom_tree.entry(imm_dom).or_insert_with(Vec::new).push(node);
+            }
         }
-    }
 
-    dom_tree
-}
+        dom_tree
+    }
 
     fn compute_dominated_blocks(cfg: &CFG, start_node: u32) -> HashMap<u32, HashSet<u32>> {
         // Step 1: Compute dominators of each node
@@ -777,7 +787,6 @@ fn compute_dominator_tree(dom: &HashMap<u32, HashSet<u32>>, start_node: u32) -> 
         // Start traversal from the start node
         Self::traverse_tree(start_node, &dom_tree, &mut dominated_blocks);
         dominated_blocks
-    
     }
 
     fn compute_post_dominators(cfg: &CFG, exit_node: u32) -> HashMap<u32, HashSet<u32>> {
@@ -796,7 +805,7 @@ fn compute_dominator_tree(dom: &HashMap<u32, HashSet<u32>>, start_node: u32) -> 
             let immediate_post_dom = post_dominators
                 .iter()
                 .filter(|&&post_dom_node| post_dom_node != node) // Exclude the node itself
-                .max_by_key(|&&dom_node| post_dom.get(&dom_node).unwrap_or(&HashSet::new()).len());// Closest post-dominator
+                .max_by_key(|&&dom_node| post_dom.get(&dom_node).unwrap_or(&HashSet::new()).len()); // Closest post-dominator
 
             if let Some(&imm_post_dom) = immediate_post_dom {
                 post_dom_tree
@@ -821,7 +830,6 @@ fn compute_dominator_tree(dom: &HashMap<u32, HashSet<u32>>, start_node: u32) -> 
         for &node in post_dominators.keys() {
             post_dominated_blocks.insert(node, HashSet::new());
         }
-
 
         // Start traversal from the exit node
         Self::traverse_tree(exit_node, &post_dom_tree, &mut post_dominated_blocks);

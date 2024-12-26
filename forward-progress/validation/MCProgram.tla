@@ -6,7 +6,7 @@ LOCAL INSTANCE FiniteSets
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES globalVars, threadLocals, Blocks
+VARIABLES globalVars, threadLocals, Blocks, DynamicExeuctionGraphSet
 (* Layout Configuration *)
 
 Threads == {tid : tid \in 1..NumThreads}
@@ -248,6 +248,106 @@ IsMemoryOperation(inst) ==
 
 EntryLabel == Min({idx \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][idx] = "OpLabel"})
 
+
+\* order matters so we use sequence instead of set
+\* currentThreadSet is the set of threads that are currently executing the block
+\* executeSet is the set of blocks that have been executed by the threads
+\* currentThreadSet != {} => executeSet != {}
+\* executeSet = {} => currentThreadSet = {}
+DynamicExecutionGraph(currentThreadSet, blockSeq, executeSet, notExecuteSet, unknownSet) ==
+    [
+        currentThreadSet |-> currentThreadSet,
+        blockSeq |-> blockSeq,
+        executeSet |-> executeSet,
+        notExecuteSet |-> notExecuteSet,
+        unknownSet |-> unknownSet
+    ]
+
+\* it is only possible for a thread to be in one DB at a time
+CurrentDynamicExecutionGraph(tid) ==
+    CHOOSE DB \in DynamicExeuctionGraphSet : tid \in DB.currentThreadSet
+
+FindDB(blokcSeq) ==
+    CHOOSE DB \in DynamicExeuctionGraphSet : DB.blockSeq = blockSeq
+
+BranchUpdateDynamicExecutionGraph(wgid, t, opLabelIdxSet, chosenBranchIdx) ==
+    LET
+        currentDB == CurrentDynamicExecutionGraph(t)
+        updatedTrueBlockSeq == Append(currentDB.blockSeq, chosenBranchIdx)
+        updatedFalseBlockSeqSet == {Append(currentDB.blockSeq, idx) : idx \in opLabelIdxSet}
+        BlockSeqSet == {DB.blockSeq : DB \in DynamicExeuctionGraphSet}
+        \* updatedTrueDB == DynamicExecutionGraph(currentDB.currentThreadSet, updatedTrueBlockSeq, currentDB.executeSet, currentDB.notExecuteSet, currentDB.unknownSet)
+    IN
+        {
+            \* Encounter current DB, remove current thread set from current DB as it creates/moves to a new DB
+            IF DB.blockSeq = currentDB.blockSeq THEN
+                DynamicExecutionGraph(DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t},
+                    DB.blockSeq,
+                    DB.executeSet,
+                    DB.notExecuteSet,
+                    DB.unknownSet)
+            \* Encounter the block that is choosen by the branch instruction
+            \* add current thread to the new DB,
+            \* add current thread to the executeSet of the new DB
+            \* remove current thread from the unknownSet of the new DB
+            ELSE IF DB.blockSeq = updatedTrueBlockSeq THEN
+                DynamicExecutionGraph(DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t},
+                    DB.blockSeq,
+                    DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t},
+                    DB.notExecuteSet,
+                    DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t})
+            \* Encounter the block that is not choosen by the branch instruction
+            \* add current thread to the notExecuteSet of the new DB
+            \* remove current thread from the unknownSet of the new DB
+            ELSE IF DB.blockSeq \in updatedFalseBlockSeqSet THEN
+                DynamicExecutionGraph(DB.currentThreadSet,
+                    DB.blockSeq,
+                    DB.executeSet,
+                    DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \union {t},
+                    DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t})
+            ELSE
+                DB
+            : DB \in DynamicExeuctionGraphSet
+        }
+        \* union with the new true branch DB if does not exist
+        \union 
+            IF updatedTrueBlockSeq \in BlockSeqSet
+            THEN 
+                {} 
+            ELSE 
+                {DynamicExecutionGraph({t}, 
+                                        updatedTrueBlockSeq,
+                                        {t},
+                                        currentDB.notExecuteSet,
+                                        \* we don't know if the threads executed in precedessor DB will execute the block or not
+                                        currentDB.unknownSet \union (currentDB.executeSet \ {t}))}
+        \* union with the new false branch DB if does not exist
+        \union 
+        {
+            IF falseBlockSeq \in BlockSeqSet
+            THEN 
+                {} 
+            ELSE 
+                DynamicExecutionGraph(currentDB.currentThreadSet EXCEPT ![wgid] = currentDB.currentThreadSet[wgid] \ {t},
+                                        falseBlockSeq,
+                                        {},
+                                        {t},
+                                        \* we don't know if the threads executed in precedessor DB will execute the block or not
+                                        currentDB.unknownSet \union (currentDB.executeSet \ {t}))
+            : falseBlockSeq \in updatedFalseBlockSeqSet
+        }
+
+TerminateUpdateDynamicExecutionGraph(wgid, t) ==
+    {
+        DynamicExecutionGraph(DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t},
+            DB.blockSeq,
+            DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \ {t},
+            DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \union {t},
+            DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t})
+        : DB \in DynamicExeuctionGraphSet
+    }
+
+
 (* CFG *)
 
 INSTANCE ProgramConf
@@ -381,16 +481,28 @@ DetermineBlockType(startIdx) ==
     ELSE 
         FALSE
 
+
+\* blockIdx is the opLabel index of the block
+\* DynamicInstance(blockIdx, thread) == 
+
+
+IsBlockWithinLoop(blockIdx) ==
+    LET matchingConstructs == {c \in ControlFlowConstructs : blockIdx \in c.blocks}
+    IN
+        /\ matchingConstructs # {}
+        /\ \E c \in matchingConstructs : c.constructType = "Loop" 
 \* find blocks witihin the same construct, if current block does not belong to any construct, return itself instead
+\* blockIdx is the opLabel index of the block
 \* This function is useful because it helps to determine the blocks that are being affeced by the change of tangle of current block
 BlocksInSameConstruct(blockIdx) ==
-    LET matchingConstruct == {c \in ControlFlowConstructs : blockIdx \in c.blocks}
+    LET matchingConstructs == {c \in ControlFlowConstructs : blockIdx \in c.blocks}
     IN 
-        IF matchingConstruct /= {}
+        IF matchingConstructs # {}
         THEN 
-            UNION {c.blocks : c \in matchingConstruct}
+            UNION {c.blocks : c \in matchingConstructs}
         ELSE 
             {blockIdx}
+
 
 \* Rule 4: If there exists termination instruction in the block, 
 \* Simply remove the thread from the tangle of all blocks as the thread has terminated.
@@ -499,9 +611,18 @@ MergeUpdate(wgid, currentLabelIdx, tangle, opLabelIdxSet) ==
 (* Global Variables *)
 
 InitProgram ==
+    /\ InitDB
     /\ InitBlocks
     /\ InitGPU
 
+\* Invariant: Each thread belongs to exactly one DB
+ThreadBelongsExactlyOne ==
+    /\  \A t \in Threads:
+            \E DB \in DynamicExeuctionGraphSet:
+                t \in DB.currentThreadSet
+    /\  \A t1, t2 \in Threads:
+            /\ \A DB1, DB2 \in DynamicExeuctionGraphSet:
+                (t1 \in DB1.currentThreadSet /\ t2 \in DB2.currentThreadSet) => DB1 = DB2
 ====
 
 
