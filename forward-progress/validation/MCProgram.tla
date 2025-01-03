@@ -6,7 +6,7 @@ LOCAL INSTANCE FiniteSets
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES globalVars, threadLocals, Blocks, DynamicExeuctionGraphSet
+VARIABLES globalVars, threadLocals, state, DynamicExecutionGraphSet
 (* Layout Configuration *)
 
 Threads == {tid : tid \in 1..NumThreads}
@@ -228,6 +228,7 @@ SubgroupId(tid) == LocalInvocationId(tid) \div SubgroupSize
 SubgroupInvocationId(tid) == LocalInvocationId(tid) % SubgroupSize
 
 ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
+ThreadsWithinWorkGroupNonTerminated(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid /\ state[tid] # "terminated"}
 
 ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
 
@@ -264,24 +265,24 @@ DynamicExecutionGraph(currentThreadSet, blockSeq, executeSet, notExecuteSet, unk
     ]
 
 \* it is only possible for a thread to be in one DB at a time
-CurrentDynamicExecutionGraph(tid) ==
-    CHOOSE DB \in DynamicExeuctionGraphSet : tid \in DB.currentThreadSet
+CurrentDynamicExecutionGraph(wgid, tid) ==
+    CHOOSE DB \in DynamicExecutionGraphSet : tid \in DB.currentThreadSet[wgid]
 
-FindDB(blokcSeq) ==
-    CHOOSE DB \in DynamicExeuctionGraphSet : DB.blockSeq = blockSeq
+FindDB(blockSeq) ==
+    CHOOSE DB \in DynamicExecutionGraphSet : DB.blockSeq = blockSeq
 
-BranchUpdateDynamicExecutionGraph(wgid, t, opLabelIdxSet, chosenBranchIdx) ==
+BranchUpdate(wgid, t, opLabelIdxSet, chosenBranchIdx) ==
     LET
-        currentDB == CurrentDynamicExecutionGraph(t)
+        currentDB == CurrentDynamicExecutionGraph(wgid, t)
         updatedTrueBlockSeq == Append(currentDB.blockSeq, chosenBranchIdx)
-        updatedFalseBlockSeqSet == {Append(currentDB.blockSeq, idx) : idx \in opLabelIdxSet}
-        BlockSeqSet == {DB.blockSeq : DB \in DynamicExeuctionGraphSet}
-        \* updatedTrueDB == DynamicExecutionGraph(currentDB.currentThreadSet, updatedTrueBlockSeq, currentDB.executeSet, currentDB.notExecuteSet, currentDB.unknownSet)
+        falseLabelIdxSet == opLabelIdxSet \ {chosenBranchIdx}
+        updatedFalseBlockSeqSet == {Append(currentDB.blockSeq, idx) : idx \in falseLabelIdxSet}
+        BlockSeqSet == {DB.blockSeq : DB \in DynamicExecutionGraphSet}
     IN
         {
             \* Encounter current DB, remove current thread set from current DB as it creates/moves to a new DB
             IF DB.blockSeq = currentDB.blockSeq THEN
-                DynamicExecutionGraph(DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t},
+                DynamicExecutionGraph([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
                     DB.blockSeq,
                     DB.executeSet,
                     DB.notExecuteSet,
@@ -291,11 +292,11 @@ BranchUpdateDynamicExecutionGraph(wgid, t, opLabelIdxSet, chosenBranchIdx) ==
             \* add current thread to the executeSet of the new DB
             \* remove current thread from the unknownSet of the new DB
             ELSE IF DB.blockSeq = updatedTrueBlockSeq THEN
-                DynamicExecutionGraph(DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t},
+                DynamicExecutionGraph([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
                     DB.blockSeq,
-                    DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t},
+                    [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
                     DB.notExecuteSet,
-                    DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t})
+                    [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}])
             \* Encounter the block that is not choosen by the branch instruction
             \* add current thread to the notExecuteSet of the new DB
             \* remove current thread from the unknownSet of the new DB
@@ -303,24 +304,25 @@ BranchUpdateDynamicExecutionGraph(wgid, t, opLabelIdxSet, chosenBranchIdx) ==
                 DynamicExecutionGraph(DB.currentThreadSet,
                     DB.blockSeq,
                     DB.executeSet,
-                    DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \union {t},
-                    DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t})
+                    [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \union {t}],
+                    [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}])
             ELSE
                 DB
-            : DB \in DynamicExeuctionGraphSet
+            : DB \in DynamicExecutionGraphSet
         }
         \* union with the new true branch DB if does not exist
         \union 
             IF updatedTrueBlockSeq \in BlockSeqSet
             THEN 
                 {} 
-            ELSE 
-                {DynamicExecutionGraph({t}, 
+            ELSE                        
+                {DynamicExecutionGraph( [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}], \* we only add current thread to the new DB
                                         updatedTrueBlockSeq,
-                                        {t},
-                                        currentDB.notExecuteSet,
+                                        [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}], \* we don't know if the threads executed in precedessor DB will execute the block or not
+                                        currentDB.notExecuteSet, \* but we know that the threads that are not executed in the previous block will also not execute the block
                                         \* we don't know if the threads executed in precedessor DB will execute the block or not
-                                        currentDB.unknownSet \union (currentDB.executeSet \ {t}))}
+                                        [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)])
+                }
         \* union with the new false branch DB if does not exist
         \union 
         {
@@ -328,23 +330,24 @@ BranchUpdateDynamicExecutionGraph(wgid, t, opLabelIdxSet, chosenBranchIdx) ==
             THEN 
                 {} 
             ELSE 
-                DynamicExecutionGraph(currentDB.currentThreadSet EXCEPT ![wgid] = currentDB.currentThreadSet[wgid] \ {t},
+                DynamicExecutionGraph([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
                                         falseBlockSeq,
-                                        {},
-                                        {t},
+                                        [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
+                                        \* current thread is not executed in the false block, but we don't know if the threads executed in precedessor DB will execute the block or not
+                                        [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
                                         \* we don't know if the threads executed in precedessor DB will execute the block or not
-                                        currentDB.unknownSet \union (currentDB.executeSet \ {t}))
+                                        [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)])
             : falseBlockSeq \in updatedFalseBlockSeqSet
         }
 
-TerminateUpdateDynamicExecutionGraph(wgid, t) ==
+TerminateUpdate(wgid, t) ==
     {
-        DynamicExecutionGraph(DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t},
+        DynamicExecutionGraph([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
             DB.blockSeq,
-            DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \ {t},
-            DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \union {t},
-            DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t})
-        : DB \in DynamicExeuctionGraphSet
+            [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \ {t}],
+            [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \union {t}],
+            [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}])
+        : DB \in DynamicExecutionGraphSet
     }
 
 
@@ -504,125 +507,28 @@ BlocksInSameConstruct(blockIdx) ==
             {blockIdx}
 
 
-\* Rule 4: If there exists termination instruction in the block, 
-\* Simply remove the thread from the tangle of all blocks as the thread has terminated.
-TerminateUpdate(wgid, t, currentLabelIdx) ==
-    [i \in 1..Len(Blocks) |->
-        \* IF IsMergeBlock(Blocks[i]) /\ StrictlyStructurallyDominates(FindHeaderBlock(Blocks[i]).opLabelIdx, currentLabelIdx)
-        IF TRUE
-        THEN
-            Block(Blocks[i].opLabelIdx,
-                Blocks[i].terminatedInstrIdx, 
-                newSeqOfSets(Blocks[i].tangle, wgid, Blocks[i].tangle[wgid] \{t}), 
-                Blocks[i].merge,
-                Blocks[i].initialized,
-                Blocks[i].constructType,
-                Blocks[i].mergeBlock,
-                Blocks[i].continueBlock,
-                Blocks[i].defaultBlock,
-                Blocks[i].caseBlocks)
-        ELSE
-            Blocks[i]
-    ] 
-
-\* BranchUpdate: update the tangle of the blocks that are pointed by the branch instruction
-\* tangle is the tangle that is going to be updated to the blocks, each workgroup has its own tangle
-\* opLabelIdxSet is the set of indices to the opLabel instructions that are pointed by the branch instruction
-\* choosenBranchIdx is the index to the opLabel instruction that is choosen by the branch instruction
-BranchUpdate(wgid, t, currentBlock, tangle, opLabelIdxSet, chosenBranchIdx) ==
-    LET blockIdx == CHOOSE i \in 1..Len(Blocks) : Blocks[i].opLabelIdx = currentBlock.opLabelIdx
-        blocksWithinConstruct == BlocksInSameConstruct(Blocks[blockIdx].opLabelIdx) \union opLabelIdxSet
-    IN 
-        [i \in 1..Len(Blocks) |-> 
-            IF  
-                /\ Blocks[i].opLabelIdx \in blocksWithinConstruct
-            THEN
-            \* rule 2: If a thread reaches a branch instruction, for any unitialized block from current block to chosen block within construct,
-            \* update the tangle of tha block to be the same as the tangle of current block.
-            \* and remove the thread itself from the tangle of unchoosen block if that block is not a merge block for current block
-            \* This is sound as the blocks within the construct are structurally dominated by the construct's header block,
-            \* So these blocks that are before choosen block are guarantee to be skipped and will never get revisited by current thread.
-                IF Blocks[i].initialized[wgid] = FALSE THEN
-                \* unchoosen block and is not a merge block
-                    IF Blocks[i].opLabelIdx < chosenBranchIdx /\  Blocks[i].opLabelIdx # currentBlock.mergeBlock THEN
-                        Block(Blocks[i].opLabelIdx,
-                            Blocks[i].terminatedInstrIdx,
-                            newSeqOfSets(Blocks[i].tangle, wgid, tangle \{t}),
-                            Blocks[i].merge,
-                            [Blocks[i].initialized EXCEPT ![wgid] = TRUE], 
-                            Blocks[i].constructType,
-                            Blocks[i].mergeBlock,
-                            Blocks[i].continueBlock,
-                            Blocks[i].defaultBlock,
-                            Blocks[i].caseBlocks)
-                    ELSE
-                        Block(Blocks[i].opLabelIdx,
-                            Blocks[i].terminatedInstrIdx,
-                            newSeqOfSets(Blocks[i].tangle, wgid, tangle), 
-                            Blocks[i].merge, [Blocks[i].initialized EXCEPT ![wgid] = TRUE],
-                            Blocks[i].constructType,
-                            Blocks[i].mergeBlock,
-                            Blocks[i].continueBlock,
-                            Blocks[i].defaultBlock,
-                            Blocks[i].caseBlocks)
-            \* rule 3: If the unchoosen block is initialized and is not a merge block for current block,
-            \* remove the thread from the tangle
-                ELSE IF Blocks[i].opLabelIdx < chosenBranchIdx /\ Blocks[i].opLabelIdx # currentBlock.mergeBlock /\ Blocks[i].initialized[wgid] = TRUE THEN
-                    Block(Blocks[i].opLabelIdx, 
-                        Blocks[i].terminatedInstrIdx,
-                        newSeqOfSets(Blocks[i].tangle, wgid, Blocks[i].tangle[wgid] \{t}), 
-                        Blocks[i].merge,
-                        Blocks[i].initialized,
-                        Blocks[i].constructType,
-                        Blocks[i].mergeBlock,
-                        Blocks[i].continueBlock,
-                        Blocks[i].defaultBlock,
-                        Blocks[i].caseBlocks)
-                ELSE 
-                    Blocks[i]
-            ELSE 
-                Blocks[i]
-        ]
-
-\* Helper function that return the updated blocks in CFG regarding the merge instruction
-MergeUpdate(wgid, currentLabelIdx, tangle, opLabelIdxSet) ==
-    [i \in 1..Len(Blocks) |-> 
-        IF Blocks[i].opLabelIdx \in opLabelIdxSet THEN
-            \* rule 1: If a thread reaches a merge instruction and the block it points to has empty tangle, 
-            \* update the tangle of tha block to the tangle of the merge instruction
-            IF Blocks[i].initialized[wgid] = FALSE THEN
-                Block(Blocks[i].opLabelIdx, 
-                    Blocks[i].terminatedInstrIdx, 
-                    newSeqOfSets(Blocks[i].tangle, wgid, tangle),
-                    Blocks[i].merge,
-                    [Blocks[i].initialized EXCEPT ![wgid] = TRUE],
-                    Blocks[i].constructType,
-                    Blocks[i].mergeBlock,
-                    Blocks[i].continueBlock,
-                    Blocks[i].defaultBlock,
-                    Blocks[i].caseBlocks) 
-            ELSE 
-                Blocks[i]
-        ELSE
-            Blocks[i]
-    ]
-
-
 (* Global Variables *)
 
 InitProgram ==
     /\ InitDB
-    /\ InitBlocks
     /\ InitGPU
 
 \* Invariant: Each thread belongs to exactly one DB
 ThreadBelongsExactlyOne ==
-    /\  \A t \in Threads:
-            \E DB \in DynamicExeuctionGraphSet:
-                t \in DB.currentThreadSet
-    /\  \A t1, t2 \in Threads:
-            /\ \A DB1, DB2 \in DynamicExeuctionGraphSet:
-                (t1 \in DB1.currentThreadSet /\ t2 \in DB2.currentThreadSet) => DB1 = DB2
+    /\ \A t \in Threads:
+        \E DB \in DynamicExecutionGraphSet:
+            t \in DB.currentThreadSet[WorkGroupId(t) + 1]
+    /\ \A t1, t2 \in Threads:
+        IF WorkGroupId(t1) = WorkGroupId(t2) THEN 
+            /\ \A DB1, DB2 \in DynamicExecutionGraphSet:
+                (t1 \in DB1.currentThreadSet[WorkGroupId(t1) + 1] /\ t2 \in DB2.currentThreadSet[WorkGroupId(t2) + 1]) => DB1 = DB2
+        ELSE
+            TRUE
+
+\* Invariant: Each dynamic execution graph has a unique block sequence
+UniqueBlockSequence ==
+    \A DB1, DB2 \in DynamicExecutionGraphSet:
+        DB1.blockSeq = DB2.blockSeq => DB1 = DB2
 ====
 
 

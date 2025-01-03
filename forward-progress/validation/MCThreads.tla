@@ -4,7 +4,7 @@ LOCAL INSTANCE Naturals
 LOCAL INSTANCE Sequences
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
-VARIABLES pc, state, threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet
+VARIABLES pc, state, threadLocals, globalVars, DynamicExecutionGraphSet
 
 (* Thread Configuration *)
 INSTANCE  MCProgram
@@ -45,13 +45,30 @@ cleanIntermediateVar(t) ==
 \* Update the state of the thread when there is an update in the tangle, especially if a thread is removed from the tangle
 \* This function tries to update the state of the thread to "ready" if it is waiting at tangled instruction and all threads within the subgroup have reached the same block
 \* within the tangle are having the same pc number. Otherwise, it keeps the state as it is.
-StateUpdate(wgid, t, newBlocks) ==
+\* StateUpdate(wgid, t, newBlocks) ==
+\*     [thread \in Threads |-> 
+\*         IF \E i \in 1..Len(newBlocks) : 
+\*             /\ state[thread] # "terminated"
+\*             /\ state[thread] # "ready"
+\*             /\ thread \in newBlocks[i].tangle[wgid] 
+\*             /\ \A tid \in newBlocks[i].tangle[wgid] : pc[tid] = pc[thread] /\ ThreadInstructions[1][pc[tid]] \in TangledInstructionSet /\ state[tid] = state[thread]
+\*         THEN 
+\*             "ready"
+\*         ELSE
+\*             state[thread]
+\*     ]
+
+\* Update the state of the thread when there is an update in the tangle, especially if a thread is removed from the tangle
+\* This function tries to update the state of the thread to "ready" if it is waiting at tangled instruction and all threads within the subgroup have reached the same block
+\* within the tangle are having the same pc number. Otherwise, it keeps the state as it is.
+StateUpdate(wgid, t, newDBSet) ==
     [thread \in Threads |-> 
-        IF \E i \in 1..Len(newBlocks) : 
+        IF \E DB \in newDBSet :
             /\ state[thread] # "terminated"
             /\ state[thread] # "ready"
-            /\ thread \in newBlocks[i].tangle[wgid] 
-            /\ \A tid \in newBlocks[i].tangle[wgid] : pc[tid] = pc[thread] /\ ThreadInstructions[1][pc[tid]] \in TangledInstructionSet /\ state[tid] = state[thread]
+            /\ thread \in DB.executeSet[wgid]
+            /\ \A tid \in DB.executeSet[wgid] : pc[tid] = pc[thread] /\ ThreadInstructions[1][pc[tid]] \in TangledInstructionSet /\ state[tid] = state[thread]
+            /\ DB.unknownSet[wgid] = {}
         THEN 
             "ready"
         ELSE
@@ -106,7 +123,7 @@ OpLogicalOr(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars, DynamicExecutionGraphSet>>
 
 OpLogicalAnd(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -123,7 +140,7 @@ OpLogicalAnd(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 OpLogicalEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -140,7 +157,7 @@ OpLogicalEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 OpLogicalNotEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -157,7 +174,7 @@ OpLogicalNotEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 OpLogicalNot(t, var, operand) ==
     LET workgroupId == WorkGroupId(t)+1
         MangleVar == Mangle(t, var)
@@ -170,7 +187,7 @@ OpLogicalNot(t, var, operand) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 
 OpEqual(t, var, operand1, operand2) ==
@@ -188,7 +205,7 @@ OpEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 
 OpNotEqual(t, var, operand1, operand2) ==
@@ -206,7 +223,7 @@ OpNotEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 
 OpLess(t, var, operand1, operand2) ==
@@ -224,7 +241,7 @@ OpLess(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 OpLessOrEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -241,7 +258,7 @@ OpLessOrEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 OpGreater(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -258,7 +275,7 @@ OpGreater(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 OpGreaterOrEqual(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -275,7 +292,7 @@ OpGreaterOrEqual(t, var, operand1, operand2) ==
                     ELSE
                         Assignment(t, {Var(MangleVar.scope, MangleVar.name, FALSE, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 
 OpAdd(t, var, operand1, operand2) ==
@@ -290,7 +307,7 @@ OpAdd(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val + operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 
 OpAtomicAdd(t, var, operand1, operand2) ==
@@ -305,7 +322,7 @@ OpAtomicAdd(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val + operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 OpSub(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -319,7 +336,7 @@ OpSub(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val - operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 OpAtomicSub(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -333,7 +350,7 @@ OpAtomicSub(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val - operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 OpMul(t, var, operand1, operand2) ==
     LET workgroupId == WorkGroupId(t)+1
@@ -347,7 +364,7 @@ OpMul(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val * operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<state, globalVars,  DynamicExecutionGraphSet>>
 
 
 GetGlobalId(t, result) ==
@@ -401,7 +418,7 @@ OpAtomicLoad(t, result, pointer) ==
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, Index(-1))})  
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, Blocks, DynamicExeuctionGraphSet>>
+        /\  UNCHANGED <<state,  DynamicExecutionGraphSet>>
 
 OpAtomicStore(t, pointer, value) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -417,7 +434,7 @@ OpAtomicStore(t, pointer, value) ==
                     ELSE
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, EvalExpr(t, WorkGroupId(t)+1, value), pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, Blocks, DynamicExeuctionGraphSet>>
+        /\  UNCHANGED <<state,  DynamicExecutionGraphSet>>
 
 OpAtomicIncrement(t, pointer) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -434,7 +451,7 @@ OpAtomicIncrement(t, pointer) ==
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value + 1, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, Blocks, DynamicExeuctionGraphSet>>
+        /\  UNCHANGED <<state,  DynamicExecutionGraphSet>>
 
 
 OpAtomicDecrement(t, pointer) == 
@@ -451,20 +468,82 @@ OpAtomicDecrement(t, pointer) ==
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value - 1, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, Blocks, DynamicExeuctionGraphSet>>
+        /\  UNCHANGED <<state,  DynamicExecutionGraphSet>>
+
+\*  OpControlBarrier(t, scope) ==
+\*     IF GetVal(-1, scope) = "subgroup" THEN \* already waiting at a subgroup barrier
+\*         \* find all threads and their corresponding barrier state within the same subgroup
+\*         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
+\*             currentTangle == FindCurrentBlock( pc[t]).tangle[WorkGroupId(t) + 1]
+\*         IN
+\*             IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
+\*                 Print("UB: All threads within subgroup must converge at current block", FALSE)
+\*             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
+\*             ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
+\*                 /\  state' = [state EXCEPT ![t] = "subgroup"]
+\*                 /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+\*             \* if all threads in the subgroup are waiting at the barrier, release them
+\*             ELSE 
+\*                 \* release all barrier in the subgroup, marking state as ready
+\*                 /\  state' = [
+\*                         tid \in Threads |->
+\*                             IF tid \in sthreads THEN 
+\*                                 "ready" 
+\*                             ELSE 
+\*                                 state[tid]
+\*                     ]
+\*                 \* increment the program counter for all threads in the subgroup
+\*                 /\  pc' = [
+\*                         tid \in Threads |->
+\*                             IF tid \in sthreads THEN 
+\*                                 pc[tid] + 1
+\*                             ELSE 
+\*                                 pc[tid]
+\*                     ]
+\*                 /\  UNCHANGED <<threadLocals, globalVars,  DynamicExecutionGraphSet>>
+
+\*     ELSE IF GetVal(-1, scope) = "workgroup" THEN \* already waiting at a workgroup barrier
+\*         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
+\*         IN
+\*             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
+\*             IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
+\*                 /\  state' = [state EXCEPT ![t] = "workgroup"]
+\*                 /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+\*             \* if all threads in the subgroup are waiting at the barrier, release them
+\*             ELSE 
+\*                 \* release all barrier in the subgroup, marking state as ready
+\*                 /\  state' = [
+\*                         tid \in Threads |->
+\*                             IF tid \in sthreads THEN 
+\*                                 "ready" 
+\*                             ELSE 
+\*                                 state[tid]
+\*                     ]
+\*                 \* increment the program counter for all threads in the subgroup
+\*                 /\  pc' = [
+\*                         tid \in Threads |->
+\*                             IF tid \in sthreads THEN 
+\*                                 pc[tid] + 1
+\*                             ELSE 
+\*                                 pc[tid]
+\*                     ]
+\*                 /\  UNCHANGED <<threadLocals, globalVars,  DynamicExecutionGraphSet>>
+\*     ELSE    
+\*         FALSE
 
  OpControlBarrier(t, scope) ==
     IF GetVal(-1, scope) = "subgroup" THEN \* already waiting at a subgroup barrier
         \* find all threads and their corresponding barrier state within the same subgroup
         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
-            currentTangle == FindCurrentBlock(Blocks, pc[t]).tangle[WorkGroupId(t) + 1]
+            workgroupId == WorkGroupId(t)+1
+            currentTangle == CurrentDynamicExecutionGraph(workgroupId, t).executeSet[workgroupId]
         IN
             IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
                 Print("UB: All threads within subgroup must converge at current block", FALSE)
             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
             ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                 /\  state' = [state EXCEPT ![t] = "subgroup"]
-                /\  UNCHANGED <<pc, threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
             \* if all threads in the subgroup are waiting at the barrier, release them
             ELSE 
                 \* release all barrier in the subgroup, marking state as ready
@@ -483,7 +562,7 @@ OpAtomicDecrement(t, pointer) ==
                             ELSE 
                                 pc[tid]
                     ]
-                /\  UNCHANGED <<threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<threadLocals, globalVars,  DynamicExecutionGraphSet>>
 
     ELSE IF GetVal(-1, scope) = "workgroup" THEN \* already waiting at a workgroup barrier
         LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
@@ -491,7 +570,7 @@ OpAtomicDecrement(t, pointer) ==
             \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
             IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                /\  UNCHANGED <<pc, threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
             \* if all threads in the subgroup are waiting at the barrier, release them
             ELSE 
                 \* release all barrier in the subgroup, marking state as ready
@@ -510,9 +589,106 @@ OpAtomicDecrement(t, pointer) ==
                             ELSE 
                                 pc[tid]
                     ]
-                /\  UNCHANGED <<threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
+                /\  UNCHANGED <<threadLocals, globalVars,  DynamicExecutionGraphSet>>
     ELSE    
         FALSE
+
+
+\* zheyuan: add assertion to check if the all threads within subgroup converge at current block because it is UB if not
+\* OpGroupAll(t, result, scope, predicate) ==
+\*     LET mangledResult == Mangle(t, result)
+\*     IN
+\*         /\  
+\*             \/  /\  IsVariable(mangledResult)
+\*                 \* /\  VarExists(WorkGroupId(t)+1, mangledResult)
+\*             \/  IsIntermediate(mangledResult)
+\*         /\  scope.value \in ScopeOperand
+\*         /\  IF scope.value = "subgroup" THEN
+\*                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
+\*                         currentTangle == FindCurrentBlock( pc[t]).tangle[WorkGroupId(t) + 1]
+\*                     IN
+\*                         IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
+\*                                 Print("UB: All threads within subgroup must converge at current block for OpGroupAll", FALSE)
+\*                         \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
+\*                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
+\*                             /\  state' = [state EXCEPT ![t] = "subgroup"]
+\*                             /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+\*                         ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+\*                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*                             /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*                         ELSE 
+\*                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*                             /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*             ELSE IF scope.value = "workgroup" THEN 
+\*                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
+\*                     IN      \* if there is a thread that has not reached the opgroupAll, return false
+\*                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
+\*                                 /\  state' = [state EXCEPT ![t] = "workgroup"]
+\*                                 /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+\*                             ELSE IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+\*                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
+\*                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                         tid \in Threads |->
+\*                                             IF tid \in wthreads THEN 
+\*                                                 "ready" 
+\*                                             ELSE 
+\*                                                 state[tid]
+\*                                     ]
+\*                                 /\  pc' = [
+\*                                         tid \in Threads |->
+\*                                             IF tid \in wthreads THEN 
+\*                                                 pc[tid] + 1
+\*                                             ELSE 
+\*                                                 pc[tid]
+\*                                     ]
+\*                                 /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*                             ELSE 
+\*                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE, Index(-1)): wthread \in wthreads })
+\*                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                         tid \in Threads |->
+\*                                             IF tid \in wthreads THEN 
+\*                                                 "ready" 
+\*                                             ELSE 
+\*                                                 state[tid]
+\*                                     ]
+\*                                 /\  pc' = [
+\*                                         tid \in Threads |->
+\*                                             IF tid \in wthreads THEN 
+\*                                                 pc[tid] + 1
+\*                                             ELSE 
+\*                                                 pc[tid]
+\*                                     ]
+\*                                 /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*             ELSE
+\*                 /\  FALSE
 
 
 \* zheyuan: add assertion to check if the all threads within subgroup converge at current block because it is UB if not
@@ -521,20 +697,20 @@ OpGroupAll(t, result, scope, predicate) ==
     IN
         /\  
             \/  /\  IsVariable(mangledResult)
-                \* /\  VarExists(WorkGroupId(t)+1, mangledResult)
             \/  IsIntermediate(mangledResult)
         /\  scope.value \in ScopeOperand
         /\  IF scope.value = "subgroup" THEN
                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
-                        currentTangle == FindCurrentBlock(Blocks, pc[t]).tangle[WorkGroupId(t) + 1]
+                        workgroupId == WorkGroupId(t)+1
+                        currentTangle == CurrentDynamicExecutionGraph(workgroupId, t).executeSet[workgroupId]
                     IN
                         IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
                                 Print("UB: All threads within subgroup must converge at current block for OpGroupAll", FALSE)
                         \* if there exists thread in the subgroup that has not reached the opgroupAll, set the barrier to current thread
                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
-                        ELSE IF \A sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                            /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+                        ELSE IF \A sthread \in sthreads: EvalExpr(sthread, workgroupId, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                     tid \in Threads |->
@@ -550,7 +726,7 @@ OpGroupAll(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                            /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
                         ELSE 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -567,14 +743,15 @@ OpGroupAll(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                            /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
             ELSE IF scope.value = "workgroup" THEN 
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
+                        workgroupId == WorkGroupId(t)+1
                     IN      \* if there is a thread that has not reached the opgroupAll, return false
                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
                                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                                /\  UNCHANGED <<pc, threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
-                            ELSE IF \A wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                                /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+                            ELSE IF \A wthread \in wthreads: EvalExpr(wthread, workgroupId, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                         tid \in Threads |->
@@ -590,7 +767,7 @@ OpGroupAll(t, result, scope, predicate) ==
                                             ELSE 
                                                 pc[tid]
                                     ]
-                                /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                                /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
                             ELSE 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE, Index(-1)): wthread \in wthreads })
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -607,11 +784,106 @@ OpGroupAll(t, result, scope, predicate) ==
                                             ELSE 
                                                 pc[tid]
                                     ]
-                                /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                                /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
             ELSE
                 /\  FALSE
 
 
+
+\* OpGroupAny(t, result, scope, predicate) ==
+\*     LET mangledResult == Mangle(t, result)
+\*     IN
+\*         /\  
+\*             \/  /\  IsVariable(mangledResult)
+\*                 \* /\  VarExists(WorkGroupId(t)+1, mangledResult)
+\*             \/  IsIntermediate(mangledResult)
+\*         /\  scope.value \in ScopeOperand
+\*         /\  IF scope.value = "subgroup" THEN
+\*                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
+\*                         currentTangle == FindCurrentBlock( pc[t]).tangle[WorkGroupId(t) + 1]
+\*                     IN
+\*                         IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
+\*                                 Print("UB: All threads within subgroup must converge at current block for OpGroupAny", FALSE)
+\*                         \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
+\*                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
+\*                             /\  state' = [state EXCEPT ![t] = "subgroup"]
+\*                             /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+\*                         ELSE IF \E sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+\*                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*                             /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*                         ELSE 
+\*                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in sthreads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*                             /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*             ELSE IF scope.value = "workgroup" THEN
+\*                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
+\*                     IN      \* if there is a thread that has not reached the opgroupAny, return false
+\*                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
+\*                                 /\  state' = [state EXCEPT ![t] = "workgroup"]
+\*                                 /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+\*                             ELSE IF \E wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+\*                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
+\*                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                         tid \in Threads |->
+\*                                             IF tid \in wthreads THEN 
+\*                                                 "ready" 
+\*                                             ELSE 
+\*                                                 state[tid]
+\*                                     ]
+\*                                 /\  pc' = [
+\*                                         tid \in Threads |->
+\*                                             IF tid \in wthreads THEN 
+\*                                                 pc[tid] + 1
+\*                                             ELSE 
+\*                                                 pc[tid]
+\*                                     ]
+\*                                 /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*                             ELSE 
+\*                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE, Index(-1)): wthread \in wthreads })
+\*                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                         tid \in Threads |->
+\*                                             IF tid \in wthreads THEN 
+\*                                                 "ready" 
+\*                                             ELSE 
+\*                                                 state[tid]
+\*                                     ]
+\*                                 /\  pc' = [
+\*                                         tid \in Threads |->
+\*                                             IF tid \in wthreads THEN 
+\*                                                 pc[tid] + 1
+\*                                             ELSE 
+\*                                                 pc[tid]
+\*                                     ]
+\*                                 /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*             ELSE
+\*                 /\  FALSE
 
 OpGroupAny(t, result, scope, predicate) ==
     LET mangledResult == Mangle(t, result)
@@ -623,15 +895,16 @@ OpGroupAny(t, result, scope, predicate) ==
         /\  scope.value \in ScopeOperand
         /\  IF scope.value = "subgroup" THEN
                 /\  LET sthreads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t))
-                        currentTangle == FindCurrentBlock(Blocks, pc[t]).tangle[WorkGroupId(t) + 1]
+                        workgroupId == WorkGroupId(t)+1
+                        currentTangle == CurrentDynamicExecutionGraph(workgroupId, t).executeSet[workgroupId]
                     IN
                         IF \E sthread \in sthreads: sthread  \notin currentTangle THEN 
                                 Print("UB: All threads within subgroup must converge at current block for OpGroupAny", FALSE)
                         \* if there exists thread in the subgroup that has not reached the subgroup barrier, set the barrier to current thread
                         ELSE IF \E sthread \in sthreads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
-                        ELSE IF \E sthread \in sthreads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                            /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+                        ELSE IF \E sthread \in sthreads: EvalExpr(sthread, workgroupId, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in sthreads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                     tid \in Threads |->
@@ -647,7 +920,7 @@ OpGroupAny(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                            /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
                         ELSE 
                             /\  Assignment(t, {Var(mangledResult.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in sthreads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as
@@ -664,14 +937,15 @@ OpGroupAny(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                            /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
             ELSE IF scope.value = "workgroup" THEN
                 /\  LET wthreads == ThreadsWithinWorkGroup(WorkGroupId(t))
+                        workgroupId == WorkGroupId(t)+1
                     IN      \* if there is a thread that has not reached the opgroupAny, return false
                         /\  IF \E wthread \in wthreads: pc[wthread] # pc[t] THEN
                                 /\  state' = [state EXCEPT ![t] = "workgroup"]
-                                /\  UNCHANGED <<pc, threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
-                            ELSE IF \E wthread \in wthreads: EvalExpr(wthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                                /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+                            ELSE IF \E wthread \in wthreads: EvalExpr(wthread, workgroupId, predicate) = TRUE THEN 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, TRUE, Index(-1)): wthread \in wthreads})
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                         tid \in Threads |->
@@ -687,7 +961,7 @@ OpGroupAny(t, result, scope, predicate) ==
                                             ELSE 
                                                 pc[tid]
                                     ]
-                                /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                                /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
                             ELSE 
                                 /\  Assignment(t, {Var(mangledResult.scope, Mangle(wthread, result).name, FALSE, Index(-1)): wthread \in wthreads })
                                 /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -704,9 +978,61 @@ OpGroupAny(t, result, scope, predicate) ==
                                             ELSE 
                                                 pc[tid]
                                     ]
-                                /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                                /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
             ELSE
                 /\  FALSE
+
+
+\* OpGroupNonUniformAll(t, result, scope, predicate) ==
+\*     LET mangledResult == Mangle(t, result)
+\*     IN
+\*         /\  
+\*             \/  /\  IsVariable(result)
+\*                 \* /\  VarExists(WorkGroupId(t)+1, result)
+\*             \/  IsIntermediate(result)
+\*         /\  scope.value \in ScopeOperand
+\*         /\  IF scope.value = "subgroup" THEN
+\*                 /\  LET active_subgroup_threads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \cap FindCurrentBlock( pc[t]).tangle[WorkGroupId(t) + 1]
+\*                     IN
+\*                         IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
+\*                             /\  state' = [state EXCEPT ![t] = "subgroup"]
+\*                             /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+\*                         ELSE IF \A sthread \in active_subgroup_threads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+\*                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in active_subgroup_threads})
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                     tid \in Threads |->
+\*                                         IF tid \in active_subgroup_threads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in active_subgroup_threads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*                             /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*                         ELSE 
+\*                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in active_subgroup_threads })
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                     tid \in Threads |->
+\*                                         IF tid \in active_subgroup_threads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in active_subgroup_threads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*                             /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*             ELSE
+\*                 /\  FALSE
 
 
 OpGroupNonUniformAll(t, result, scope, predicate) ==
@@ -714,16 +1040,20 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
     IN
         /\  
             \/  /\  IsVariable(result)
-                \* /\  VarExists(WorkGroupId(t)+1, result)
             \/  IsIntermediate(result)
         /\  scope.value \in ScopeOperand
         /\  IF scope.value = "subgroup" THEN
-                /\  LET active_subgroup_threads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \cap FindCurrentBlock(Blocks, pc[t]).tangle[WorkGroupId(t) + 1]
+                /\  LET workGroupId == WorkGroupId(t) + 1
+                        currentDB == CurrentDynamicExecutionGraph(workGroupId, t)
+                        active_subgroup_threads == currentDB.executeSet[workGroupId]
+                        unknown_subgroup_threads == currentDB.unknownSet[workGroupId]
                     IN
-                        IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
+                        \* if there are threads in tangle not reaching the instruction point,
+                        \* or there are threads in unknown set, make current thread waiting
+                        IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] \/ unknown_subgroup_threads # {} THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
-                        ELSE IF \A sthread \in active_subgroup_threads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                            /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+                        ELSE IF \A sthread \in active_subgroup_threads: EvalExpr(sthread, workGroupId, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in active_subgroup_threads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                     tid \in Threads |->
@@ -739,7 +1069,7 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                            /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
                         ELSE 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in active_subgroup_threads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -756,9 +1086,59 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                            /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
             ELSE
                 /\  FALSE
+
+\* OpGroupNonUniformAny(t, result, scope, predicate) ==
+\*     LET mangledResult == Mangle(t, result)
+\*     IN
+\*         /\  
+\*             \/  /\  IsVariable(result)
+\*             \/  IsIntermediate(result)
+\*         /\  scope.value \in ScopeOperand
+\*         /\  IF scope.value = "subgroup" THEN
+\*                 /\  LET active_subgroup_threads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \cap FindCurrentBlock( pc[t]).tangle[WorkGroupId(t) + 1]
+\*                     IN
+\*                         IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
+\*                             /\  state' = [state EXCEPT ![t] = "subgroup"]
+\*                             /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+\*                         ELSE IF \E sthread \in active_subgroup_threads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+\*                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in active_subgroup_threads})
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                     tid \in Threads |->
+\*                                         IF tid \in active_subgroup_threads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in active_subgroup_threads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*                             /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*                         ELSE 
+\*                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in active_subgroup_threads })
+\*                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+\*                                     tid \in Threads |->
+\*                                         IF tid \in active_subgroup_threads THEN 
+\*                                             "ready" 
+\*                                         ELSE 
+\*                                             state[tid]
+\*                                 ]
+\*                             /\  pc' = [
+\*                                     tid \in Threads |->
+\*                                         IF tid \in active_subgroup_threads THEN 
+\*                                             pc[tid] + 1
+\*                                         ELSE 
+\*                                             pc[tid]
+\*                                 ]
+\*                             /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
+\*             ELSE
+\*                 /\  FALSE
 
 
 OpGroupNonUniformAny(t, result, scope, predicate) ==
@@ -766,16 +1146,18 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
     IN
         /\  
             \/  /\  IsVariable(result)
-                \* /\  VarExists(WorkGroupId(t)+1, result)
             \/  IsIntermediate(result)
         /\  scope.value \in ScopeOperand
         /\  IF scope.value = "subgroup" THEN
-                /\  LET active_subgroup_threads == ThreadsWithinSubgroup(SubgroupId(t), WorkGroupId(t)) \cap FindCurrentBlock(Blocks, pc[t]).tangle[WorkGroupId(t) + 1]
+                /\  LET workGroupId == WorkGroupId(t) + 1
+                        currentDB == CurrentDynamicExecutionGraph(workGroupId, t)
+                        active_subgroup_threads == currentDB.executeSet[workGroupId]
+                        unknown_subgroup_threads == currentDB.unknownSet[workGroupId]
                     IN
                         IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
-                            /\  UNCHANGED <<pc, threadLocals, globalVars, Blocks, DynamicExeuctionGraphSet>>
-                        ELSE IF \E sthread \in active_subgroup_threads: EvalExpr(sthread, WorkGroupId(t)+1, predicate) = TRUE THEN 
+                            /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicExecutionGraphSet>>
+                        ELSE IF \E sthread \in active_subgroup_threads: EvalExpr(sthread, workGroupId+1, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in active_subgroup_threads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                     tid \in Threads |->
@@ -791,7 +1173,7 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                            /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
                         ELSE 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in active_subgroup_threads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
@@ -808,7 +1190,7 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
                                         ELSE 
                                             pc[tid]
                                 ]
-                            /\ UNCHANGED <<globalVars, Blocks, DynamicExeuctionGraphSet>>
+                            /\ UNCHANGED <<globalVars,  DynamicExecutionGraphSet>>
             ELSE
                 /\  FALSE
 
@@ -838,7 +1220,7 @@ OpAtomicExchange(t, result, pointer, value) ==
                 ELSE
                     Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, Blocks, DynamicExeuctionGraphSet>>
+        /\  UNCHANGED <<state,  DynamicExecutionGraphSet>>
 
 (* result and pointer are variable, compare and value are literal *)
 OpAtomicCompareExchange(t, result, pointer, value, comparator) ==
@@ -878,7 +1260,7 @@ OpAtomicCompareExchange(t, result, pointer, value, comparator) ==
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index)})
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, Blocks, DynamicExeuctionGraphSet>>
+        /\  UNCHANGED <<state,  DynamicExecutionGraphSet>>
 
 
 (* zheyuan chen: invocation is escaped from reconvergence if: 
@@ -889,64 +1271,65 @@ OpAtomicCompareExchange(t, result, pointer, value, comparator) ==
 *)
 \* Block with OpBranch as termination instruction is not part of construct
 \* Hence, we do not need to update the Blocks and state
+\* OpBranch(t, label) ==
+\*     /\  LET curBlock == FindCurrentBlock( pc[t])
+\*             targetBlock == FindBlockbyOpLabelIdx( GetVal(-1, label))
+\*             labelVal == GetVal(-1, label)
+\*             workGroupId == WorkGroupId(t)+1
+\*         IN
+\*             LET newBlocks == BranchUpdate(workGroupId, t, curBlock, curBlock.tangle[workGroupId], {labelVal}, labelVal)
+\*                 newState == StateUpdate(workGroupId, t, newBlocks)
+\*                 newDBSet == BranchUpdateDynamicExecutionGraph(workGroupId, t, {labelVal}, labelVal)
+\*             IN 
+\*                 /\  Blocks' = newBlocks
+\*                 /\  state' = newState  
+\*                 /\  DynamicExecutionGraphSet' = newDBSet 
+\*     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
+\*     /\  UNCHANGED <<threadLocals, globalVars>>
+
+
 OpBranch(t, label) ==
-    /\  LET curBlock == FindCurrentBlock(Blocks, pc[t])
-            targetBlock == FindBlockbyOpLabelIdx(Blocks, GetVal(-1, label))
-            labelVal == GetVal(-1, label)
+    /\  LET labelVal == GetVal(-1, label)
             workGroupId == WorkGroupId(t)+1
         IN
-            LET newBlocks == BranchUpdate(workGroupId, t, curBlock, curBlock.tangle[workGroupId], {labelVal}, labelVal)
-                newState == StateUpdate(workGroupId, t, newBlocks)
-                newDBSet == BranchUpdateDynamicExecutionGraph(workGroupId, t, {labelVal}, labelVal)
+            LET newDBSet == BranchUpdate(workGroupId, t, {labelVal}, labelVal)
+                newState == StateUpdate(workGroupId, t, newDBSet)
             IN 
-                /\  Blocks' = newBlocks
                 /\  state' = newState  
-                /\  DynamicExeuctionGraphSet' = newDBSet 
+                /\  DynamicExecutionGraphSet' = newDBSet 
     /\ pc' = [pc EXCEPT ![t] = GetVal(-1, label)]
     /\  UNCHANGED <<threadLocals, globalVars>>
+
 
 (* condition is an expression, trueLabel and falseLabel are integer representing pc *)
 OpBranchConditional(t, condition, trueLabel, falseLabel) ==
     /\  IsLiteral(trueLabel)
     /\  IsLiteral(falseLabel)
-    /\  LET curBlock == FindCurrentBlock(Blocks, pc[t])
-            trueLabelVal == GetVal(-1, trueLabel)
+    /\  LET trueLabelVal == GetVal(-1, trueLabel)
             falseLabelVal == GetVal(-1, falseLabel)
             workGroupId == WorkGroupId(t)+1
         IN
             IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
-                /\  LET newBlocks == BranchUpdate(workGroupId,
-                                                    t,
-                                                    FindCurrentBlock(Blocks, pc[t]), 
-                                                    FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId], 
-                                                    {trueLabelVal, falseLabelVal}, trueLabelVal)
-                        newState == StateUpdate(workGroupId, t, newBlocks)
-                        newDBSet == BranchUpdateDynamicExecutionGraph(workGroupId, t, {trueLabelVal, falseLabelVal}, trueLabelVal)
+                /\  LET newDBSet == BranchUpdate(workGroupId, t, {trueLabelVal, falseLabelVal}, trueLabelVal)
+                        newState == StateUpdate(workGroupId, t, newDBSet)
                     IN
-                        /\  Blocks' = newBlocks
                         /\  state' = newState   
-                        /\  DynamicExeuctionGraphSet' = newDBSet
+                        /\  DynamicExecutionGraphSet' = newDBSet
                 /\  pc' = [pc EXCEPT ![t] = trueLabelVal]
             ELSE
-                /\  LET newBlocks == BranchUpdate(workGroupId,
-                                                    t,
-                                                    FindCurrentBlock(Blocks, pc[t]),
-                                                    FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId],
-                                                    {trueLabelVal, falseLabelVal},
-                                                    falseLabelVal)
-                        newState == StateUpdate(workGroupId, t, newBlocks)
-                        newDBSet == BranchUpdateDynamicExecutionGraph(workGroupId, t, {trueLabelVal, falseLabelVal}, falseLabelVal)
+                /\  LET newDBSet == BranchUpdate(workGroupId, t, {trueLabelVal, falseLabelVal}, falseLabelVal)
+                        newState == StateUpdate(workGroupId, t, newDBSet)
+                        
                     IN
-                        /\  Blocks' = newBlocks
                         /\  state' = newState
-                        /\  DynamicExeuctionGraphSet' = newDBSet
+                        /\  DynamicExecutionGraphSet' = newDBSet
                 /\  pc' = [pc EXCEPT ![t] = falseLabelVal]
     /\  UNCHANGED <<threadLocals, globalVars>>
 
+    
 \* zheyuan: need more tests
 OpSwitch(t, selector, default, literals, ids) ==
-    /\  LET curBlock == FindCurrentBlock(Blocks, pc[t])
-            defaultVal == GetVal(-1, default)
+    /\  LET defaultVal == GetVal(-1, default)
             literalsVal == [idx \in 1..Len(literals) |-> GetVal(-1, literals[idx])]
             idsVal == [idx \in 1..Len(ids) |-> GetVal(-1, ids[idx])]
             workGroupId == WorkGroupId(t)+1
@@ -955,63 +1338,46 @@ OpSwitch(t, selector, default, literals, ids) ==
                 LET val == EvalExpr(t, WorkGroupId(t)+1, selector)
                     index == CHOOSE i \in 1..Len(literalsVal): literalsVal[i] = val 
                 IN
-                    /\  LET newBlocks == BranchUpdate(workGroupId,
-                                                        t,
-                                                        FindCurrentBlock(Blocks, pc[t]),
-                                                        FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId],
-                                                        SeqToSet(idsVal),
-                                                        idsVal[index])
-                            newState == StateUpdate(workGroupId, t, newBlocks)
-                            newDBSet == BranchUpdateDynamicExecutionGraph(workGroupId, t, SeqToSet(idsVal), idsVal[index])
+                    /\  LET newDBSet == BranchUpdate(workGroupId, t, SeqToSet(idsVal), idsVal[index])
+                            newState == StateUpdate(workGroupId, t, newDBSet)
                         IN
-                            /\  Blocks' = newBlocks
                             /\  state' = newState
-                            /\  DynamicExeuctionGraphSet' = newDBSet
+                            /\  DynamicExecutionGraphSet' = newDBSet
                     /\  pc' = [pc EXCEPT ![t] = idsVal[index]]
             ELSE
-                /\  LET newBlocks == BranchUpdate(workGroupId, t, FindCurrentBlock(Blocks, pc[t]), FindCurrentBlock(Blocks, pc[t]).tangle[workGroupId], SeqToSet(idsVal), defaultVal)
-                        newState == StateUpdate(workGroupId, t, newBlocks)
-                        newDBSet == BranchUpdateDynamicExecutionGraph(workGroupId, t, SeqToSet(idsVal), defaultVal)
+                /\  LET newDBSet == BranchUpdate(workGroupId, t, SeqToSet(idsVal), defaultVal)
+                        newState == StateUpdate(workGroupId, t, newDBSet)
                     IN
-                        /\  Blocks' = newBlocks
                         /\  state' = newState
-                        /\  DynamicExeuctionGraphSet' = newDBSet
+                        /\  DynamicExecutionGraphSet' = newDBSet
                 /\  pc' = [pc EXCEPT ![t] = defaultVal]
     /\  UNCHANGED <<threadLocals, globalVars>>
 
 (* structured loop, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block *)
 OpLabel(t, label) ==
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-    /\  UNCHANGED <<state, threadLocals, globalVars, Blocks>>
+    /\  UNCHANGED <<state, threadLocals, globalVars,  DynamicExecutionGraphSet>>
 
 (* structured loop, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block *)
 OpLoopMerge(t, mergeLabel, continueTarget) ==
     \* because the merge instruction must be the second to last instruction in the block, we can find the currren block by looking at the termination instruction
-    LET currBlock == FindBlockByTerminationIns(Blocks, pc[t]+1)
-        workGroupId == WorkGroupId(t)+1
-    IN 
-        /\  Blocks' = MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel), GetVal(-1, continueTarget)})
-        /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, threadLocals, globalVars>>
+     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+    /\  UNCHANGED <<state, threadLocals, globalVars, DynamicExecutionGraphSet>>
 
 (* structured switch/if, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block  *)
 OpSelectionMerge(t, mergeLabel) ==
     \* because the merge instruction must be the second to last instruction in the block, we can find the currren block by looking at the termination instruction
-    LET currBlock == FindBlockByTerminationIns(Blocks, pc[t]+1)
-        workGroupId == WorkGroupId(t)+1
-    IN
-        /\  Blocks' = MergeUpdate(workGroupId, currBlock.opLabelIdx, currBlock.tangle[workGroupId], {GetVal(-1, mergeLabel)})
-        /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state, threadLocals, globalVars>>
+    /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+    /\  UNCHANGED <<state, threadLocals, globalVars, DynamicExecutionGraphSet>>
 
 \* zheyuan chen: update tangle
 Terminate(t) ==
     LET workGroupId == WorkGroupId(t)+1
     IN
-        LET newBlocks == TerminateUpdate(workGroupId, t, FindBlockByTerminationIns(Blocks, pc[t]).opLabelIdx)
-            newState == StateUpdate(workGroupId, t, newBlocks)
+        LET newDBSet == TerminateUpdate(workGroupId, t)
+            newState == StateUpdate(workGroupId, t, newDBSet)
         IN 
-            /\  Blocks' = newBlocks
+            /\  DynamicExecutionGraphSet' = newDBSet
             /\  state' = [newState EXCEPT ![t] = "terminated"]
             /\  UNCHANGED <<pc, threadLocals, globalVars>>
 
@@ -1024,7 +1390,7 @@ ExecuteInstruction(t) ==
             ELSE IF ThreadInstructions[t][pc[t]] = "Assignment" THEN
                 /\  Assignment(t, {Mangle(t,ThreadArguments[t][pc[t]][1])})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, Blocks>>
+                /\  UNCHANGED <<state,  DynamicExecutionGraphSet>>
             ELSE IF ThreadInstructions[t][pc[t]] = "GetGlobalId" THEN
                 GetGlobalId(t, ThreadArguments[t][pc[t]][1])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicIncrement" THEN
@@ -1094,7 +1460,7 @@ ExecuteInstruction(t) ==
             ELSE
                 FALSE
         ELSE 
-            /\ UNCHANGED << threadVars, threadLocals, globalVars, Blocks>>
+            /\ UNCHANGED << threadVars, threadLocals, globalVars,  DynamicExecutionGraphSet>>
 
 
 (* This property ensures all the instructions in all threads are bounded to the instruction set *)

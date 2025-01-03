@@ -251,7 +251,7 @@ impl Display for CFG {
         writeln!(f, "}}")?;
 
         // write blocks
-        writeln!(f, "InitBlocks == \n Blocks = <<")?;
+        writeln!(f, "Blocks == <<")?;
         for (idx, block) in self.nodes.iter().enumerate() {
             write!(f, "{}", block)?;
             if idx != self.nodes.len() - 1 {

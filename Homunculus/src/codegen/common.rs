@@ -403,7 +403,7 @@ impl Program {
     }
 
     fn write_dynamic_blocks(&self, writer: &mut BufWriter<File>, cfg: &CFG) -> Result<()> {
-        writeln!(writer, "InitDB == DynamicExeuctionGraphSet = {{")?;
+        writeln!(writer, "InitDB == DynamicExecutionGraphSet = {{")?;
         // each node has different op_label_idx, so we can safely unwrap the result
         let node = cfg
             .nodes
