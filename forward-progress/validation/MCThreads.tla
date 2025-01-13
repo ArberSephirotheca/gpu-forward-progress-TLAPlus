@@ -1292,7 +1292,7 @@ OpBranch(t, label) ==
     /\  LET labelVal == GetVal(-1, label)
             workGroupId == WorkGroupId(t)+1
         IN
-            LET newDBSet == BranchUpdate(workGroupId, t, {labelVal}, labelVal)
+            LET newDBSet == BranchUpdate(workGroupId, t, pc[t], {labelVal}, labelVal)
                 newState == StateUpdate(workGroupId, t, newDBSet)
             IN 
                 \* /\ Print(newDBSet, TRUE)
@@ -1311,14 +1311,14 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
             workGroupId == WorkGroupId(t)+1
         IN
             IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
-                /\  LET newDBSet == BranchUpdate(workGroupId, t, {trueLabelVal, falseLabelVal}, trueLabelVal)
+                /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], {trueLabelVal, falseLabelVal}, trueLabelVal)
                         newState == StateUpdate(workGroupId, t, newDBSet)
                     IN
                         /\  state' = newState   
                         /\  DynamicNodeSet' = newDBSet
                 /\  pc' = [pc EXCEPT ![t] = trueLabelVal]
             ELSE
-                /\  LET newDBSet == BranchUpdate(workGroupId, t, {trueLabelVal, falseLabelVal}, falseLabelVal)
+                /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], {trueLabelVal, falseLabelVal}, falseLabelVal)
                         newState == StateUpdate(workGroupId, t, newDBSet)
                         
                     IN
@@ -1339,14 +1339,14 @@ OpSwitch(t, selector, default, literals, ids) ==
                 LET val == EvalExpr(t, WorkGroupId(t)+1, selector)
                     index == CHOOSE i \in 1..Len(literalsVal): literalsVal[i] = val 
                 IN
-                    /\  LET newDBSet == BranchUpdate(workGroupId, t, SeqToSet(idsVal), idsVal[index])
+                    /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], SeqToSet(idsVal), idsVal[index])
                             newState == StateUpdate(workGroupId, t, newDBSet)
                         IN
                             /\  state' = newState
                             /\  DynamicNodeSet' = newDBSet
                     /\  pc' = [pc EXCEPT ![t] = idsVal[index]]
             ELSE
-                /\  LET newDBSet == BranchUpdate(workGroupId, t, SeqToSet(idsVal), defaultVal)
+                /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], SeqToSet(idsVal), defaultVal)
                         newState == StateUpdate(workGroupId, t, newDBSet)
                     IN
                         /\  state' = newState
@@ -1362,12 +1362,12 @@ OpLabel(t, label) ==
 (* structured loop, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block *)
 OpLoopMerge(t, mergeLabel, continueTarget) ==
     \* because the merge instruction must be the second to last instruction in the block, we can find the currren block by looking at the termination instruction
-    /\  LET workGroupId == WorkGroupId(t) + 1
-            newDBSet == LoopMergeUpdate(workGroupId, t, FindCurrentBlock(Blocks, pc[t]).opLabelIdx, mergeLabel)
-        IN
-            /\  DynamicNodeSet' = newDBSet
+    \* /\  LET workGroupId == WorkGroupId(t) + 1
+    \*         newDBSet == LoopMergeUpdate(workGroupId, t, FindCurrentBlock(Blocks, pc[t]).opLabelIdx, mergeLabel)
+    \*     IN
+    \*         /\  DynamicNodeSet' = newDBSet
     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-    /\  UNCHANGED <<state, threadLocals, globalVars>>
+    /\  UNCHANGED <<state, threadLocals, globalVars, DynamicNodeSet>>
 
 (* structured switch/if, must immediately precede block termination instruction, which means it must be second-to-last instruction in its block  *)
 OpSelectionMerge(t, mergeLabel) ==
