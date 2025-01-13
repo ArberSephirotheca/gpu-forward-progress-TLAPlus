@@ -79,6 +79,14 @@ pub(crate) static TERMINATION_INSTRUCTIONS: [InstructionName; 4] = [
     InstructionName::Return,
 ];
 
+pub(crate) static TANGLED_INSTRUCTIONS: [InstructionName; 5] = [
+    InstructionName::ControlBarrier,
+    InstructionName::GroupAll,
+    InstructionName::GroupAny,
+    InstructionName::GroupNonUniformAll,
+    InstructionName::GroupNonUniformAny,
+];
+
 pub(crate) static MERGE_INSTRUCTIONS: [InstructionName; 2] =
     [InstructionName::SelectionMerge, InstructionName::LoopMerge];
 impl Display for InstructionName {
@@ -399,11 +407,44 @@ impl Program {
         );
         writeln!(writer, "{}", cfg)?;
         self.write_dynamic_blocks(writer, &cfg)?;
+        // self.write_unique_block_id(writer)?;
+        Ok(())
+    }
+
+    fn write_unique_block_id(&self, writer: &mut BufWriter<File>) -> Result<()> {
+        writeln!(writer, " InitBID == UniqueBlockID = <<")?;
+        for _ in 0..self.num_threads {
+            writeln!(writer, "{{")?;
+
+            let filtered_instructions: Vec<_> = self
+                .instructions
+                .iter()
+                .filter(|ins| ins.name == InstructionName::Label)
+                .collect();
+
+            filtered_instructions
+                .iter()
+                .enumerate()
+                .for_each(|(i, ins)| {
+                    let is_last = i == filtered_instructions.len() - 1;
+                    let separator = if is_last { "" } else { "," };
+                    writeln!(
+                        writer,
+                        "[labelIdx |-> {}, id |-> 1]{}",
+                        ins.position + 1,
+                        separator
+                    )
+                    .unwrap();
+                });
+
+            writeln!(writer, "}}")?;
+        }
+        writeln!(writer, ">>")?;
         Ok(())
     }
 
     fn write_dynamic_blocks(&self, writer: &mut BufWriter<File>, cfg: &CFG) -> Result<()> {
-        writeln!(writer, "InitDB == DynamicExecutionGraphSet = {{")?;
+        writeln!(writer, "InitDB == DynamicNodeSet = {{")?;
         // each node has different op_label_idx, so we can safely unwrap the result
         let node = cfg
             .nodes
@@ -426,15 +467,17 @@ impl Program {
             .collect::<Vec<_>>();
         let current_threads = current_threads.join(", ");
         let empty_set_per_wg = vec!["{}"; self.num_work_groups as usize].join(", ");
+        let empty_seq_per_thread = vec!["<<>>"; self.num_threads as usize].join(", ");
         writeln!(
             writer,
-            "DynamicExecutionGraph(<<{}>>, <<{}>>, <<{}>>, <<{}>>, <<{}>>)",
-            current_threads, node.op_label_idx, current_threads, empty_set_per_wg, empty_set_per_wg
+            "DynamicNode(<<{}>>, <<{}>>, <<{}>>, <<{}>>, {}, <<{}>>)",
+            current_threads, current_threads, empty_set_per_wg, empty_set_per_wg, node.op_label_idx, empty_seq_per_thread
         )?;
 
         writeln!(writer, "}}")?;
         Ok(())
     }
+
     fn write_layout(&self, writer: &mut BufWriter<File>) -> Result<()> {
         // Write layout information to the lines
         writeln!(writer, "SubgroupSize == {}", self.subgroup_size)?;

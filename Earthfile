@@ -5,6 +5,7 @@ tlaplusbuild-image:
     RUN apt-get update && apt-get install -y git bash sudo curl graphviz clang cmake
     RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
     ENV PATH="/root/.cargo/bin:${PATH}"
+    RUN git config --global http.postBuffer 157286400
     RUN git clone https://github.com/pmer/tla-bin.git
     # RUN git clone https://github.com/KhronosGroup/glslang.git
     WORKDIR /tla-bin
