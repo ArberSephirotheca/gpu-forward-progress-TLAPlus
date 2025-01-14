@@ -534,14 +534,11 @@ LoopMergeUpdate(wgid, t, currentLabelIdx, mergeBlock) ==
 BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
     LET
         currentDB == CurrentDynamicNode(wgid, t)
-        falseLabelIdxSet == opLabelIdxSet \ {chosenBranchIdx}
-        newFalseLabelIdxSet == {
-            falselabelIdx \in falseLabelIdxSet: (\E DB \in DynamicNodeSet: DB.labelIdx = falselabelIdx /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec))
-        }
+        falseLabelIdxSet == opLabelIdxSet \ {chosenBranchIdx}  
         labelIdxSet == {DB.labelIdx : DB \in DynamicNodeSet}
         choosenBlock == FindBlockbyOpLabelIdx(Blocks, chosenBranchIdx)
         currentBlock == FindBlockbyOpLabelIdx(Blocks, currentDB.labelIdx)
-        currentIteration == FindIteration(currentDB.labelIdx, currentDB.iterationVec[t], t)
+        currentIteration == FindIteration(currentDB.labelIdx, currentDB.iterationVec, t)
         \* if new iteration is created, we need to add it to the iteration vector
         \* otherwise we just need to increment the iteration number of top element of the iteration vector
         updatedThreadIterationVec == IF currentIteration.iter = 0
@@ -554,6 +551,14 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
             ThreadArguments[t][pc-1][1].value
         ELSE
             -1
+        newFalseLabelIdxSet == {
+            falselabelIdx \in falseLabelIdxSet: 
+                (\E DB \in DynamicNodeSet: DB.labelIdx = falselabelIdx /\
+                    (\/  (DB.labelIdx = chosenBranchIdx /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec)) 
+                    \/  (IsMergeBlock(choosenBlock) /\ IsMergeBlockOfLoop(chosenBranchIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
+                    \/  (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec)))
+                )
+        }
     IN  
         \* update the existing dynamic blocks
         {
