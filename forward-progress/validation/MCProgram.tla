@@ -561,8 +561,6 @@ CanMergeSameIterationVector(curr, remaining) ==
         \* Pops the iteration vector of current thread from the iteration vector of that DB.
     \* 2. a loop body:
         \* Increment the iteration number of top element of the iteration vector by one.
-
-
 BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
     LET
         currentDB == CurrentDynamicNode(wgid, t)
@@ -586,7 +584,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
         newFalseLabelIdxSet == {
             falselabelIdx \in falseLabelIdxSet: 
                 (\E DB \in DynamicNodeSet: DB.labelIdx = falselabelIdx /\
-                    (\/  (DB.labelIdx = chosenBranchIdx /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec)) 
+                    (\/ SameIterationVector(DB.iterationVec, currentDB.iterationVec)
                     \/  (IsMergeBlock(choosenBlock) /\ IsMergeBlockOfLoop(chosenBranchIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
                     \/  (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec)))
                 )
@@ -630,10 +628,15 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
                     DB
             \* Encounter the block that is not choosen by the branch instruction
             ELSE IF DB.labelIdx \in falseLabelIdxSet 
-                /\ ((IsMergeBlockOfLoop(DB.labelIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
-                    \/ (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec))
-                    \/ (IsMergeBlock(FindBlockbyOpLabelIdx(Blocks, DB.labelIdx)) /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec))
-                    )
+                \* /\ ((IsMergeBlockOfLoop(DB.labelIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
+                \*     \/ (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec))
+                \*     \/ (IsMergeBlock(FindBlockbyOpLabelIdx(Blocks, DB.labelIdx)) /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec))
+                \*     )
+                /\ (\/ SameIterationVector(DB.iterationVec, currentDB.iterationVec)
+                    \/  (IsMergeBlock(choosenBlock) /\ IsMergeBlockOfLoop(chosenBranchIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
+                    \/  (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec)))
+            
+            
             THEN
                 DynamicNode(DB.currentThreadSet,
                     DB.executeSet,
@@ -719,7 +722,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
                             [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
                             falselabelIdx,
                             currentDB.iterationVec)
-            : falselabelIdx \in newFalseLabelIdxSet
+            : falselabelIdx \in (falseLabelIdxSet \ newFalseLabelIdxSet)
         }
         )
 
