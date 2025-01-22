@@ -101,7 +101,7 @@ Spec ==
     /\ [][Next]_vars
     /\ Fairness
 
-\* eventually all threads are always terminatedac
+\* eventually all threads are always terminated
 EventuallyAlwaysTerminated ==
     \* \A t \in Threads: <>[](pc[t] = Len(ThreadInstructions[t]))
     \A t \in Threads: <>[](state[t] = "terminated")

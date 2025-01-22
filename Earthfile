@@ -65,9 +65,9 @@ tlaplus-image:
         IF [ "$OUT" = "text" ]
             RUN tlc forward-progress/validation/MCProgressModel  > output.txt 2>&1 || true
         ELSE IF [ "$OUT" = "dot" ]
-            RUN tlc forward-progress/validation/MCProgressModel -dump dot,actionlabels,colorize output.dot 2>&1 || true 
+            RUN tlc forward-progress/validation/MCProgressModel -dump dot output.dot 2>&1 || true 
         ELSE IF [ "$OUT" = "all" ]
-            RUN tlc forward-progress/validation/MCProgressModel  -dump dot,actionlabels,colorize output.dot 2>&1 || true 
+            RUN tlc forward-progress/validation/MCProgressModel  -dump dot output.dot 2>&1 || true 
             RUN tlc forward-progress/validation/MCProgressModel > output.txt 2>&1 || true
         ELSE
             RUN echo "Invalid output format"

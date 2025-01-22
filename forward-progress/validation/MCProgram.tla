@@ -578,14 +578,14 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
             [currentDB.iterationVec EXCEPT ![Len(currentDB.iterationVec[t])] = Iteration(currentIteration.blockIdx, currentIteration.iter + 1)]
         isLoopHeader == IsLoopHeaderBlock(currentBlock)
         loopBranchIdx == IF isLoopHeader THEN
-            ThreadArguments[t][pc-1][1].value
+            ThreadArguments[t][pc][1].value
         ELSE
             -1
         newFalseLabelIdxSet == {
             falselabelIdx \in falseLabelIdxSet: 
                 (\E DB \in DynamicNodeSet: DB.labelIdx = falselabelIdx /\
-                    (\/ SameIterationVector(DB.iterationVec, currentDB.iterationVec)
-                    \/  (IsMergeBlock(choosenBlock) /\ IsMergeBlockOfLoop(chosenBranchIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
+                    (\/ (SameIterationVector(DB.iterationVec, currentDB.iterationVec) /\ IsMergeBlockOfLoop(chosenBranchIdx) = FALSE /\ DB.labelIdx # loopBranchIdx)
+                    \/  (IsMergeBlock(choosenBlock) /\ IsMergeBlockOfLoop(chosenBranchIdx) /\ DB.labelIdx # loopBranchIdx /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
                     \/  (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec)))
                 )
         }
@@ -652,7 +652,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
         \union
         (
             IF \E DB \in DynamicNodeSet: 
-                \/  (DB.labelIdx = chosenBranchIdx /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec)) 
+                \/  (DB.labelIdx = chosenBranchIdx /\ IsMergeBlockOfLoop(chosenBranchIdx) = FALSE /\ DB.labelIdx # loopBranchIdx /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec)) 
                 \/  (IsMergeBlock(choosenBlock) /\ IsMergeBlockOfLoop(chosenBranchIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
                 \/  (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec))
             THEN 

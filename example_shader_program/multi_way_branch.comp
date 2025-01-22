@@ -1,0 +1,39 @@
+#version 450
+#pragma scheduler(HSA)
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_KHR_shader_subgroup_vote : enable
+layout(local_size_x = 4) in;
+layout(tla_subgroup_size = 4) in;
+layout(tla_num_workgroups = 1) in;
+
+
+layout(std430, binding = 0) buffer Lock {
+    uint lock;
+};
+
+void main() {
+    uint tid = gl_GlobalInvocationID.x;
+    uint modValue = tid % 4;
+
+    // Multi-way switch
+    switch (modValue) {
+        case 0:
+            // Possibly do some subgroup op
+            subgroup_op
+            break;
+        case 1:
+            // Another subgroup op
+            subgroup_op 
+            break;
+        case 2:
+            // A different path
+            // Possibly do some memory or barrier usage
+            barrier();
+            break;
+        default:
+            // Another case
+            subgroupAll(true);
+            break;
+    }
+}

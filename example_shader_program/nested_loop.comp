@@ -1,0 +1,37 @@
+#version 450
+#pragma scheduler(OBE)
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_KHR_shader_subgroup_vote : enable
+#extension GL_KHR_shader_subgroup_basic : enable
+layout(local_size_x = 2) in;
+layout(tla_subgroup_size = 2) in;
+layout(tla_num_workgroups = 2) in;
+
+
+layout(std430, binding = 0) buffer Lock {
+    uint lock;
+};
+
+void main() {
+    uint tid = gl_GlobalInvocationID.x;
+    
+    // Outer loop
+    for (int i = 0; i < 3; i++) {
+        // Some threads might skip the inner loop
+        if ((tid + i) % 2 == 0) {
+            for (int j = 0; j < 2; j++) {
+                // Possibly do some subgroup operation
+                subgroupAdd(i + j);
+                // Barrier inside the inner loop
+                barrier();
+            }
+        } else {
+            // Barrier in the outer loop
+            barrier();
+        }
+        // Another barrier after the inner loop
+        barrier();
+    }
+    // Check final concurrency 
+    subgroupAll(true);
+}

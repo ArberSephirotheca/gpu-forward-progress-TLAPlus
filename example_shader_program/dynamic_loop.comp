@@ -1,0 +1,33 @@
+#version 450
+#pragma scheduler(OBE)
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_KHR_shader_subgroup_vote : enable
+#extension GL_KHR_shader_subgroup_basic : enable
+layout(local_size_x = 4) in;
+layout(tla_subgroup_size = 4) in;
+layout(tla_num_workgroups = 1) in;
+
+
+layout(std430, binding = 0) buffer Lock {
+    uint lock;
+};
+
+void main() {
+    uint tid = gl_GlobalInvocationID.x;
+    uint count = 0;
+
+    while (true) {
+        // Some data-dependent condition
+        if ((tid + count) > 3) {
+            // This thread decides to break
+            break;
+        } else {
+            // Do a subgroup operation
+            subgroupAll(true);
+            // Possibly increment 'count'
+            count++;
+        }
+    }
+    // See if everyone eventually arrives here or if some might get stuck
+    subgroupAll(true);
+}

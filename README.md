@@ -114,3 +114,6 @@ This command will try to run all the litmus tests in the `litmus_tests` director
 ## Memory Semantics
 The model does not implement any extension to memory semantics, and all SPIR-V instructions
 are behaving like `SequentiallyConsistent`.
+
+## Reference
+- https://lamport.azurewebsites.net/tla/safety-liveness.pdf
