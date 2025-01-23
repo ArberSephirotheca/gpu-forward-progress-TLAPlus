@@ -66,8 +66,8 @@ StateUpdate(wgid, t, newDBSet) ==
         IF \E DB \in newDBSet :
             /\ state[thread] # "terminated"
             /\ state[thread] # "ready"
-            /\ thread \in DB.executeSet[wgid]
-            /\ \A tid \in DB.executeSet[wgid] : pc[tid] = pc[thread] /\ ThreadInstructions[1][pc[tid]] \in TangledInstructionSet /\ state[tid] = state[thread]
+            /\ thread \in DB.currentThreadSet[wgid]
+            /\ \A tid \in DB.currentThreadSet[wgid] : pc[tid] = pc[thread] /\ ThreadInstructions[1][pc[tid]] \in TangledInstructionSet /\ state[tid] = state[thread]
             /\ DB.unknownSet[wgid] = {}
         THEN 
             "ready"
@@ -1045,7 +1045,7 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
         /\  IF scope.value = "subgroup" THEN
                 /\  LET workGroupId == WorkGroupId(t) + 1
                         currentDB == CurrentDynamicNode(workGroupId, t)
-                        active_subgroup_threads == currentDB.executeSet[workGroupId]
+                        active_subgroup_threads == currentDB.currentThreadSet[workGroupId]
                         unknown_subgroup_threads == currentDB.unknownSet[workGroupId]
                     IN
                         \* if there are threads in tangle not reaching the instruction point,
@@ -1151,10 +1151,10 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
         /\  IF scope.value = "subgroup" THEN
                 /\  LET workGroupId == WorkGroupId(t) + 1
                         currentDB == CurrentDynamicNode(workGroupId, t)
-                        active_subgroup_threads == currentDB.executeSet[workGroupId]
+                        active_subgroup_threads == currentDB.currentThreadSet[workGroupId]
                         unknown_subgroup_threads == currentDB.unknownSet[workGroupId]
                     IN
-                        IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
+                        IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] \/ unknown_subgroup_threads # {} THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
                             /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicNodeSet>>
                         ELSE IF \E sthread \in active_subgroup_threads: EvalExpr(sthread, workGroupId+1, predicate) = TRUE THEN 

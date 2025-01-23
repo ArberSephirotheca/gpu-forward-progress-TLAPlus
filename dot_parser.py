@@ -99,8 +99,8 @@ def extract_path(dot_file, start_node, end_node, output_file):
 
 # Input your DOT file and nodes
 dot_file = "build/fixed_output.dot"
-start_node = "-8837611122450243856"  # Replace with your start node
-end_node = "7295582909359311910"      # Replace with your end node
+start_node = "-9140878119817401936"  # Replace with your start node
+end_node = "3058739425817216169"      # Replace with your end node
 output_file = "path_subgraph.dot"
 
 # Extract the path and write to a file
