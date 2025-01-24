@@ -1050,7 +1050,7 @@ OpGroupNonUniformAll(t, result, scope, predicate) ==
                     IN
                         \* if there are threads in tangle not reaching the instruction point,
                         \* or there are threads in unknown set, make current thread waiting
-                        IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] \/ unknown_subgroup_threads # {} THEN
+                        IF unknown_subgroup_threads # {} \/ \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
                             /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicNodeSet>>
                         ELSE IF \A sthread \in active_subgroup_threads: EvalExpr(sthread, workGroupId, predicate) = TRUE THEN 
@@ -1154,7 +1154,7 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
                         active_subgroup_threads == currentDB.currentThreadSet[workGroupId]
                         unknown_subgroup_threads == currentDB.unknownSet[workGroupId]
                     IN
-                        IF \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] \/ unknown_subgroup_threads # {} THEN
+                        IF unknown_subgroup_threads # {} \/ \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
                             /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicNodeSet>>
                         ELSE IF \E sthread \in active_subgroup_threads: EvalExpr(sthread, workGroupId+1, predicate) = TRUE THEN 

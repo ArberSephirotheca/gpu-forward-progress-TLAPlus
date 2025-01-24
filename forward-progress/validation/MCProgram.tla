@@ -601,9 +601,12 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
                     \/  (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec)))
                 )
         }
+        \* we want to update the blocks in loop construct as well as the continue target
         loopConstructUpdate == 
             IF IsMergeBlockOfLoop(chosenBranchIdx) THEN
-                BlocksInSameLoopConstruct(currentDB.iterationVec[Len(currentDB.iterationVec)].blockIdx, chosenBranchIdx).blocks
+                LET loopConstruct == BlocksInSameLoopConstruct(currentDB.iterationVec[Len(currentDB.iterationVec)].blockIdx, chosenBranchIdx)
+                IN
+                    loopConstruct.blocks \union {loopConstruct.continueTarget}
             ELSE
                 {}
         \* thi is set of all threads that are not terminated and still in the current construct
@@ -681,13 +684,22 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
         (
             IF \E DB \in DynamicNodeSet: 
                 \/  (DB.labelIdx = chosenBranchIdx /\ IsMergeBlockOfLoop(chosenBranchIdx) = FALSE /\ DB.labelIdx # loopBranchIdx /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec)) 
-                \/  ( IsMergeBlockOfLoop(chosenBranchIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
-                \/  (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec))
+                \/  (DB.labelIdx = chosenBranchIdx /\ IsMergeBlockOfLoop(chosenBranchIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
+                \/  (DB.labelIdx = chosenBranchIdx /\ DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec))
             THEN 
                 {} 
             ELSE
+                \* zheyuan: is this even possible to happen? loopConstructUpdate is non-empty only if we choose to exit the loop, try to test it
+                IF chosenBranchIdx \in loopConstructUpdate THEN
+                    {DynamicNode([wg \in 1..NumWorkGroups |-> {}],
+                                [wg \in 1..NumWorkGroups |-> {}],
+                                [wg \in 1..NumWorkGroups |-> {}],
+                                [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+                                chosenBranchIdx,
+                                currentDB.iterationVec)
+                    }
                 \* if the choosen block is a merge block of a loop, we need to pop the iteration vector of current thread from the iteration vector of that DB
-                IF IsMergeBlockOfLoop(chosenBranchIdx) THEN 
+                ELSE IF IsMergeBlockOfLoop(chosenBranchIdx) THEN 
                     {
                         DynamicNode([wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
                                     [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
@@ -725,8 +737,17 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
         \* union with the new false branch DB if does not exist
         \union
         (
-        {
-            IF IsMergeBlockOfLoop(falselabelIdx) THEN 
+        {   
+            \* thread is exiting the loop, we also need to create a new dynamic block for false label and remove current thread from all sets of new block.
+            IF falselabelIdx \in loopConstructUpdate THEN 
+                DynamicNode([wg \in 1..NumWorkGroups |-> {}],
+                            [wg \in 1..NumWorkGroups |-> {}],
+                            [wg \in 1..NumWorkGroups |-> {}],
+                            [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+                            falselabelIdx,
+                            currentDB.iterationVec)
+        
+            ELSE IF IsMergeBlockOfLoop(falselabelIdx) THEN 
                 DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
                             [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
                             \* We don't know if the threads executed in precedessor DB will execute the block or not

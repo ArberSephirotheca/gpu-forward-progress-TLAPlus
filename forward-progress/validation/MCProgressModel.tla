@@ -105,8 +105,12 @@ Spec ==
 EventuallyAlwaysTerminated ==
     \* \A t \in Threads: <>[](pc[t] = Len(ThreadInstructions[t]))
     \A t \in Threads: <>[](state[t] = "terminated")
+
+\* EventuallyExitLoop ==
+\*     \A node \in DynamicNodeSet: <>[](node.currenThreadSet = <<>>)
     
 Liveness == 
     /\  EventuallyAlwaysTerminated
+    \* /\  EventuallyExitLoop
 
 ====
