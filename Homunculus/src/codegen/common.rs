@@ -407,13 +407,13 @@ impl Program {
         );
         writeln!(writer, "{}", cfg)?;
         self.write_dynamic_blocks(writer, &cfg)?;
-        // self.write_unique_block_id(writer)?;
+        self.write_unique_block_id(writer)?;
         Ok(())
     }
 
     fn write_unique_block_id(&self, writer: &mut BufWriter<File>) -> Result<()> {
-        writeln!(writer, " InitBID == UniqueBlockID = <<")?;
-        for _ in 0..self.num_threads {
+        writeln!(writer, " InitGlobalCounter == globalCounter = <<")?;
+        for idx in 0..self.num_threads {
             writeln!(writer, "{{")?;
 
             let filtered_instructions: Vec<_> = self
@@ -431,13 +431,17 @@ impl Program {
                     writeln!(
                         writer,
                         "[labelIdx |-> {}, id |-> 1]{}",
-                        ins.position + 1,
+                        ins.position,
                         separator
                     )
                     .unwrap();
                 });
-
-            writeln!(writer, "}}")?;
+            
+            if idx != self.num_threads - 1 {
+                writeln!(writer, "}},")?;
+            } else {
+                writeln!(writer, "}}")?;
+            }
         }
         writeln!(writer, ">>")?;
         Ok(())

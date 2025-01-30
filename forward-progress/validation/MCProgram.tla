@@ -6,7 +6,8 @@ LOCAL INSTANCE FiniteSets
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES globalVars, threadLocals, state, DynamicNodeSet
+VARIABLES globalVars, threadLocals, state, DynamicNodeSet, globalCounter
+
 (* Layout Configuration *)
 
 Threads == {tid : tid \in 1..NumThreads}
@@ -425,7 +426,6 @@ BlocksInSameConstruct(blockIdx) ==
             UNION {c.blocks : c \in matchingConstructs}
         ELSE 
             {blockIdx}
-
                 
 Iteration(blockIdx, iter) == 
     [blockIdx |-> blockIdx,
@@ -809,6 +809,7 @@ TerminateUpdate(wgid, t) ==
 InitProgram ==
     /\ InitDB
     /\ InitGPU
+    /\ InitGlobalCounter
 
 \* Invariant: Each thread belongs to exactly one DB
 ThreadBelongsExactlyOne ==
