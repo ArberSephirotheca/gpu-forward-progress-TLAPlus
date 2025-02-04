@@ -260,15 +260,16 @@ IsMemoryOperation(inst) ==
 \* executeSet is the set of blocks that have been executed by the threads
 \* currentThreadSet != {} => executeSet != {}
 \* executeSet = {} => currentThreadSet = {}
-DynamicNode(currentThreadSet, executeSet, notExecuteSet, unknownSet, labelIdx, (*mergeStack,*) iterationVec) ==
+DynamicNode(currentThreadSet, executeSet, notExecuteSet, unknownSet, labelIdx, id, mergeStack, children) ==
     [
         currentThreadSet |-> currentThreadSet,
         executeSet |-> executeSet,
         notExecuteSet |-> notExecuteSet,
         unknownSet |-> unknownSet,
         labelIdx |-> labelIdx,
-        \* mergeStack |-> mergeStack,
-        iterationVec |-> iterationVec
+        id |-> id,
+        mergeStack |-> mergeStack,
+        children |-> children
     ]
 
 
@@ -364,12 +365,16 @@ IsOpLabel(instr) ==
 IsMergeBlock(blockIdx) ==
     /\ \E construct \in ControlFlowConstructs : construct.mergeBlock = blockIdx
 
+IsConstructHeaderBlock(blockIdx) ==
+    /\ \E construct \in ControlFlowConstructs : construct.headerBlock = blockIdx
+
 IsHeaderBlock(block) ==
     block.mergeBlock # -1
 
 IsLoopHeaderBlock(block) ==
     /\ IsHeaderBlock(block)
     /\ block.constructType = "Loop"
+
 
 IsContinueBlockOf(currentBlock, headerBlock) ==
     /\ IsLoopHeaderBlock(headerBlock)
@@ -415,18 +420,20 @@ IsBlockWithinLoop(blockIdx) ==
     IN
         /\ matchingConstructs # {}
         /\ \E c \in matchingConstructs : c.constructType = "Loop" 
-\* find blocks witihin the same construct, if current block does not belong to any construct, return itself instead
-\* blockIdx is the opLabel index of the block
+
 \* This function is useful because it helps to determine the blocks that are being affeced by the change of tangle of current block
-BlocksInSameConstruct(blockIdx) ==
-    LET matchingConstructs == {c \in ControlFlowConstructs : blockIdx \in c.blocks}
-    IN 
-        IF matchingConstructs # {}
-        THEN 
-            UNION {c.blocks : c \in matchingConstructs}
-        ELSE 
-            {blockIdx}
-                
+BlocksInSameConstruct(headerIdx, mergeIdx) ==
+    CHOOSE  construct \in ControlFlowConstructs : construct.headerBlock = headerIdx /\ construct.mergeBlock = mergeIdx
+
+
+UniqueBlockId(blockIdx, counter) ==
+    [blockIdx |-> blockIdx,
+     counter |-> counter]
+
+ContainsSameMergeBlock(exitDB, other) ==
+    CHOOSE 
+    
+    
 Iteration(blockIdx, iter) == 
     [blockIdx |-> blockIdx,
      iter |-> iter]
@@ -451,6 +458,12 @@ FindIteration(blockIdx, iterationsVec, tid) ==
     ELSE
         Iteration(blockIdx, 0)
 
+SameMergeStack(left, right) ==
+    /\ Len(left) = Len(right)
+    /\ \A idx \in 1..Len(left):
+        /\ left[idx].blockIdx = right[idx].blockIdx
+        /\ left[idx].counter = right[idx].counter
+
 SameIterationVector(left, right) ==
     /\ Len(left) = Len(right)
     /\ \A idx \in 1..Len(left):
@@ -468,21 +481,21 @@ CanMergeSameIterationVector(curr, remaining) ==
 
 \*         currentDB == CurrentDynamicNode(wgid, t)
 \*         \* updatedThreadMergeStack == Push(currentDB.mergeStack[t], mergeBlock)
-\*         currentIteration == FindIteration(currentLabelIdx, currentDB.iterationVec[t], t)
+\*         currentIteration == FindIteration(currentLabelIdx, currentDB.children[t], t)
 \*         \* if new iteration is created, we need to add it to the iteration vector
 \*         \* otherwise we just need to increment the iteration number of top element of the iteration vector
 \*         updatedThreadIterationVec == IF currentIteration.iter = 0
 \*         THEN 
-\*             Push(currentDB.iterationVec[t], Iteration(currentLabelIdx, 1))
+\*             Push(currentDB.children[t], Iteration(currentLabelIdx, 1))
 \*         ELSE 
-\*             [currentDB.iterationVec[t] EXCEPT ![Len(currentDB.iterationVec[t])] = Iteration(currentIteration.blockIdx, currentIteration.iter + 1)]
-\*         hasExistingBlock == \E DB \in DynamicNodeSet : DB.labelIdx = currentLabelIdx /\ CanMergeSameIterationVector(updatedThreadIterationVec, DB.iterationVec)
+\*             [currentDB.children[t] EXCEPT ![Len(currentDB.children[t])] = Iteration(currentIteration.blockIdx, currentIteration.iter + 1)]
+\*         hasExistingBlock == \E DB \in DynamicNodeSet : DB.labelIdx = currentLabelIdx /\ CanMergeSameIterationVector(updatedThreadIterationVec, DB.children)
 \*         filterDynamicNode == {DB \in DynamicNodeSet : t \notin DB.currentThreadSet[wgid]}
 \*     IN
 \*         \* if we has existing block with the same iteration vector, we need to merge the current block with the existing block
 \*         IF hasExistingBlock THEN
 \*             {
-\*                 IF DB.labelIdx = currentLabelIdx /\ CanMergeSameIterationVector(updatedThreadIterationVec, DB.iterationVec)
+\*                 IF DB.labelIdx = currentLabelIdx /\ CanMergeSameIterationVector(updatedThreadIterationVec, DB.children)
 \*                 THEN
 \*                     DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
 \*                     [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
@@ -490,7 +503,7 @@ CanMergeSameIterationVector(curr, remaining) ==
 \*                     [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
 \*                     DB.labelIdx,
 \*                     \* [DB.mergeStack EXCEPT ![t] = updatedThreadMergeStack],
-\*                     [DB.iterationVec EXCEPT ![t] = updatedThreadIterationVec])
+\*                     [DB.children EXCEPT ![t] = updatedThreadIterationVec])
 \*                 ELSE 
 \*                     DB
 \*                 : DB \in filterDynamicNode
@@ -505,7 +518,7 @@ CanMergeSameIterationVector(curr, remaining) ==
 \*                         currentDB.unknownSet,
 \*                         currentLabelIdx,
 \*                         \* currentDB.mergeStack,
-\*                         [currentDB.iterationVec EXCEPT ![t] = updatedThreadIterationVec])
+\*                         [currentDB.children EXCEPT ![t] = updatedThreadIterationVec])
 \*             }
 \*         )
         \* {
@@ -516,7 +529,7 @@ CanMergeSameIterationVector(curr, remaining) ==
         \*                 currentDB.unknownSet,
         \*                 currentLabelIdx,
         \*                 \* currentDB.mergeStack,
-        \*                 [currentDB.iterationVec EXCEPT ![t] = updatedThreadIterationVec])
+        \*                 [currentDB.children EXCEPT ![t] = updatedThreadIterationVec])
             
         \*     ELSE 
         \*         DB
@@ -572,100 +585,153 @@ CanMergeSameIterationVector(curr, remaining) ==
         \* Increment the iteration number of last element of the iteration stack by one.
     \* 3. a purely merge block:
         \* remove self from the not execute set.
-BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
+BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
     LET
+        currentCounter == globalCounter
+        currentBranchOptions == Append(opLabelIdxVec, chosenBranchIdx)
         currentDB == CurrentDynamicNode(wgid, t)
-        falseLabelIdxSet == opLabelIdxSet \ {chosenBranchIdx}  
+        falseLabelIdxSet == SeqToSet(opLabelIdxVec) \ {chosenBranchIdx}  
         labelIdxSet == {DB.labelIdx : DB \in DynamicNodeSet}
         choosenBlock == FindBlockbyOpLabelIdx(Blocks, chosenBranchIdx)
         currentBlock == FindBlockbyOpLabelIdx(Blocks, currentDB.labelIdx)
-        currentIteration == FindIteration(currentDB.labelIdx, currentDB.iterationVec, t)
+        currentChildren == currentDB.children
+        currentMergeStack == currentDB.mergeStack
+        \* it determines if the current db has already created the dynamic block for branching
+        childrenContainsAllBranchDB == \A blockIdx \in currentBranchOptions:
+            \E  child \in currentChildren: child.blockIdx = blockIdx
+        \* currentIteration == FindIteration(currentDB.labelIdx, currentDB.children, t)
         \* if new iteration is created, we need to add it to the iteration vector
         \* otherwise we just need to increment the iteration number of top element of the iteration vector
-        updatedThreadIterationVec == IF currentIteration.iter = 0
-        THEN 
-            Push(currentDB.iterationVec, Iteration(currentDB.labelIdx, 1))
-        ELSE 
-            [currentDB.iterationVec EXCEPT ![Len(currentDB.iterationVec)] = Iteration(currentIteration.blockIdx, currentIteration.iter + 1)]
-        isLoopHeader == IsLoopHeaderBlock(currentBlock)
-        loopBranchIdx == IF isLoopHeader THEN
-            ThreadArguments[t][pc][1].value
-        ELSE
-            -1
+        \* updatedThreadIterationVec == IF currentIteration.iter = 0
+        \* THEN 
+        \*     Push(currentDB.children, Iteration(currentDB.labelIdx, 1))
+        \* ELSE 
+        \*     [currentDB.children EXCEPT ![Len(currentDB.children)] = Iteration(currentIteration.blockIdx, currentIteration.iter + 1)]
+        isHeaderBlock == IsHeaderBlock(currentBlock)
+        isMergeBlock == IsMergeBlock(currentBlock.opLabelIdx)
+        \* check if current header block already has a merge block
+        mergeStackContainsCurrent == isHeaderBlock /\ Len(currentMergeStack) # 0 /\ currentMergeStack[Len(currentMergeStack)].blockIdx = currentBlock.mergeBlock
+        \* update the children if firstly reach the divergence
+        \* otherwise keep as it is
+        updatedChildren == 
+            IF childrenContainsAllBranchDB THEN
+                currentChildren
+            ELSE
+                currentChildren \union {i \in 1..Len(currentBranchOptions):  UniqueBlockId(currentBranchOptions[i], currentCounter + i)}
+        \* We only update the merge stack if the current block is a header block and if firstly reach the divergence
+        updatedMergeStack == 
+            IF mergeStackContainsCurrent \/  isHeaderBlock = FALSE THEN 
+                currentMergeStack
+            ELSE
+                Push(currentMergeStack, UniqueBlockId(currentBlock.mergeBlock, currentCounter + 1 + Cardinality(updatedChildren) - Cardinality(currentChildren)))
+        \* globalCounter is only updated when we firstly reach the divergence
+        updatedCounter == currentCounter + Cardinality(updatedChildren) - Cardinality(currentChildren) + Len(updatedMergeStack) - Len(currentMergeStack)
+        \* isLoopHeader == IsLoopHeaderBlock(currentBlock)
+        \* loopBranchIdx == IF isLoopHeader THEN
+        \*     ThreadArguments[t][pc][1].value
+        \* ELSE
+        \*     -1
+        
+        mergeBlock == currentBlock.mergeBlock
         \* exsiting dynamic blocks for false labels
-        newFalseLabelIdxSet == {
+        \* zheyuan: update this
+        existingFalseLabelIdxSet == {
             falselabelIdx \in falseLabelIdxSet: 
-                (\E DB \in DynamicNodeSet: DB.labelIdx = falselabelIdx /\
-                    (\/ (SameIterationVector(DB.iterationVec, currentDB.iterationVec) /\ IsMergeBlockOfLoop(DB.labelIdx) = FALSE /\ DB.labelIdx # loopBranchIdx)
-                    \/  (IsMergeBlockOfLoop(DB.labelIdx) /\ DB.labelIdx # loopBranchIdx /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
-                    \/  (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec)))
-                )
+                \E DB \in DynamicNodeSet: DB.labelIdx = falselabelIdx /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id
+                
         }
         \* we want to update the blocks in loop construct as well as the continue target
-        loopConstructUpdate == 
-            IF IsMergeBlockOfLoop(chosenBranchIdx) THEN
-                LET loopConstruct == BlocksInSameLoopConstruct(currentDB.iterationVec[Len(currentDB.iterationVec)].blockIdx, chosenBranchIdx)
+        \* loopConstructUpdate == 
+        \*     IF IsMergeBlockOfLoop(chosenBranchIdx) THEN
+        \*         LET loopConstruct == BlocksInSameLoopConstruct(currentDB.mergeStack[Len(currentDB.mergeStack)].blockIdx, chosenBranchIdx)
+        \*         IN
+        \*             loopConstruct.blocks \union {loopConstruct.continueTarget}
+        \*     ELSE
+        \*         {}
+        \* we want to update the blocks in construct if choosen block is merge block
+        constructUpdate == 
+            IF IsMergeBlock(chosenBranchIdx) THEN
+                LET construct == BlocksInSameConstruct(currentDB.mergeStack[Len(currentDB.mergeStack)].blockIdx, chosenBranchIdx)
                 IN
-                    loopConstruct.blocks \union {loopConstruct.continueTarget}
+                    construct.blocks \union {construct.continueTarget}
             ELSE
                 {}
-        \* thi is set of all threads that are not terminated and still in the current construct
+        \* this is set of all threads that are not terminated and still in the current construct
         unionSet == 
             [wg \in 1..NumWorkGroups |-> currentDB.currentThreadSet[wg] \union currentDB.executeSet[wg] \union currentDB.notExecuteSet[wg] \union currentDB.unknownSet[wg]]
     IN  
         \* update the existing dynamic blocks
         {
-            \* if the loopConstructUpdate is not empty, it means we are exiting the loop, all the dynamic blocks in same iteration within that loop construct should be properly updated
-            \* remove current thread from all set as it is not partcipating in the loop anymore for current iteration
-            IF DB.labelIdx \in loopConstructUpdate /\ SameIterationVector(Pop(DB.iterationVec), Pop(currentDB.iterationVec)) THEN
+            \* if the constructUpdate is not empty, it means we are exiting a construct, all the dynamic blocks in that construct should be properly updated
+            \* remove current thread from all set as it is not partcipating in the construct anymore
+            IF DB.labelIdx \in constructUpdate /\ SameMergeStack(Pop(DB.mergeStack), Pop(updatedMergeStack)) THEN
                 DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
                     [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \ {t}],
                     [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \ {t}],
                     [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
                     DB.labelIdx,
-                    DB.iterationVec)
+                    DB.id,
+                    DB.mergeStack,
+                    DB.children)
             \* if encounter current dynamic block
-            ELSE IF DB.labelIdx = currentDB.labelIdx /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec) THEN
+            ELSE IF DB.labelIdx = currentDB.labelIdx /\ DB.id = currentDB.id THEN
                 DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
                     DB.executeSet,
                     DB.notExecuteSet,
                     DB.unknownSet,
                     DB.labelIdx,
-                    DB.iterationVec)
+                    DB.id,
+                    DB.mergeStack,
+                    DB.children)
 
             \* if encounter choosen dynamic block
-            ELSE IF DB.labelIdx = chosenBranchIdx THEN
-                \*merge block of a loop header (exit the loop)
-                IF  IsMergeBlockOfLoop(chosenBranchIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)) THEN 
-                    DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
-                        [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
-                        DB.notExecuteSet,
-                        [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
-                        DB.labelIdx,
-                        DB.iterationVec)
-                \* if the choosen branch index is the branch to the loop body
-                ELSE IF DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec) THEN
-                    DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
-                        [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
-                        DB.notExecuteSet,
-                        [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
-                        DB.labelIdx,
-                        DB.iterationVec)
-                ELSE IF IsMergeBlockOfLoop(DB.labelIdx) = FALSE /\ DB.labelIdx # loopBranchIdx /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec) THEN 
-                    DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
-                        [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
-                        DB.notExecuteSet,
-                        [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
-                        DB.labelIdx,
-                        DB.iterationVec)
+            ELSE IF DB.labelIdx = chosenBranchIdx /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id THEN
+                DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
+                    [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
+                    DB.notExecuteSet,
+                    [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                    DB.labelIdx,
+                    DB.id,
+                    DB.mergeStack,
+                    DB.children)
+                \* IF  IsMergeBlock(chosenBranchIdx) /\ SameMergeStack(DB.mergeStack, Pop(updatedMergeStack)) THEN 
+                \*     DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
+                \*         [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
+                \*         DB.notExecuteSet,
+                \*         [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                \*         DB.labelIdx,
+                \*         DB.id,
+                \*         DB.mergeStack,
+                \*         DB.children)
+                \* \* if the choosen branch index is the header of a construct
+                \* \* zheyuan: has problem here
+                \* ELSE IF IsConstructHeaderBlock(DB.labelIdx) /\ SameMergeStack(DB.mergeStack, updatedMergeStack) THEN
+                \*     DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
+                \*         [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
+                \*         DB.notExecuteSet,
+                \*         [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                \*         DB.labelIdx,
+                \*         DB.id,
+                \*         DB.mergeStack,
+                \*         DB.children)
+                \* ELSE IF IsMergeBlock(DB.labelIdx) = FALSE /\ SameMergeStack(DB.mergeStack, updatedMergeStack) THEN 
+                \*     DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
+                \*         [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
+                \*         DB.notExecuteSet,
+                \*         [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                \*         DB.labelIdx,
+                \*         DB.id,
+                \*         DB.mergeStack,
+                \*         DB.children)
                 ELSE
                     DB
             \* Encounter the block that is not choosen by the branch instruction
             \* we don't update the existing set for merge block as threads will eventually reach there unless they terminate early
             ELSE IF DB.labelIdx \in falseLabelIdxSet
                 /\ IsMergeBlock(DB.labelIdx) = FALSE
-                /\ (\/ (SameIterationVector(DB.iterationVec, currentDB.iterationVec) /\ DB.labelIdx # loopBranchIdx)
-                    \/  (DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec)))
+                /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id
+                \* /\ (\/ (SameMergeStack(DB.mergeStack, currentDB.mergeStack))
+                \*     \/  ( SameMergeStack(DB.mergeStack, updatedMergeStack)))
             
             THEN
                 DynamicNode(DB.currentThreadSet,
@@ -673,7 +739,9 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
                     [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \union {t}],
                     [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
                     DB.labelIdx,
-                    DB.iterationVec)
+                    DB.id,
+                    DB.mergeStack,
+                    DB.children)
             
             ELSE
                 DB
@@ -683,23 +751,25 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
         \union
         (
             IF \E DB \in DynamicNodeSet: 
-                \/  (DB.labelIdx = chosenBranchIdx /\ IsMergeBlockOfLoop(chosenBranchIdx) = FALSE /\ DB.labelIdx # loopBranchIdx /\ SameIterationVector(DB.iterationVec, currentDB.iterationVec)) 
-                \/  (DB.labelIdx = chosenBranchIdx /\ IsMergeBlockOfLoop(chosenBranchIdx) /\ SameIterationVector(DB.iterationVec, Pop(currentDB.iterationVec)))
-                \/  (DB.labelIdx = chosenBranchIdx /\ DB.labelIdx = loopBranchIdx /\ SameIterationVector(DB.iterationVec, updatedThreadIterationVec))
+                DB.labelIdx = chosenBranchIdx /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id
             THEN 
                 {} 
             ELSE
-                \* zheyuan: is this even possible to happen? loopConstructUpdate is non-empty only if we choose to exit the loop, try to test it
-                IF chosenBranchIdx \in loopConstructUpdate THEN
+                \* zheyuan: is this even possible to happen? constructUpdate is non-empty only if we choose to exit the construct, try to test it
+                IF chosenBranchIdx \in construct THEN
                     {DynamicNode([wg \in 1..NumWorkGroups |-> {}],
                                 [wg \in 1..NumWorkGroups |-> {}],
                                 [wg \in 1..NumWorkGroups |-> {}],
                                 [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
                                 chosenBranchIdx,
-                                currentDB.iterationVec)
+                                LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
+                                IN
+                                    child.id,
+                                updatedMergeStack,
+                                {})
                     }
-                \* if the choosen block is a merge block of a loop, we need to pop the iteration vector of current thread from the iteration vector of that DB
-                ELSE IF IsMergeBlockOfLoop(chosenBranchIdx) THEN 
+                \* if the choosen block is a merge block , we need to pop the merge stack of current DB.
+                ELSE IF IsMergeBlock(chosenBranchIdx) THEN 
                     {
                         DynamicNode([wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
                                     [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
@@ -707,22 +777,30 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
                                     \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
                                     [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
                                     chosenBranchIdx,
-                                    Pop(currentDB.iterationVec)
+                                    LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
+                                    IN
+                                        child.id,
+                                    Pop(updatedMergeStack),
+                                    {}
                                     )
                     }
                 \* if the chosen block is a new block for loop body, we need to update the iteration vector. 
                 \* we can only go to the loop branch at loop header block, hence if a thread is not executing the loop header block, it will also not be executing the loop body
-                ELSE IF chosenBranchIdx = loopBranchIdx THEN
-                    {
-                        DynamicNode([wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
-                                    [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
-                                    \* zheyuan: do we need to update the notExecuteSet here? or just leave it blank
-                                    [currentDB.notExecuteSet EXCEPT ![wgid] = currentDB.notExecuteSet[wgid] \ {t}],
-                                    \* [currentDB.unknownSet EXCEPT ![wgid] = currentDB.unknownSet[wgid] \ {t}],
-                                    [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
-                                    chosenBranchIdx,
-                                    updatedThreadIterationVec)
-                    }
+                \* ELSE IF chosenBranchIdx = loopBranchIdx THEN
+                \*     {
+                \*         DynamicNode([wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+                \*                     [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+                \*                     \* zheyuan: do we need to update the notExecuteSet here? or just leave it blank
+                \*                     [currentDB.notExecuteSet EXCEPT ![wgid] = currentDB.notExecuteSet[wgid] \ {t}],
+                \*                     \* [currentDB.unknownSet EXCEPT ![wgid] = currentDB.unknownSet[wgid] \ {t}],
+                \*                     [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+                \*                     chosenBranchIdx,
+                \*                     LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
+                \*                     IN
+                \*                         child.id,
+                \*                     updatedMergeStack,
+                \*                     {})
+                \*     }
                 ELSE
                     {
                         DynamicNode([wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
@@ -731,23 +809,31 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
                                     \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
                                     [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
                                     chosenBranchIdx,
-                                    currentDB.iterationVec)
+                                    LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
+                                    IN
+                                        child.id,
+                                    updatedMergeStack,
+                                    {})
                     }
         )
         \* union with the new false branch DB if does not exist
         \union
         (
         {   
-            \* thread is exiting the loop, we also need to create a new dynamic block for false label and remove current thread from all sets of new block.
-            IF falselabelIdx \in loopConstructUpdate THEN 
+            \* thread is exiting the construct, we also need to create a new dynamic block for false label and remove current thread from all sets of new block.
+            IF falselabelIdx \in constructUpdate THEN 
                 DynamicNode([wg \in 1..NumWorkGroups |-> {}],
                             [wg \in 1..NumWorkGroups |-> {}],
                             [wg \in 1..NumWorkGroups |-> {}],
                             [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
                             falselabelIdx,
-                            currentDB.iterationVec)
+                            LET child == CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
+                            IN
+                                child.id,
+                            updatedMergeStack,
+                            {})
         
-            ELSE IF IsMergeBlockOfLoop(falselabelIdx) THEN 
+            ELSE IF IsMergeBlock(falselabelIdx) = TRUE THEN 
                 DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
                             [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
                             \* We don't know if the threads executed in precedessor DB will execute the block or not
@@ -756,29 +842,33 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
                             \* [wg \in 1..NumWorkGroups |->  ThreadsWithinWorkGroupNonTerminated(wg-1)],
                             [wg \in 1..NumWorkGroups |-> unionSet[wg]],
                             falselabelIdx,
-                            Pop(currentDB.iterationVec))
-            ELSE IF IsMergeBlock(falselabelIdx) = TRUE THEN 
-                DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
-                            [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
-                            \* current thread is not executed in the false block, but we don't know if the threads executed in precedessor DB will execute the block or not
-                            [wg \in 1..NumWorkGroups |-> {}],
-                            \* we don't know if the threads executed in precedessor DB will execute the block or not
-                            \* [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroupNonTerminated(wg-1)],
-                            [wg \in 1..NumWorkGroups |-> unionSet[wg]],
-                            falselabelIdx,
-                            currentDB.iterationVec)
+                            LET child == CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
+                            IN
+                                child.id,
+                            Pop(updatedMergeStack),
+                            {})
+            \* ELSE IF IsMergeBlock(falselabelIdx) = TRUE THEN 
+            \*     DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
+            \*                 [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
+            \*                 \* current thread is not executed in the false block, but we don't know if the threads executed in precedessor DB will execute the block or not
+            \*                 [wg \in 1..NumWorkGroups |-> {}],
+            \*                 \* we don't know if the threads executed in precedessor DB will execute the block or not
+            \*                 \* [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroupNonTerminated(wg-1)],
+            \*                 [wg \in 1..NumWorkGroups |-> unionSet[wg]],
+            \*                 falselabelIdx,
+            \*                 currentDB.children)
             \* if the unchosen chosen block is a new block for loop body, we need to update the iteration vector. 
             \* we can only go to the loop branch at loop header block, hence if a thread is not executing the loop header block, it will also not be executing the loop body
-            ELSE IF falselabelIdx = loopBranchIdx THEN
-                DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
-                            [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
-                            \* current thread is not executed in the false block, but we don't know if the threads executed in precedessor DB will execute the block or not
-                            [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
-                            \* we don't know if the threads executed in precedessor DB will execute the block or not
-                            \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
-                            [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
-                            falselabelIdx,
-                            updatedThreadIterationVec)
+            \* ELSE IF falselabelIdx = loopBranchIdx THEN
+            \*     DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
+            \*                 [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
+            \*                 \* current thread is not executed in the false block, but we don't know if the threads executed in precedessor DB will execute the block or not
+            \*                 [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+            \*                 \* we don't know if the threads executed in precedessor DB will execute the block or not
+            \*                 \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
+            \*                 [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+            \*                 falselabelIdx,
+            \*                 updatedThreadIterationVec)
             ELSE 
                 DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
                             [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
@@ -788,8 +878,12 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx) ==
                             \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
                             [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
                             falselabelIdx,
-                            currentDB.iterationVec)
-            : falselabelIdx \in (falseLabelIdxSet \ newFalseLabelIdxSet)
+                            CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
+                            IN
+                                child.id,
+                            updatedMergeStack,
+                            {})
+            : falselabelIdx \in (falseLabelIdxSet \ existingFalseLabelIdxSet)
         }
         )
 
@@ -800,11 +894,17 @@ TerminateUpdate(wgid, t) ==
             [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \ {t}],
             [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
             DB.labelIdx,
-            DB.iterationVec)
+            DB.id,
+            DB.mergeStack,
+            DB.children)
         : DB \in DynamicNodeSet
     }
 
 (* Global Variables *)
+
+
+InitGlobalCounter ==
+    globalCounter = 0
 
 InitProgram ==
     /\ InitDB

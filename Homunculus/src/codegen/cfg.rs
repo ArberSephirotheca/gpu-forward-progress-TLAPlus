@@ -261,6 +261,18 @@ impl Display for CFG {
             }
         }
         writeln!(f, ">>")?;
+
+        // write blocks
+        writeln!(f, "MergeBlocks == {{")?;
+        for (idx, block) in self.nodes.iter().filter(|n| n.merge == true).enumerate() {
+            write!(f, "{}", block.op_label_idx)?;
+            if idx != self.nodes.len() - 1 {
+                writeln!(f, ",")?;
+            } else {
+                writeln!(f, "")?;
+            }
+        }
+        writeln!(f, "}}")?;
         Ok(())
     }
 }

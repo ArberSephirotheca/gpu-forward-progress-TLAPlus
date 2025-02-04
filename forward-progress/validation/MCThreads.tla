@@ -1379,7 +1379,7 @@ OpBranch(t, label) ==
             workGroupId == WorkGroupId(t)+1
             newPc == [pc EXCEPT ![t] = GetVal(-1, label)]
         IN
-            LET newDBSet == BranchUpdate(workGroupId, t, pc[t], {labelVal}, labelVal)
+            LET newDBSet == BranchUpdate(workGroupId, t, pc[t], <<labelVal>>, labelVal)
                 newState == StateUpdate(workGroupId, t, newDBSet)
                 newSnapShotMap == SnapShotUpdate(newDBSet, newState, t, newPc)
             IN 
@@ -1407,7 +1407,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
 
         IN
             IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
-                /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], {trueLabelVal, falseLabelVal}, trueLabelVal)
+                /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], <<trueLabelVal, falseLabelVal>>, trueLabelVal)
                         newState == StateUpdate(workGroupId, t, newDBSet)
                         newPc == [pc EXCEPT ![t] = trueLabelVal]
                         newSnapShotMap == SnapShotUpdate(newDBSet, newState, t, newPc)
@@ -1424,7 +1424,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
                             /\ pc' = newPc
                             /\ UNCHANGED <<threadLocals, globalVars, snapShotMap>>
             ELSE
-                /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], {trueLabelVal, falseLabelVal}, falseLabelVal)
+                /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], <<trueLabelVal, falseLabelVal>>, falseLabelVal)
                         newState == StateUpdate(workGroupId, t, newDBSet)
                         newPc == [pc EXCEPT ![t] = falseLabelVal]
                         newSnapShotMap == SnapShotUpdate(newDBSet, newState, t, newPc)
@@ -1445,6 +1445,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
 
     
 \* zheyuan: need more tests
+\* need to update it
 OpSwitch(t, selector, default, literals, ids) ==
     /\  LET defaultVal == GetVal(-1, default)
             literalsVal == [idx \in 1..Len(literals) |-> GetVal(-1, literals[idx])]
@@ -1455,7 +1456,7 @@ OpSwitch(t, selector, default, literals, ids) ==
                 LET val == EvalExpr(t, WorkGroupId(t)+1, selector)
                     index == CHOOSE i \in 1..Len(literalsVal): literalsVal[i] = val 
                 IN
-                    /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], SeqToSet(idsVal), idsVal[index])
+                    /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], idsVal, idsVal[index])
                             newState == StateUpdate(workGroupId, t, newDBSet)
                             newPc == [pc EXCEPT ![t] = idsVal[index]]
                             newSnapShotMap == SnapShotUpdate(newDBSet, newState, t, newPc)
@@ -1468,7 +1469,7 @@ OpSwitch(t, selector, default, literals, ids) ==
                             ELSE 
                                 /\  UNCHANGED <<pc, state, threadLocals, globalVars, DynamicNodeSet, snapShotMap>>
             ELSE
-                /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], SeqToSet(idsVal), defaultVal)
+                /\  LET newDBSet == BranchUpdate(workGroupId, t, pc[t], idsVal, defaultVal)
                         newState == StateUpdate(workGroupId, t, newDBSet)
                         newPc == [pc EXCEPT ![t] = defaultVal]
                         newSnapShotMap == SnapShotUpdate(newDBSet, newState, t, newPc)
