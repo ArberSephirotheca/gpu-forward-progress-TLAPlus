@@ -422,16 +422,13 @@ IsBlockWithinLoop(blockIdx) ==
         /\ \E c \in matchingConstructs : c.constructType = "Loop" 
 
 \* This function is useful because it helps to determine the blocks that are being affeced by the change of tangle of current block
-BlocksInSameConstruct(headerIdx, mergeIdx) ==
-    CHOOSE  construct \in ControlFlowConstructs : construct.headerBlock = headerIdx /\ construct.mergeBlock = mergeIdx
+BlocksInSameConstruct(mergeIdx) ==
+    CHOOSE  construct \in ControlFlowConstructs : construct.mergeBlock = mergeIdx
 
 
 UniqueBlockId(blockIdx, counter) ==
     [blockIdx |-> blockIdx,
      counter |-> counter]
-
-ContainsSameMergeBlock(exitDB, other) ==
-    CHOOSE 
     
     
 Iteration(blockIdx, iter) == 
@@ -597,8 +594,8 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
         currentChildren == currentDB.children
         currentMergeStack == currentDB.mergeStack
         \* it determines if the current db has already created the dynamic block for branching
-        childrenContainsAllBranchDB == \A blockIdx \in currentBranchOptions:
-            \E  child \in currentChildren: child.blockIdx = blockIdx
+        childrenContainsAllBranchDB == \A i \in 1..Len(currentBranchOptions):
+            \E  child \in currentChildren: child.blockIdx = currentBranchOptions[i]
         \* currentIteration == FindIteration(currentDB.labelIdx, currentDB.children, t)
         \* if new iteration is created, we need to add it to the iteration vector
         \* otherwise we just need to increment the iteration number of top element of the iteration vector
@@ -611,19 +608,32 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
         isMergeBlock == IsMergeBlock(currentBlock.opLabelIdx)
         \* check if current header block already has a merge block
         mergeStackContainsCurrent == isHeaderBlock /\ Len(currentMergeStack) # 0 /\ currentMergeStack[Len(currentMergeStack)].blockIdx = currentBlock.mergeBlock
+        updatedMergeStack == 
+            IF mergeStackContainsCurrent \/ isHeaderBlock = FALSE THEN 
+                currentMergeStack
+            ELSE
+                Push(currentMergeStack, UniqueBlockId(currentBlock.mergeBlock, currentCounter + 1))
         \* update the children if firstly reach the divergence
         \* otherwise keep as it is
+        counterAfterMergeStack == 
+            IF isHeaderBlock /\ mergeStackContainsCurrent THEN
+                currentCounter
+            ELSE
+                currentCounter + 1
         updatedChildren == 
             IF childrenContainsAllBranchDB THEN
                 currentChildren
             ELSE
-                currentChildren \union {i \in 1..Len(currentBranchOptions):  UniqueBlockId(currentBranchOptions[i], currentCounter + i)}
+                currentChildren \union 
+                {
+                    IF IsMergeBlock(currentBranchOptions[i]) /\ updatedMergeStack[Len(updatedMergeStack)].blockIdx = currentBranchOptions[i]
+                    THEN 
+                        UniqueBlockId(currentBranchOptions[i], updatedMergeStack[Len(updatedMergeStack)].counter)
+                    ELSE
+                        UniqueBlockId(currentBranchOptions[i], counterAfterMergeStack + i)
+                    : i \in 1..Len(currentBranchOptions)
+                }
         \* We only update the merge stack if the current block is a header block and if firstly reach the divergence
-        updatedMergeStack == 
-            IF mergeStackContainsCurrent \/  isHeaderBlock = FALSE THEN 
-                currentMergeStack
-            ELSE
-                Push(currentMergeStack, UniqueBlockId(currentBlock.mergeBlock, currentCounter + 1 + Cardinality(updatedChildren) - Cardinality(currentChildren)))
         \* globalCounter is only updated when we firstly reach the divergence
         updatedCounter == currentCounter + Cardinality(updatedChildren) - Cardinality(currentChildren) + Len(updatedMergeStack) - Len(currentMergeStack)
         \* isLoopHeader == IsLoopHeaderBlock(currentBlock)
@@ -651,7 +661,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
         \* we want to update the blocks in construct if choosen block is merge block
         constructUpdate == 
             IF IsMergeBlock(chosenBranchIdx) THEN
-                LET construct == BlocksInSameConstruct(currentDB.mergeStack[Len(currentDB.mergeStack)].blockIdx, chosenBranchIdx)
+                LET construct == BlocksInSameConstruct(chosenBranchIdx)
                 IN
                     construct.blocks \union {construct.continueTarget}
             ELSE
@@ -659,7 +669,8 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
         \* this is set of all threads that are not terminated and still in the current construct
         unionSet == 
             [wg \in 1..NumWorkGroups |-> currentDB.currentThreadSet[wg] \union currentDB.executeSet[wg] \union currentDB.notExecuteSet[wg] \union currentDB.unknownSet[wg]]
-    IN  
+    IN
+        << updatedCounter, 
         \* update the existing dynamic blocks
         {
             \* if the constructUpdate is not empty, it means we are exiting a construct, all the dynamic blocks in that construct should be properly updated
@@ -685,7 +696,11 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                     DB.children)
 
             \* if encounter choosen dynamic block
-            ELSE IF DB.labelIdx = chosenBranchIdx /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id THEN
+            \* whether its in current DB's children or on the top of the merge stack, we update it
+            ELSE IF DB.labelIdx = chosenBranchIdx 
+                    \* /\ ((IsMergeBlock(chosenBranchIdx) /\ updatedMergeStack[Len(updatedMergeStack)].blockIdx = DB.labelIdx /\ updatedMergeStack[Len(updatedMergeStack)].counter = DB.id) 
+                    /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id
+            THEN
                 DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
                     [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
                     DB.notExecuteSet,
@@ -723,8 +738,8 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                 \*         DB.id,
                 \*         DB.mergeStack,
                 \*         DB.children)
-                ELSE
-                    DB
+                \* ELSE
+                \*     DB
             \* Encounter the block that is not choosen by the branch instruction
             \* we don't update the existing set for merge block as threads will eventually reach there unless they terminate early
             ELSE IF DB.labelIdx \in falseLabelIdxSet
@@ -756,7 +771,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                 {} 
             ELSE
                 \* zheyuan: is this even possible to happen? constructUpdate is non-empty only if we choose to exit the construct, try to test it
-                IF chosenBranchIdx \in construct THEN
+                IF chosenBranchIdx \in constructUpdate THEN
                     {DynamicNode([wg \in 1..NumWorkGroups |-> {}],
                                 [wg \in 1..NumWorkGroups |-> {}],
                                 [wg \in 1..NumWorkGroups |-> {}],
@@ -764,7 +779,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                                 chosenBranchIdx,
                                 LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
                                 IN
-                                    child.id,
+                                    child.counter,
                                 updatedMergeStack,
                                 {})
                     }
@@ -779,7 +794,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                                     chosenBranchIdx,
                                     LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
                                     IN
-                                        child.id,
+                                        child.counter,
                                     Pop(updatedMergeStack),
                                     {}
                                     )
@@ -797,7 +812,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                 \*                     chosenBranchIdx,
                 \*                     LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
                 \*                     IN
-                \*                         child.id,
+                \*                         child.counter,
                 \*                     updatedMergeStack,
                 \*                     {})
                 \*     }
@@ -811,7 +826,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                                     chosenBranchIdx,
                                     LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
                                     IN
-                                        child.id,
+                                        child.counter,
                                     updatedMergeStack,
                                     {})
                     }
@@ -829,10 +844,10 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                             falselabelIdx,
                             LET child == CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
                             IN
-                                child.id,
+                                child.counter,
                             updatedMergeStack,
                             {})
-        
+            \* if new false branch is merge block, we need to pop the merge stack of current DB.
             ELSE IF IsMergeBlock(falselabelIdx) = TRUE THEN 
                 DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
                             [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
@@ -844,7 +859,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                             falselabelIdx,
                             LET child == CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
                             IN
-                                child.id,
+                                child.counter,
                             Pop(updatedMergeStack),
                             {})
             \* ELSE IF IsMergeBlock(falselabelIdx) = TRUE THEN 
@@ -878,14 +893,14 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                             \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
                             [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
                             falselabelIdx,
-                            CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
+                            LET child == CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
                             IN
-                                child.id,
+                                child.counter,
                             updatedMergeStack,
                             {})
             : falselabelIdx \in (falseLabelIdxSet \ existingFalseLabelIdxSet)
         }
-        )
+        )>>
 
 TerminateUpdate(wgid, t) ==
     {

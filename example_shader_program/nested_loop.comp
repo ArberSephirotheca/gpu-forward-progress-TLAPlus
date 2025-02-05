@@ -3,9 +3,9 @@
 #extension GL_KHR_memory_scope_semantics : enable
 #extension GL_KHR_shader_subgroup_vote : enable
 #extension GL_KHR_shader_subgroup_basic : enable
-layout(local_size_x = 2) in;
-layout(tla_subgroup_size = 2) in;
-layout(tla_num_workgroups = 2) in;
+layout(local_size_x = 4) in;
+layout(tla_subgroup_size = 4) in;
+layout(tla_num_workgroups = 1) in;
 
 
 layout(std430, binding = 0) buffer Lock {
@@ -14,24 +14,15 @@ layout(std430, binding = 0) buffer Lock {
 
 void main() {
     uint tid = gl_GlobalInvocationID.x;
-    
-    // Outer loop
-    for (int i = 0; i < 3; i++) {
-        // Some threads might skip the inner loop
-        if ((tid + i) % 2 == 0) {
-            for (int j = 0; j < 2; j++) {
-                // Possibly do some subgroup operation
-                subgroupAdd(i + j);
-                // Barrier inside the inner loop
-                barrier();
+
+    for (int outer = 0; outer < 2; outer++) {
+        for (int inner = 0; inner < 3; inner++) {
+            bool cond = (tid == (outer + inner));
+            bool allSame = subgroupAll(cond);
+
+            if (allSame) {
             }
-        } else {
-            // Barrier in the outer loop
-            barrier();
         }
-        // Another barrier after the inner loop
-        barrier();
     }
-    // Check final concurrency 
-    subgroupAll(true);
+    // Tangle usage: reconvergence each time subgroupAll is called
 }

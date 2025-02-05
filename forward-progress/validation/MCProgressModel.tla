@@ -3,7 +3,7 @@ EXTENDS Integers, Naturals, Sequences, MCThreads, TLC, FiniteSets
 
 VARIABLES fairExecutionSet, selected, runningThread
 
-vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicNodeSet, globalCounter>>
+vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicNodeSet>>
 
 
 InitState ==
@@ -72,27 +72,27 @@ IterationNotExceedsBound ==
         LET iterationStack == DB.iterationVec IN
             \A i \in 1..Len(iterationStack): iterationStack[i].iter <= 4
 
-IterationReachGC ==
-    \A DB \in DynamicNodeSet:
-        LET iterationStack == DB.iterationVec IN
-            \A i \in 1..Len(iterationStack): iterationStack[i].iter <= 2
-GarbageCollect ==
-    /\ IterationReachGC = FALSE
-    /\ LET SetMin(S) == CHOOSE s \in S : \A t \in S : s.iter <= t.iter IN 
-         LET Transpose == SetMin( {node.iterationVec[Len(node.iterationVec)] : node \in {DB \in DynamicNodeSet: Len(DB.iterationVec) > 0}}).iter - 1 IN
-            /\ DynamicNodeSet' = {
-                  DynamicNode(DB.currentThreadSet,
-                    DB.executeSet,
-                    DB.notExecuteSet,
-                    DB.unknownSet,
-                    DB.labelIdx,
-                    IF Len(DB.iterationVec) = 0 THEN 
-                        DB.iterationVec 
-                    ELSE 
-                        [DB.iterationVec EXCEPT ![Len(DB.iterationVec)] = Iteration(DB.iterationVec[Len(DB.iterationVec)].blockIdx, DB.iterationVec[Len(DB.iterationVec)].iter - Transpose)])
-                : DB \in DynamicNodeSet
-                }
-            /\ UNCHANGED <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars>>
+\* IterationReachGC ==
+\*     \A DB \in DynamicNodeSet:
+\*         LET iterationStack == DB.iterationVec IN
+\*             \A i \in 1..Len(iterationStack): iterationStack[i].iter <= 2
+\* GarbageCollect ==
+\*     /\ IterationReachGC = FALSE
+\*     /\ LET SetMin(S) == CHOOSE s \in S : \A t \in S : s.iter <= t.iter IN 
+\*          LET Transpose == SetMin( {node.iterationVec[Len(node.iterationVec)] : node \in {DB \in DynamicNodeSet: Len(DB.iterationVec) > 0}}).iter - 1 IN
+\*             /\ DynamicNodeSet' = {
+\*                   DynamicNode(DB.currentThreadSet,
+\*                     DB.executeSet,
+\*                     DB.notExecuteSet,
+\*                     DB.unknownSet,
+\*                     DB.labelIdx,
+\*                     IF Len(DB.iterationVec) = 0 THEN 
+\*                         DB.iterationVec 
+\*                     ELSE 
+\*                         [DB.iterationVec EXCEPT ![Len(DB.iterationVec)] = Iteration(DB.iterationVec[Len(DB.iterationVec)].blockIdx, DB.iterationVec[Len(DB.iterationVec)].iter - Transpose)])
+\*                 : DB \in DynamicNodeSet
+\*                 }
+\*             /\ UNCHANGED <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars>>
 
 
 \* IterationNotExceedBound(t, wgid) ==
@@ -139,12 +139,16 @@ Step ==
             ELSE
                 /\ UNCHANGED vars
                 /\ UNCHANGED snapShotMap
+                /\ UNCHANGED globalCounter
 \* Deadlock means reaching a state in which Next is not enabled.
 Next ==
     Step
     \* \* \/ Converge
     \* \/ GarbageCollect
 
+ViewFunction == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicNodeSet>>
+
+(* Fairness properties *)
 
 Fairness ==
     /\  <>[](ENABLED <<Step>>_vars) => ([]<><<Step>>_vars /\ PickAnyWorkGroupInFairExecutionSet)

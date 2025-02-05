@@ -474,7 +474,7 @@ impl Program {
         let empty_seq_per_thread = vec!["<<>>"; self.num_threads as usize].join(", ");
         writeln!(
             writer,
-            "DynamicNode(<<{}>>, <<{}>>, <<{}>>, <<{}>>, {}, 0)",
+            "DynamicNode(<<{}>>, <<{}>>, <<{}>>, <<{}>>, {}, 0, <<>>, {{}})",
             current_threads, current_threads, empty_set_per_wg, empty_set_per_wg, node.op_label_idx
         )?;
 

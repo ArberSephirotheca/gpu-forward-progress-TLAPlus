@@ -1,0 +1,27 @@
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_KHR_shader_subgroup_vote : enable
+layout(std430, binding = 0) buffer LAGBuf {
+    uint lowestActiveGroup;
+};
+
+void main() {
+    uint gid = gl_WorkGroupID.x;
+    uint tid = gl_LocalInvocationID.x;
+    bool done = false;
+
+    do {
+        if (!done) {
+            uint lag = atomicLoad(lowestActiveGroup, 4, 0, 0);
+            if (lag == gid) {
+                if ((tid % 2) == 0) {
+                    subgroupAll(true);
+                }
+                // done
+                done = true;
+                // set next lowest group
+                atomicStore(lowestActiveGroup, lag + 1, 4, 0, 0);
+            }
+        }
+    } while (!subgroupAll(done));
+}
