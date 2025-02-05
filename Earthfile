@@ -63,12 +63,12 @@ tlaplus-image:
         SAVE ARTIFACT spirv-asm.txt AS LOCAL ./build/
         RUN Homunculus/target/release/homunculus ./spirv-asm.txt 
         IF [ "$OUT" = "text" ]
-            RUN tlc forward-progress/validation/MCProgressModel  > output.txt 2>&1 || true
+            RUN tlc forward-progress/validation/MCProgressModel -view -workers 10 > output.txt 2>&1 || true
         ELSE IF [ "$OUT" = "dot" ]
-            RUN tlc forward-progress/validation/MCProgressModel  -dump dot output.dot 2>&1 || true 
+            RUN tlc forward-progress/validation/MCProgressModel  -view -dump dot output.dot 2>&1 || true 
         ELSE IF [ "$OUT" = "all" ]
-            RUN tlc forward-progress/validation/MCProgressModel -workers 10 -dump dot output.dot 2>&1 || true 
-            RUN tlc forward-progress/validation/MCProgressModel -workers 10 > output.txt 2>&1 || true
+            RUN tlc forward-progress/validation/MCProgressModel -view -workers 10 -dump dot output.dot 2>&1 || true 
+            RUN tlc forward-progress/validation/MCProgressModel -view -workers 10 > output.txt 2>&1 || true
         ELSE
             RUN echo "Invalid output format"
         END

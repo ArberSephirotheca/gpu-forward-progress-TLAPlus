@@ -1,0 +1,22 @@
+#version 450
+layout(local_size_x = 8) in;
+
+void main() {
+    uint tid = gl_GlobalInvocationID.x;
+    bool done = false;
+
+    do {
+        // If not done, let's see if any thread is "active"
+        bool anyActive = subgroupAny(!done);
+        if (!anyActive) {
+            // means all are done => we might break
+            done = true; 
+        } else if (!done) {
+            // This thread tries to claim “something,” e.g. an atomic?
+            // once claimed, done
+            done = true; 
+        }
+        // or partial warp usage: only half attempt claiming => forces warp replay
+    } while (!subgroupAll(done));
+    // indefinite do/while + tangle ops => test HSA/OBE scheduling & reconvergence
+}

@@ -1,26 +1,27 @@
+#version 450
+#pragma scheduler(OBE)
 #extension GL_KHR_shader_subgroup_basic : enable
 #extension GL_KHR_memory_scope_semantics : enable
 #extension GL_KHR_shader_subgroup_vote : enable
-layout(std430, binding = 0) buffer LAGBuf {
-    uint lowestActiveGroup;
+layout(local_size_x = 2) in;
+layout(tla_subgroup_size = 2) in;
+layout(tla_num_workgroups = 2) in;
+layout(std430, binding = 0) buffer Msg {
+    uint msg;
 };
 
+// this is a mutation of original producer consumer, the only change is the additional non-uniform subgroup operation inside the loop
 void main() {
-    uint gid = gl_WorkGroupID.x;
-    uint tid = gl_LocalInvocationID.x;
+    uint gid = gl_GlobalInvocationID.x;
     bool done = false;
 
     do {
         if (!done) {
-            uint lag = atomicLoad(lowestActiveGroup, 4, 0, 0);
-            if (lag == gid) {
-                if ((tid % 2) == 0) {
-                    subgroupAll(true);
-                }
-                // done
+            if (gid == atomicLoad(msg, 4, 0, 0)) {
                 done = true;
-                // set next lowest group
-                atomicStore(lowestActiveGroup, lag + 1, 4, 0, 0);
+                atomicStore(msg, gid + 1, 4, 0, 0);
+                // this one is interesting beacuse the active threads in this block are always {gid}
+                subgroupAll(true);
             }
         }
     } while (!subgroupAll(done));

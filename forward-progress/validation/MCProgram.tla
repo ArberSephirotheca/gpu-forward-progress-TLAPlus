@@ -455,11 +455,17 @@ FindIteration(blockIdx, iterationsVec, tid) ==
     ELSE
         Iteration(blockIdx, 0)
 
-SameMergeStack(left, right) ==
-    /\ Len(left) = Len(right)
-    /\ \A idx \in 1..Len(left):
-        /\ left[idx].blockIdx = right[idx].blockIdx
-        /\ left[idx].counter = right[idx].counter
+SameMergeStack(left, mergeBlock) ==
+    IF mergeBlock = <<>> THEN 
+        TRUE
+    ELSE IF left = <<>> THEN 
+        FALSE
+    ELSE 
+        SubSeq(left, 1, Len(mergeBlock)) = mergeBlock
+    \* /\ Len(left) = Len(right)
+    \* /\ \A idx \in 1..Len(left):
+    \*     /\ left[idx].blockIdx = right[idx].blockIdx
+    \*     /\ left[idx].counter = right[idx].counter
 
 SameIterationVector(left, right) ==
     /\ Len(left) = Len(right)
@@ -585,7 +591,7 @@ CanMergeSameIterationVector(curr, remaining) ==
 BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
     LET
         currentCounter == globalCounter
-        currentBranchOptions == Append(opLabelIdxVec, chosenBranchIdx)
+        currentBranchOptions == opLabelIdxVec
         currentDB == CurrentDynamicNode(wgid, t)
         falseLabelIdxSet == SeqToSet(opLabelIdxVec) \ {chosenBranchIdx}  
         labelIdxSet == {DB.labelIdx : DB \in DynamicNodeSet}
@@ -616,7 +622,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
         \* update the children if firstly reach the divergence
         \* otherwise keep as it is
         counterAfterMergeStack == 
-            IF isHeaderBlock /\ mergeStackContainsCurrent THEN
+            IF isHeaderBlock = FALSE  \/ mergeStackContainsCurrent THEN
                 currentCounter
             ELSE
                 currentCounter + 1
@@ -692,8 +698,8 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                     DB.unknownSet,
                     DB.labelIdx,
                     DB.id,
-                    DB.mergeStack,
-                    DB.children)
+                    updatedMergeStack,
+                    updatedChildren)
 
             \* if encounter choosen dynamic block
             \* whether its in current DB's children or on the top of the merge stack, we update it
