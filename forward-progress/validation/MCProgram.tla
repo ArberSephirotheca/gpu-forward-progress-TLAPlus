@@ -681,7 +681,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
         {
             \* if the constructUpdate is not empty, it means we are exiting a construct, all the dynamic blocks in that construct should be properly updated
             \* remove current thread from all set as it is not partcipating in the construct anymore
-            IF DB.labelIdx \in constructUpdate /\ SameMergeStack(Pop(DB.mergeStack), Pop(updatedMergeStack)) THEN
+            IF DB.labelIdx \in constructUpdate /\ SameMergeStack(DB.mergeStack, Pop(updatedMergeStack)) THEN
                 DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
                     [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \ {t}],
                     [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \ {t}],

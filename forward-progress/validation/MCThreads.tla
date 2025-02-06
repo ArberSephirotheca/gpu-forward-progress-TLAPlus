@@ -129,24 +129,40 @@ SnapShotUpdate(newDBSet, newState, t, localPc, newCounter) ==
 \* MeaningfulUpdate(newSnapShotMap, oldSnapShotMap) ==
 \*     /\ \E blockIdx \in DOMAIN newSnapShotMap : oldSnapShotMap[blockIdx] /= newSnapShotMap[blockIdx]
 
+\* MeaningfulUpdate(localPc, newState, oldSnapShotMap, newDBSet) ==
+\*     \A db \in newDBSet \ DynamicNodeSet:
+\*         IF \E snapshot \in oldSnapShotMap : 
+\*             /\ snapshot["pc"] = localPc
+\*             /\ snapshot["state"] = newState
+\*             /\ snapshot["threadLocals"] = threadLocals
+\*             /\ snapshot["globalVars"] = globalVars
+\*             /\ snapshot["dynamicNode"] = RemoveId(db)
+\*         THEN 
+\*             FALSE
+\*         ELSE
+
+\* MeaningfulUpdate(localPc, newState, oldSnapShotMap, newDBSet) ==
+\*         { db \in (newDBSet \ DynamicNodeSet) :
+\*             \E snapshot \in oldSnapShotMap :
+\*                 /\ snapshot["pc"] = localPc
+\*                 /\ snapshot["state"] = newState
+\*                 /\ snapshot["threadLocals"] = threadLocals
+\*                 /\ snapshot["globalVars"] = globalVars
+\*                 /\ snapshot["dynamicNode"] = RemoveId(db)
+\*         }
+
 MeaningfulUpdate(localPc, newState, oldSnapShotMap, newDBSet) ==
-    \A db \in newDBSet \ DynamicNodeSet:
-        IF \E snapshot \in oldSnapShotMap : 
-            /\ snapshot["pc"] = localPc
-            /\ snapshot["state"] = newState
-            /\ snapshot["threadLocals"] = threadLocals
-            /\ snapshot["globalVars"] = globalVars
-            /\ snapshot["dynamicNode"] = RemoveId(db)
-            \* /\ snapshot["dynamicNodeSet"] = DynamicNodeSet
-        THEN 
-            FALSE
-        ELSE
-            TRUE
-    \* LET normMap == {Normalize(snapshot) : snapshot \in newSnapShotMap}
-    \*     normOldMap == {Normalize(snapshot) : snapshot \in oldSnapShotMap}
-    \* IN
-    \*     normMap # normOldMap
-    
+    LET newDBs == newDBSet \ DynamicNodeSet
+    IN
+        { snapshot \in oldSnapShotMap :
+            \E db \in newDBs :
+                /\ snapshot["pc"] = localPc
+                /\ snapshot["state"] = newState
+                /\ snapshot["threadLocals"] = threadLocals
+                /\ snapshot["globalVars"] = globalVars
+                /\ snapshot["dynamicNode"] = RemoveId(db)
+        }
+
 GetBackState(localPc, newState, oldSnapShotMap, newDBSet) ==
     CHOOSE snapshot \in oldSnapShotMap:
         /\ snapshot["pc"] = localPc
@@ -1376,15 +1392,16 @@ OpBranch(t, label) ==
                 newDBSet == counterNewDBSet[2]
                 newState == StateUpdate(workGroupId, t, newDBSet)
                 newSnapShotMap == SnapShotUpdate(newDBSet, newState, t, newPc, newCounter)
+                matchedSnapShot == MeaningfulUpdate(newPc, newState, snapShotMap, newDBSet)
             IN 
-                IF MeaningfulUpdate(newPc, newState, snapShotMap, newDBSet) THEN
+                IF matchedSnapShot = {} THEN
                     /\  snapShotMap' = newSnapShotMap
                     /\  state' = newState  
                     /\  DynamicNodeSet' = newDBSet 
                     /\  pc' = newPc
                     /\  globalCounter' = newCounter
                 ELSE
-                    LET previousState == GetBackState(newPc, newState, snapShotMap, newDBSet)
+                    LET previousState == CHOOSE db \in matchedSnapShot: TRUE
                     IN
                         /\ state' = newState
                         /\ DynamicNodeSet' = previousState.dynamicNodeSet
@@ -1410,15 +1427,16 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
                         newState == StateUpdate(workGroupId, t, newDBSet)
                         newPc == [pc EXCEPT ![t] = trueLabelVal]
                         newSnapShotMap == SnapShotUpdate(newDBSet, newState, t, newPc, newCounter)
+                        matchedSnapShot == MeaningfulUpdate(newPc, newState, snapShotMap, newDBSet)
                     IN
-                        IF MeaningfulUpdate(newPc, newState, snapShotMap, newDBSet) THEN
+                        IF matchedSnapShot = {} THEN
                             /\  snapShotMap' = newSnapShotMap
                             /\  state' = newState   
                             /\  DynamicNodeSet' = newDBSet
                             /\  pc' = newPc
                             /\  globalCounter' = newCounter
                         ELSE 
-                            LET previousState == GetBackState(newPc, newState, snapShotMap, newDBSet)
+                            LET previousState == CHOOSE db \in matchedSnapShot: TRUE
                             IN
                                 /\ state' = newState
                                 /\ DynamicNodeSet' = previousState.dynamicNodeSet
@@ -1432,16 +1450,17 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
                         newState == StateUpdate(workGroupId, t, newDBSet)
                         newPc == [pc EXCEPT ![t] = falseLabelVal]
                         newSnapShotMap == SnapShotUpdate(newDBSet, newState, t, newPc, newCounter)
+                        matchedSnapShot == MeaningfulUpdate(newPc, newState, snapShotMap, newDBSet)
 
                     IN
-                        IF MeaningfulUpdate(newPc, newState, snapShotMap, newDBSet) THEN
+                        IF matchedSnapShot = {} THEN
                             /\  snapShotMap' = newSnapShotMap
                             /\  state' = newState
                             /\  DynamicNodeSet' = newDBSet
                             /\  pc' = newPc
                             /\  globalCounter' = newCounter
                         ELSE 
-                            LET previousState == GetBackState(newPc, newState, snapShotMap, newDBSet)
+                            LET previousState == CHOOSE db \in matchedSnapShot: TRUE
                             IN
                                 /\ state' = newState
                                 /\ DynamicNodeSet' = previousState.dynamicNodeSet
