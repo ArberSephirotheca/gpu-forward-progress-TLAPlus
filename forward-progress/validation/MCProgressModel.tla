@@ -3,8 +3,9 @@ EXTENDS Integers, Naturals, Sequences, MCThreads, TLC, FiniteSets
 
 VARIABLES fairExecutionSet, selected, runningThread
 
-vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicNodeSet>>
+vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicNodeSet, snapShotMap, globalCounter>>
 
+UniverseOfAllWGs == {0, 1}
 
 InitState ==
     /\ selected = -1
@@ -72,55 +73,18 @@ IterationNotExceedsBound ==
         LET iterationStack == DB.iterationVec IN
             \A i \in 1..Len(iterationStack): iterationStack[i].iter <= 4
 
-\* IterationReachGC ==
-\*     \A DB \in DynamicNodeSet:
-\*         LET iterationStack == DB.iterationVec IN
-\*             \A i \in 1..Len(iterationStack): iterationStack[i].iter <= 2
-\* GarbageCollect ==
-\*     /\ IterationReachGC = FALSE
-\*     /\ LET SetMin(S) == CHOOSE s \in S : \A t \in S : s.iter <= t.iter IN 
-\*          LET Transpose == SetMin( {node.iterationVec[Len(node.iterationVec)] : node \in {DB \in DynamicNodeSet: Len(DB.iterationVec) > 0}}).iter - 1 IN
-\*             /\ DynamicNodeSet' = {
-\*                   DynamicNode(DB.currentThreadSet,
-\*                     DB.executeSet,
-\*                     DB.notExecuteSet,
-\*                     DB.unknownSet,
-\*                     DB.labelIdx,
-\*                     IF Len(DB.iterationVec) = 0 THEN 
-\*                         DB.iterationVec 
-\*                     ELSE 
-\*                         [DB.iterationVec EXCEPT ![Len(DB.iterationVec)] = Iteration(DB.iterationVec[Len(DB.iterationVec)].blockIdx, DB.iterationVec[Len(DB.iterationVec)].iter - Transpose)])
-\*                 : DB \in DynamicNodeSet
-\*                 }
-\*             /\ UNCHANGED <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars>>
+\* PickAnyWorkGroupInFairExecutionSet ==
+\*            <>[] (\A wg \in fairExecutionSet:  selected = wg)
 
-
-\* IterationNotExceedBound(t, wgid) ==
-\*     IF \E DB \in DynamicNodeSet: t \in DB.currentThreadSet[wgid] THEN
-\*         LET DB == CurrentDynamicNode(wgid, t)
-\*             iterationStack == DB.iterationVec IN
-\*                 \A i \in 1..Len(iterationStack): iterationStack[i].iter <= 2
-\*     ELSE
-\*         TRUE
-\* DynamicNodeSetSmall ==
-\*     Cardinality(DynamicNodeSet) <= 8
-\* This fairness property ensures that every workgroup in the fair execution set will be scheduled at some point indefinitely
-\* So we don't have a unfairness problem where some workgroup in the fair execution set is never scheduled/only scheduled once
 PickAnyWorkGroupInFairExecutionSet ==
-            <>[](\A wg \in fairExecutionSet: selected = wg)
-
+    \A wg \in UniverseOfAllWGs :
+        [] ( wg \in fairExecutionSet => <> (selected = wg) )
 
 Execute(t) == 
-        \* /\  IterationNotExceedsBound
         /\  ExecuteInstruction(t)
         /\  UpdateFairExecutionSet(t)
         /\  selected' = WorkGroupId(t)
         /\  runningThread' = t
-        \* /\  UNCHANGED converge
-
-\* Converge == 
-\*     /\ converge' = TRUE
-\*     /\ UNCHANGED <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicNodeSet>> 
 
 Step ==
     LET ThreadsReady == {t \in Threads: state[t] = "ready"}
@@ -133,9 +97,6 @@ Step ==
                 ELSE
                     /\  Execute(runningThread)
         
-            \* IF ThreadsReady # {} THEN
-            \*     \E t \in ThreadsReady:
-            \*         /\  Execute(t)
             ELSE
                 /\ UNCHANGED vars
                 /\ UNCHANGED snapShotMap
@@ -143,10 +104,8 @@ Step ==
 \* Deadlock means reaching a state in which Next is not enabled.
 Next ==
     Step
-    \* \* \/ Converge
-    \* \/ GarbageCollect
 
-ViewFunction == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicNodeSet>>
+ViewFunction == <<pc, state, threadLocals, globalVars, DynamicNodeSet>>
 
 (* Fairness properties *)
 
@@ -163,13 +122,8 @@ Spec ==
 EventuallyAlwaysTerminated ==
     \A t \in Threads: <>[](state[t] = "terminated")
 
-\* Terminated ==
-\*     \A t \in Threads: state[t] = "terminated"
     
 Liveness == 
     /\  EventuallyAlwaysTerminated
-
-\* EventuallyConverge ==
-\*     converge ~> Terminated
 
 ====
