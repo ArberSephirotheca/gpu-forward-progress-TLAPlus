@@ -21,13 +21,13 @@ InitThreadVars ==
 InitThreads == 
     /\  InitThreadVars
 
-newSnapShot(localPc, localState, localThreadLocals, localGlobalVars, dynamicNode, dynamicNodeSet, localCounter) ==
+newSnapShot(localPc, localState, localThreadLocals, localGlobalVars, (* dynamicNode,*) dynamicNodeSet, localCounter) ==
     [
         pc |-> localPc,
         state |-> localState,
         threadLocals |-> localThreadLocals,
         globalVars |-> localGlobalVars,
-        dynamicNode |-> dynamicNode,
+        \*dynamicNode |-> dynamicNode,
         dynamicNodeSet |-> dynamicNodeSet,
         globalCounter |-> localCounter
     ]
@@ -41,7 +41,7 @@ RemoveId(dynamicNode) == [dynamicNode EXCEPT !.id = 0, !.mergeStack = <<>>, !.ch
 
 InitSnapShotMap ==
      LET newDBIds == {db.labelIdx : db \in DynamicNodeSet} IN
-         snapShotMap = { newSnapShot(<<>>, <<>>, <<>>, {}, RemoveId(db), DynamicNodeSet, 1) : db \in DynamicNodeSet}
+         snapShotMap = { newSnapShot(<<>>, <<>>, <<>>, {}, (*RemoveId(db),*) DynamicNodeSet, 1) : db \in DynamicNodeSet}
 
 \* ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
 
@@ -108,8 +108,7 @@ Basic(s) ==
     state        |-> s.state,
     threadLocals |-> s.threadLocals,
     globalVars   |-> s.globalVars,
-    dynamicNode  |-> s.dynamicNode,
-    dynamicNodeSet |-> s.dynamicNodeSet]
+    dynamicNode  |-> s.dynamicNode]
 
 InsertMultipleSnapShots(map, snapshots) ==
     map \cup snapshots
@@ -130,7 +129,7 @@ SnapShotUpdate(newDBSet, newState, t, localPc, newCounter) ==
         \* get set of newly created DBs
         LET newDBs == newDBSet \ DynamicNodeSet
             newDBIds == {db.labelIdx : db \in newDBs}
-            snapShots == {newSnapShot(localPc, newState, threadLocals, globalVars, RemoveId(db), newDBSet, newCounter) : db \in newDBs}
+            snapShots == {newSnapShot(localPc, newState, threadLocals, globalVars,(* RemoveId(db),*) newDBSet, newCounter) : db \in newDBs}
         IN
             InsertMultipleSnapShots(snapShotMap, snapShots)
 
@@ -169,7 +168,7 @@ MeaningfulUpdate(localPc, newState, oldSnapShotMap, newDBSet) ==
                 /\ snapshot["state"] = newState
                 /\ snapshot["threadLocals"] = threadLocals
                 /\ snapshot["globalVars"] = globalVars
-                /\ snapshot["dynamicNode"] = RemoveId(db)
+                \* /\ snapshot["dynamicNode"] = RemoveId(db)
         }
 
 GetBackState(localPc, newState, oldSnapShotMap, newDBSet) ==
@@ -1416,7 +1415,8 @@ OpBranch(t, label) ==
                         /\ DynamicNodeSet' = previousState.dynamicNodeSet
                         /\ globalCounter' = previousState.globalCounter
                         /\ pc' = previousState.pc
-                        /\ UNCHANGED  <<threadLocals, globalVars, snapShotMap>>
+                        /\  snapShotMap' = newSnapShotMap
+                        /\ UNCHANGED  <<threadLocals, globalVars>>
     /\  UNCHANGED <<threadLocals, globalVars>>
 
 
@@ -1451,7 +1451,8 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
                                 /\ DynamicNodeSet' = previousState.dynamicNodeSet
                                 /\ globalCounter' = previousState.globalCounter
                                 /\ pc' = previousState.pc
-                                /\ UNCHANGED  <<threadLocals, globalVars, snapShotMap>>
+                                /\  snapShotMap' = newSnapShotMap
+                                /\ UNCHANGED  <<threadLocals, globalVars>>
             ELSE
                 /\  LET counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], <<trueLabelVal, falseLabelVal>>, falseLabelVal)
                         newCounter == counterNewDBSet[1]
@@ -1475,7 +1476,8 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
                                 /\ DynamicNodeSet' = previousState.dynamicNodeSet
                                 /\ globalCounter' = previousState.globalCounter
                                 /\ pc' = previousState.pc
-                                /\ UNCHANGED  <<threadLocals, globalVars, snapShotMap>>
+                                /\  snapShotMap' = newSnapShotMap
+                                /\ UNCHANGED  <<threadLocals, globalVars>>
     /\  UNCHANGED <<threadLocals, globalVars>>
 
     

@@ -456,12 +456,12 @@ FindIteration(blockIdx, iterationsVec, tid) ==
         Iteration(blockIdx, 0)
 
 SameMergeStack(left, mergeBlock) ==
-    IF mergeBlock = <<>> THEN 
+    IF Len(mergeBlock) = 0 THEN 
         TRUE
-    ELSE IF left = <<>> THEN 
-        FALSE
-    ELSE 
+    ELSE IF Len(left) >= Len(mergeBlock) THEN
         SubSeq(left, 1, Len(mergeBlock)) = mergeBlock
+    ELSE 
+        FALSE
     \* /\ Len(left) = Len(right)
     \* /\ \A idx \in 1..Len(left):
     \*     /\ left[idx].blockIdx = right[idx].blockIdx
@@ -681,7 +681,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
         {
             \* if the constructUpdate is not empty, it means we are exiting a construct, all the dynamic blocks in that construct should be properly updated
             \* remove current thread from all set as it is not partcipating in the construct anymore
-            IF DB.labelIdx \in constructUpdate /\ SameMergeStack(DB.mergeStack, Pop(updatedMergeStack)) THEN
+            IF DB.labelIdx \in constructUpdate /\ SameMergeStack(DB.mergeStack, currentMergeStack) THEN
                 DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
                     [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \ {t}],
                     [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \ {t}],
