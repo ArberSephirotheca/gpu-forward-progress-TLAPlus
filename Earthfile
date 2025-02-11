@@ -63,12 +63,12 @@ tlaplus-image:
         SAVE ARTIFACT spirv-asm.txt AS LOCAL ./build/
         RUN Homunculus/target/release/homunculus ./spirv-asm.txt 
         IF [ "$OUT" = "text" ]
-            RUN JAVA_OPTS="-Xmx24G" tlc forward-progress/validation/MCProgressModel -view -fpmem .25 -workers 20 2>&1 | tee output.txt || true
+            RUN JAVA_OPTS="-Xmx32G" tlc forward-progress/validation/MCProgressModel -view -fpmem .25 -workers 12 2>&1 | tee output.txt || true
         ELSE IF [ "$OUT" = "dot" ]
-            RUN tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 15 -maxSetSize 100 -dump dot output.dot 2>&1 || true 
+            RUN JAVA_OPTS="-Xmx32G" tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 15 -maxSetSize 100 -dump dot output.dot 2>&1 || true 
         ELSE IF [ "$OUT" = "all" ]
-            RUN tlc forward-progress/validation/MCProgressModel -fpmem .50 -workers 15 -maxSetSize 100 -dump dot output.dot 2>&1 | tee output.txt || true 
-            RUN tlc forward-progress/validation/MCProgressModel -fpmem .50 -workers 15 -maxSetSize 100 > output.txt 2>&1 || true
+            RUN JAVA_OPTS="-Xmx32G" tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 15 -maxSetSize 100 -dump dot output.dot 2>&1 | tee output.txt || true 
+            RUN JAVA_OPTS="-Xmx32G" tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 15 -maxSetSize 100 > output.txt 2>&1 || true
         ELSE
             RUN echo "Invalid output format"
         END

@@ -105,7 +105,7 @@ Step ==
 Next ==
     Step
 
-ViewFunction == <<pc, state, threadLocals, globalVars, DynamicNodeSet>>
+ViewFunction == <<pc, state, threadLocals, globalVars(*, DynamicNodeSet, selected, runningThread*)>>
 
 (* Fairness properties *)
 

@@ -129,7 +129,7 @@ SnapShotUpdate(newDBSet, newState, t, localPc, newCounter) ==
         \* get set of newly created DBs
         LET newDBs == newDBSet \ DynamicNodeSet
             newDBIds == {db.labelIdx : db \in newDBs}
-            snapShots == {newSnapShot(localPc, newState, threadLocals, globalVars,(* RemoveId(db),*) newDBSet, newCounter) : db \in newDBs}
+            snapShots == {newSnapShot(localPc, newState, threadLocals, globalVars,(* RemoveId(db),*) newDBSet, newCounter)}
         IN
             InsertMultipleSnapShots(snapShotMap, snapShots)
 
@@ -163,12 +163,10 @@ MeaningfulUpdate(localPc, newState, oldSnapShotMap, newDBSet) ==
     LET newDBs == newDBSet \ DynamicNodeSet
     IN
         { snapshot \in oldSnapShotMap :
-            \E db \in newDBs :
                 /\ snapshot["pc"] = localPc
                 /\ snapshot["state"] = newState
                 /\ snapshot["threadLocals"] = threadLocals
                 /\ snapshot["globalVars"] = globalVars
-                \* /\ snapshot["dynamicNode"] = RemoveId(db)
         }
 
 GetBackState(localPc, newState, oldSnapShotMap, newDBSet) ==
