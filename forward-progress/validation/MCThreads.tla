@@ -158,7 +158,6 @@ SnapShotUpdate(newDBSet, newState, t, localPc, newCounter) ==
 \*                 /\ snapshot["dynamicNode"] = RemoveId(db)
 \*         }
 
-\* benefit of making it sequence is to make it deterministic when jump back to previous state
 MeaningfulUpdate(localPc, newState, oldSnapShotMap, newDBSet) ==
     LET newDBs == newDBSet \ DynamicNodeSet
     IN

@@ -688,7 +688,14 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                     [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
                     DB.labelIdx,
                     DB.id,
-                    DB.mergeStack,
+                    IF DB.labelIdx = currentDB.labelIdx /\ DB.id = currentDB.id THEN 
+                        updatedMergeStack
+                    ELSE 
+                        DB.mergeStack
+                    ,
+                    IF DB.labelIdx = currentDB.labelIdx /\ DB.id = currentDB.id THEN
+                        updatedChildren
+                    ELSE
                     DB.children)
             \* if encounter current dynamic block
             ELSE IF DB.labelIdx = currentDB.labelIdx /\ DB.id = currentDB.id THEN

@@ -105,7 +105,7 @@ Step ==
 Next ==
     Step
 
-ViewFunction == <<pc, state, threadLocals, globalVars(*, DynamicNodeSet, selected, runningThread*)>>
+ViewFunction == <<pc, state, threadLocals, globalVars, DynamicNodeSet(*, selected, runningThread*)>>
 
 (* Fairness properties *)
 
@@ -122,6 +122,7 @@ Spec ==
 EventuallyAlwaysTerminated ==
     \A t \in Threads: <>[](state[t] = "terminated")
 
+CounterConstraint == globalCounter <= 40
     
 Liveness == 
     /\  EventuallyAlwaysTerminated
