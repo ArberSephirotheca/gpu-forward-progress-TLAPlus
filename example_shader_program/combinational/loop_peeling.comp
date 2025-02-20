@@ -1,5 +1,11 @@
 #version 450
-layout(local_size_x = 8) in;
+#pragma scheduler(OBE)
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_KHR_shader_subgroup_vote : enable
+layout(local_size_x = 3) in;
+layout(tla_subgroup_size = 3) in;
+layout(tla_num_workgroups = 1) in;
 
 void main() {
     uint tid = gl_GlobalInvocationID.x;
@@ -9,11 +15,8 @@ void main() {
         // If not done, let's see if any thread is "active"
         bool anyActive = subgroupAny(!done);
         if (!anyActive) {
-            // means all are done => we might break
             done = true; 
         } else if (!done) {
-            // This thread tries to claim “something,” e.g. an atomic?
-            // once claimed, done
             done = true; 
         }
         // or partial warp usage: only half attempt claiming => forces warp replay

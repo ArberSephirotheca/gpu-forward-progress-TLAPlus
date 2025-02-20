@@ -81,6 +81,14 @@ Pop(seq) ==
   SubSeq(seq, 1, Len(seq)-1)
 
 
+PopUntilBlock(seq, blockIdx) == 
+    LET idxSet == {i \in DOMAIN seq : seq[i].blockIdx = blockIdx}
+    IN
+        IF idxSet = {} THEN
+            seq
+        ELSE
+            SubSeq(seq, 1, Max(idxSet))
+
 VarExists(workgroupId, var) == 
     \* IF IsShared(var) \/ IsGlobal(var) THEN 
     IF IsGlobal(var) THEN 
@@ -635,9 +643,9 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
             ELSE
                 currentChildren \union 
                 {
-                    IF IsMergeBlock(currentBranchOptions[i]) /\ updatedMergeStack[Len(updatedMergeStack)].blockIdx = currentBranchOptions[i]
+                    IF IsMergeBlock(currentBranchOptions[i]) /\ \E index \in DOMAIN updatedMergeStack: updatedMergeStack[index].blockIdx = currentBranchOptions[i]
                     THEN 
-                        UniqueBlockId(currentBranchOptions[i], updatedMergeStack[Len(updatedMergeStack)].counter)
+                        UniqueBlockId(currentBranchOptions[i], updatedMergeStack[(CHOOSE index \in DOMAIN updatedMergeStack: updatedMergeStack[index].blockIdx = currentBranchOptions[i])].counter)
                     ELSE
                         UniqueBlockId(currentBranchOptions[i], counterAfterMergeStack + i)
                     : i \in 1..Len(currentBranchOptions)
@@ -811,7 +819,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                                     LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
                                     IN
                                         child.counter,
-                                    Pop(updatedMergeStack),
+                                    PopUntilBlock(updatedMergeStack, chosenBranchIdx),
                                     {}
                                     )
                     }
@@ -876,7 +884,7 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                             LET child == CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
                             IN
                                 child.counter,
-                            Pop(updatedMergeStack),
+                            PopUntilBlock(updatedMergeStack, falselabelIdx),
                             {})
             \* ELSE IF IsMergeBlock(falselabelIdx) = TRUE THEN 
             \*     DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
