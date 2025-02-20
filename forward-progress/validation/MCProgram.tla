@@ -683,8 +683,8 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
             \* remove current thread from all set as it is not partcipating in the construct anymore
             IF DB.labelIdx \in constructUpdate /\ SameMergeStack(DB.mergeStack, currentMergeStack) THEN
                 DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
-                    [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \ {t}],
-                    [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \ {t}],
+                    DB.executeSet,
+                    DB.notExecuteSet,
                     [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
                     DB.labelIdx,
                     DB.id,
@@ -918,8 +918,8 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
 TerminateUpdate(wgid, t) ==
     {
         DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
-            [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \ {t}],
-            [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \ {t}],
+            DB.executeSet,
+            DB.notExecuteSet,
             [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
             DB.labelIdx,
             DB.id,
