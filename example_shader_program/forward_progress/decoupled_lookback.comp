@@ -1,5 +1,5 @@
 #version 450
-#pragma scheduler(OBE)
+#pragma scheduler(HSA)
 #extension GL_KHR_shader_subgroup_basic : enable
 #extension GL_KHR_memory_scope_semantics : enable
 #extension GL_KHR_shader_subgroup_vote : enable
@@ -28,12 +28,12 @@ void main() {
     uint partIdx = workgroupPart;
     uint workgroupSize = gl_WorkGroupSize.x;
 
-    for (uint i = partIdx - 1; i >= 0;) {
-        uint index = i * workgroupSize + localIdx;
+    for (int i = int(partIdx - 1); i >= 0;) {
+        uint index = 1u << (i * workgroupSize + localIdx);
         uint payLoad = bitArray & index;
         if (payLoad == 1) {
             i -= 1;
         }
     }
-    bitArray = bitArray | (partIdx * workgroupSize + localIdx);
+    atomicOr(bitArray, 1u << (partIdx * workgroupSize + localIdx));
 }

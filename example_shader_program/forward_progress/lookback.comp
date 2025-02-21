@@ -1,10 +1,10 @@
 #version 450
-#pragma scheduler(HSA)
+#pragma scheduler(OBE)
 #extension GL_KHR_shader_subgroup_basic : enable
 #extension GL_KHR_memory_scope_semantics : enable
 #extension GL_KHR_shader_subgroup_vote : enable
-layout(local_size_x = 2) in;
-layout(tla_subgroup_size = 2) in;
+layout(local_size_x = 1) in;
+layout(tla_subgroup_size = 1) in;
 layout(tla_num_workgroups = 2) in;
 
 layout(std430, binding = 0) buffer Partition {
@@ -18,17 +18,21 @@ layout(std430, binding = 0) buffer BitArray {
 
 // this requires HSA to terminate
 void main() {
-    // 2: entry block
+    // 3: entry block
     uint localIdx = gl_LocalInvocationID.x;
     uint partIdx = gl_WorkGroupID.x;
     uint workgroupSize = gl_WorkGroupSize.x;
-
-    for (uint i = partIdx - 1; i >= 0;) {
-        uint index = i * workgroupSize + localIdx;
+    // 16
+    for (int i = int(partIdx - 1); i >= 0;) { // 19
+    //22
+        uint index = 1u << (i * workgroupSize + localIdx);
         uint payLoad = bitArray & index;
-        if (payLoad == 1) {
+        if (payLoad == 1) { // 31
+        // 35
             i -= 1;
         }
+        // 37
     }
-    bitArray = bitArray | (partIdx * workgroupSize + localIdx);
+    // 39
+    atomicOr(bitArray, 1u << (partIdx * workgroupSize + localIdx));
 }

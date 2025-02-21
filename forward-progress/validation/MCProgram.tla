@@ -260,9 +260,9 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
 (* Thread Configuration *)
 InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicIncrement" , "OpAtomicDecrement", "OpGroupAll", "OpGroupAny", "OpGroupNonUniformAll", "OpGroupNonUniformAny",
 "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpSwitch", "OpControlBarrier", "OpLoopMerge",
-"OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalOr", "OpLogicalAnd", "OpLogicalEqual", "OpLogicalNotEqual", "OpLogicalNot", "OpBitwiseOr", "OpBitwiseAnd",
+"OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalOr", "OpLogicalAnd", "OpLogicalEqual", "OpLogicalNotEqual", "OpLogicalNot", "OpShiftLeftLogical", "OpBitcast", "OpBitwiseOr", "OpBitwiseAnd",
 "OpEqual", "OpNotEqual", "OpLess", "OpLessOrEqual", "OpGreater", "OpGreaterOrEqual",
-"OpAdd", "OpAtomicAdd", "OpSub", "OpAtomicSub", "OpMul"}
+"OpAdd", "OpAtomicAdd", "OpSub", "OpAtomicSub", "OpAtomicOr", "OpMul"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup", "tangle"}
 MemoryOperationSet == {"OpAtomicLoad", "OpAtomicStore", "OpAtomicIncrement" , "OpAtomicDecrement", "OpAtomicAdd" , "OpAtomicSub", "OpAtomicCompareExchange" ,"OpAtomicExchange"}

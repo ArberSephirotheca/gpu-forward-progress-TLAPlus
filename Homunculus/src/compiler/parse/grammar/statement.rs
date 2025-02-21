@@ -68,6 +68,8 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_logical_not_equal_expr(p))
     } else if p.at(TokenKind::OpLogicalNot) {
         Some(op_logical_not_expr(p))
+    } else if p.at(TokenKind::OpShiftLeftLogical) {
+        Some(op_shift_left_logical(p))
     } else if p.at(TokenKind::OpReturn) {
         Some(op_return_statement(p))
     } else if p.at(TokenKind::OpLoad) {
@@ -98,6 +100,8 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_sub_expr(p))
     } else if p.at(TokenKind::OpAtomicSub) {
         Some(op_atomic_sub_expr(p))
+    } else if p.at(TokenKind::OpAtomicOr) {
+        Some(op_atomic_or_expr(p))
     } else if p.at(TokenKind::OpIMul) {
         Some(op_mul_expr(p))
     } else if p.at(TokenKind::OpAtomicExchange) {
@@ -128,6 +132,8 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_bitwise_or_expr(p))
     } else if p.at(TokenKind::OpBitwiseAnd) {
         Some(op_bitwise_and_expr(p))
+    } else if p.at(TokenKind::OpBitcast) {
+        Some(op_bitcast_expr(p))
     } else if p.at_set(&IGNORED_INSTRUCTION_SET) {
         skip_ignored_op(p)
     } else {
@@ -518,6 +524,18 @@ fn op_logical_not_expr(p: &mut Parser) -> CompletedMarker {
     m.complete(p, TokenKind::LogicalNotExpr)
 }
 
+/// example: OpShiftLeftLogical %uint %uint_1 %64
+fn op_shift_left_logical(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpShiftLeftLogical token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::ShiftLeftLogicalExpr)
+}
+
 /// example: OpReturn
 fn op_return_statement(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
@@ -722,6 +740,20 @@ fn op_atomic_sub_expr(p: &mut Parser) -> CompletedMarker {
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::AtomicSubExpr)
+}
+
+/// example: OpAtomicOr %uint  %result_ptr %uint_0 %uint_0 %value
+fn op_atomic_or_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpAtomicSub token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::AtomicOrExpr)
 }
 
 /// example: OpISub %int %int_0 %int_1
@@ -951,6 +983,17 @@ fn op_bitwise_and_expr(p: &mut Parser) -> CompletedMarker {
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::BitwiseAndExpr)
+}
+
+/// example: OpBitcast %uint %uint_0
+fn op_bitcast_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpBitcast token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::BitcastExpr)
 }
 
 
