@@ -191,6 +191,81 @@ GetBackState(localPc, newState, oldSnapShotMap, newDBSet) ==
 \*     }
 
 
+
+\* https://en.wikipedia.org/wiki/Bitwise_operation#Mathematical_equivalents
+RECURSIVE And(_,_,_,_)
+LOCAL And(x,y,n,m) == 
+        LET exp == 2^n
+        IN IF m = 0 
+           THEN 0
+           ELSE exp * ((x \div exp) % 2) * ((y \div exp) % 2) 
+                    + And(x,y,n+1,m \div 2)
+
+x & y == 
+    (***************************************************************************)
+    (* Bitwise AND of (non-negative) x and y (defined for Nat \cup {0}).       *)
+    (***************************************************************************)
+    IF x >= y THEN And(x, y, 0, x) ELSE And(y, x, 0, y) \* Infix variant of And(x,y)
+
+-------------------------------------------------------------------------------
+
+RECURSIVE Or(_,_,_,_)
+LOCAL Or(x,y,n,m) == 
+        LET exp == 2^n
+            xdm == (x \div exp) % 2
+            ydm == (y \div exp) % 2
+        IN IF m = 0 
+           THEN 0
+           ELSE exp * (((xdm + ydm) + (xdm * ydm)) % 2)
+                        + Or(x,y,n+1,m \div 2)
+
+x | y == 
+    (***************************************************************************)
+    (* Bitwise OR of (non-negative) x and y (defined for Nat \cup {0}).        *)
+    (***************************************************************************)
+    IF x >= y THEN Or(x, y, 0, x) ELSE Or(y, x, 0, y) \* Infix variant of Or(x,y)
+
+-------------------------------------------------------------------------------
+
+RECURSIVE Xor(_,_,_,_)
+LOCAL Xor(x,y,n,m) == 
+        LET exp == 2^n
+        IN IF m = 0 
+           THEN 0
+           ELSE exp * (((x \div exp) + (y \div exp)) % 2) 
+                    + Xor(x,y,n+1,m \div 2)
+
+x ^^ y ==   \* single "^" already taken by Naturals.tla
+    (***************************************************************************)
+    (* Bitwise XOR of (non-negative) x and y (defined for Nat \cup {0}).       *)
+    (***************************************************************************)
+    IF x >= y THEN Xor(x, y, 0, x) ELSE Xor(y, x, 0, y) \* Infix variant of Xor(x,y)
+
+-------------------------------------------------------------------------------
+
+RECURSIVE NotR(_,_,_)
+LOCAL NotR(x,n,m) == 
+    LET exp == 2^n
+        xdm == (x \div exp) % 2
+    IN IF m = 0 
+        THEN 0
+        ELSE exp * ((xdm + 1) % 2)
+                    + NotR(x,n+1,m \div 2)
+
+-------------------------------------------------------------------------------
+
+RECURSIVE shiftR(_,_)
+shiftR(n,pos) == 
+    (***************************************************************************)
+    (* Logical bit-shifting the (non-negative) n by pos positions to the right *)
+    (* shifting zeros in from the left/MSB (defined for Nat \cup {0}).         *)
+    (***************************************************************************)
+    IF pos = 0 
+    THEN n
+    ELSE LET odd(z) == z % 2 = 1
+             m == IF odd(n) THEN (n-1) \div 2 ELSE n \div 2
+         IN shiftR(m, pos - 1)
+
 Assignment(t, vars) == 
     /\  LET workGroupId == WorkGroupId(t)+1
             AssGlobalVars == {var \in vars : var.scope = "global"} 
@@ -395,6 +470,33 @@ OpGreaterOrEqual(t, var, operand1, operand2) ==
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
 
+OpBitwiseOr(t, var, operand1, operand2) ==
+    LET workGroupId == WorkGroupId(t)+1
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workGroupId, mangledOperand1)
+                operand2Val == GetVal(workGroupId, mangledOperand2)
+            IN
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val | operand2Val, Index(-1))})
+        /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]   
+        /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>     
+
+OpBitwiseAnd(t, var, operand1, operand2) ==
+    LET workGroupId == WorkGroupId(t)+1
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workGroupId, mangledOperand1)
+                operand2Val == GetVal(workGroupId, mangledOperand2)
+            IN
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val & operand2Val, Index(-1))})
+        /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+        /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>
 
 OpAdd(t, var, operand1, operand2) ==
     LET workGroupId == WorkGroupId(t)+1
@@ -408,22 +510,22 @@ OpAdd(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val + operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
+                /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>
 
 
-OpAtomicAdd(t, var, operand1, operand2) ==
+OpAtomicAdd(t, var, pointer, value) ==
     LET workGroupId == WorkGroupId(t)+1
         MangleVar == Mangle(t, var)
-        mangledOperand1 == Mangle(t, operand1)
-        mangledOperand2 == Mangle(t, operand2)
+        mangledPointer == Mangle(t, pointer)
+        mangledValue == Mangle(t, value)
 
     IN
-        /\  LET operand1Val == GetVal(workGroupId, mangledOperand1)
-                operand2Val == GetVal(workGroupId, mangledOperand2)
+        /\  LET pointerVal == GetVal(workGroupId, mangledPointer)
+                valueVal == GetVal(workGroupId, mangledValue)
             IN
-                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val + operand2Val, Index(-1))})
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, pointerVal, Index(-1)), Var(mangledPointer.scope, mangledPointer.name, pointerVal + valueVal, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
+                /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>
 
 OpSub(t, var, operand1, operand2) ==
     LET workGroupId == WorkGroupId(t)+1
@@ -437,21 +539,21 @@ OpSub(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val - operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
+                /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>
 
-OpAtomicSub(t, var, operand1, operand2) ==
+OpAtomicSub(t, var, pointer, value) ==
     LET workGroupId == WorkGroupId(t)+1
         MangleVar == Mangle(t, var)
-        mangledOperand1 == Mangle(t, operand1)
-        mangledOperand2 == Mangle(t, operand2)
+        mangledPointer == Mangle(t, pointer)
+        mangledValue == Mangle(t, value)
 
     IN
-        /\  LET operand1Val == GetVal(workGroupId, mangledOperand1)
-                operand2Val == GetVal(workGroupId, mangledOperand2)
+        /\  LET pointerVal == GetVal(workGroupId, mangledPointer)
+                valueVal == GetVal(workGroupId, mangledValue)
             IN
-                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val - operand2Val, Index(-1))})
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, pointerVal, Index(-1)), Var(mangledPointer.scope, mangledPointer.name, pointerVal - valueVal, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
+                /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>
 
 OpMul(t, var, operand1, operand2) ==
     LET workGroupId == WorkGroupId(t)+1
@@ -465,7 +567,7 @@ OpMul(t, var, operand1, operand2) ==
             IN
                 Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val * operand2Val, Index(-1))})
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-                /\  UNCHANGED <<state, globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
+                /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>
 
 
 GetGlobalId(t, result) ==
@@ -519,7 +621,7 @@ OpAtomicLoad(t, result, pointer) ==
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, Index(-1))})  
         /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
-        /\  UNCHANGED <<state,  DynamicNodeSet, globalCounter, snapShotMap>>
+        /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>
 
 OpAtomicStore(t, pointer, value) == 
     LET mangledPointer == Mangle(t, pointer)
@@ -1281,6 +1383,10 @@ ExecuteInstruction(t) ==
                 OpGreater(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpGreaterOrEqual" THEN
                 OpGreaterOrEqual(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpBitwiseOr" THEN
+                OpBitwiseOr(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpBitwiseAnd" THEN
+                OpBitwiseAnd(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAdd" THEN
                 OpAdd(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicAdd" THEN
@@ -1289,6 +1395,8 @@ ExecuteInstruction(t) ==
                 OpSub(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicSub" THEN
                 OpAtomicSub(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpMul" THEN
+                OpMul(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicExchange" THEN
                 OpAtomicExchange(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicCompareExchange" THEN

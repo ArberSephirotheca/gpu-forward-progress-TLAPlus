@@ -61,6 +61,26 @@ IsIntermediate(var) ==
     /\ IsVar(var)
     /\ var.scope = "intermediate"
 
+
+GlobalInvocationId(tid) == tid-1
+
+LocalInvocationId(tid) == GlobalInvocationId(tid) % WorkGroupSize
+
+WorkGroupId(tid) == GlobalInvocationId(tid) \div WorkGroupSize
+    
+SubgroupId(tid) == LocalInvocationId(tid) \div SubgroupSize
+
+SubgroupInvocationId(tid) == LocalInvocationId(tid) % SubgroupSize
+
+ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
+
+ThreadsWithinWorkGroupNonTerminated(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid /\ state[tid] # "terminated"}
+
+ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
+
+ThreadsWithinSubgroupNonTerminated(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid /\ state[tid] # "terminated"} \intersect ThreadsWithinWorkGroup(wgid)
+
+
 Inter(S) ==
   { x \in UNION S : \A t \in S : x \in t }
 Range(f) == { f[x] : x \in DOMAIN f }
@@ -108,6 +128,8 @@ GetVar(workgroupId, var) ==
 Mangle(t, var) ==
     IF var.scope = "local" THEN
         Var(var.scope, Append(ToString(t), Append(var.scope, var.name)), var.value, var.index)
+    ELSE IF var.scope = "shared" THEN
+        Var(var.scope, Append(ToString(WorkGroupId(t)), Append(var.scope, var.name)), var.value, var.index)
     ELSE IF var.scope = "intermediate" THEN
         Var(var.scope, Append(ToString(t), Append(var.scope, var.name)), var.value, var.index)
     ELSE
@@ -235,28 +257,10 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
                 ELSE
                     FALSE
 
-GlobalInvocationId(tid) == tid-1
-
-LocalInvocationId(tid) == GlobalInvocationId(tid) % WorkGroupSize
-
-WorkGroupId(tid) == GlobalInvocationId(tid) \div WorkGroupSize
-    
-SubgroupId(tid) == LocalInvocationId(tid) \div SubgroupSize
-
-SubgroupInvocationId(tid) == LocalInvocationId(tid) % SubgroupSize
-
-ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
-
-ThreadsWithinWorkGroupNonTerminated(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid /\ state[tid] # "terminated"}
-
-ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
-
-ThreadsWithinSubgroupNonTerminated(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid /\ state[tid] # "terminated"} \intersect ThreadsWithinWorkGroup(wgid)
-
 (* Thread Configuration *)
 InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicIncrement" , "OpAtomicDecrement", "OpGroupAll", "OpGroupAny", "OpGroupNonUniformAll", "OpGroupNonUniformAny",
 "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpSwitch", "OpControlBarrier", "OpLoopMerge",
-"OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalOr", "OpLogicalAnd", "OpLogicalEqual", "OpLogicalNotEqual", "OpLogicalNot",
+"OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalOr", "OpLogicalAnd", "OpLogicalEqual", "OpLogicalNotEqual", "OpLogicalNot", "OpBitwiseOr", "OpBitwiseAnd",
 "OpEqual", "OpNotEqual", "OpLess", "OpLessOrEqual", "OpGreater", "OpGreaterOrEqual",
 "OpAdd", "OpAtomicAdd", "OpSub", "OpAtomicSub", "OpMul"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}

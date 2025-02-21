@@ -124,6 +124,10 @@ pub(super) fn stmt(p: &mut Parser) -> Option<CompletedMarker> {
         Some(op_loop_merge_statement(p))
     } else if p.at(TokenKind::OpSelectionMerge) {
         Some(op_selection_merge_statement(p))
+    } else if p.at(TokenKind::OpBitwiseOr){
+        Some(op_bitwise_or_expr(p))
+    } else if p.at(TokenKind::OpBitwiseAnd) {
+        Some(op_bitwise_and_expr(p))
     } else if p.at_set(&IGNORED_INSTRUCTION_SET) {
         skip_ignored_op(p)
     } else {
@@ -924,6 +928,31 @@ fn op_group_nonuniform_any_expr(p: &mut Parser) -> CompletedMarker {
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::GroupNonUniformAnyExpr)
 }
+
+/// example: OpBitwiseOr %result %uint_0 %uint_1
+fn op_bitwise_or_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpBitwiseOr token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::BitwiseOrExpr)
+}
+
+/// example: OpBitwiseAnd %result %uint_0 %uint_1
+fn op_bitwise_and_expr(p: &mut Parser) -> CompletedMarker {
+    let m = p.start();
+    // skip OpBitwiseAnd token
+    p.bump();
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Ident);
+    p.expect(TokenKind::Newline);
+    m.complete(p, TokenKind::BitwiseAndExpr)
+}
+
 
 fn variable_def(p: &mut Parser) -> Option<CompletedMarker> {
     let m = p.start();

@@ -203,7 +203,8 @@ impl CodegenCx {
 
                 // increment the instruction position if the variable' scope is within current invocation, as global and shared variable shouldn't to be initialized explicitly by TLA+ code
                 match &storage_class {
-                    StorageClass::Global | StorageClass::Shared => {}
+                    // StorageClass::Global | StorageClass::Shared => {}
+                    StorageClass::Global => {}
                     _ => {
                         self.increment_inst_position();
                     }
@@ -584,12 +585,41 @@ impl CodegenCx {
                 self.insert_variable(var_name, var_info);
                 self.increment_inst_position();
             }
+            Expr::BitwiseOrExpr(_) => {
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    SpirvType::Int { width: 32, signed: true },
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                    // self.resolve_spirv_type_to_default_value(&SpirvType::Bool).0,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
+            Expr::BitwiseAndExpr(_) => {
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    SpirvType::Int { width: 32, signed: true },
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                    // self.resolve_spirv_type_to_default_value(&SpirvType::Bool).0,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
             Expr::LabelExpr(_) => {
                 let position = self.increment_inst_position();
                 self.insert_label(var_name.clone(), position);
             }
             // fixme: handle array type
-            // Load result is always local
             Expr::LoadExpr(load_expr) => {
                 // fixme: better error handling
                 let pointer_ssa_id = load_expr.pointer().unwrap();
@@ -603,8 +633,8 @@ impl CodegenCx {
                         // var_name,
                         pointer_info.get_var_name(),
                         pointer_info.get_ty(),
-                        pointer_info.access_chain,
-                        StorageClass::Local,
+                        pointer_info.access_chain.clone(),
+                        pointer_info.get_storage_class(),
                         None,
                         None,
                         InstructionValue::None,
@@ -891,7 +921,8 @@ impl CodegenCx {
                 let inst_arg_builder = InstructionArgument::builder();
                 // we dont initialize variable with scope larger than current invocation in TLA+, we do it in the global variable initialization pass
                 match &var_expr.storage_class().unwrap() {
-                    StorageClass::Global | StorageClass::Shared => None,
+                    // StorageClass::Global | StorageClass::Shared => None,
+                    StorageClass::Global => None,
                     _ => {
                         let var = self.lookup_variable(&var_name).unwrap();
 
@@ -1801,6 +1832,112 @@ impl CodegenCx {
                 Some(
                     inst_args_builder
                         .name(InstructionName::GreaterThanEqual)
+                        .num_args(3)
+                        .push_argument(result_arg)
+                        .push_argument(first_operand_arg)
+                        .push_argument(second_operand_arg),
+                )
+            }
+            Expr::BitwiseOrExpr(bitwise_or_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let first_operand_builder = InstructionArgument::builder();
+                let second_operand_builder = InstructionArgument::builder();
+
+                let first_operand = bitwise_or_expr.first_operand().unwrap();
+                let second_operand = bitwise_or_expr.second_operand().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("BitwiseOrExpr: Result variable not found");
+                let first_operand_info = self
+                    .lookup_variable(first_operand.text())
+                    .expect("BitwiseOrExpr: First operand not found");
+                let second_operand_info = self
+                    .lookup_variable(second_operand.text())
+                    .expect("BitwiseOrExpr: Second operand not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let first_operand_arg = first_operand_builder
+                    .name(first_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&first_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let second_operand_arg = second_operand_builder
+                    .name(second_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&second_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(
+                        &second_operand_info.get_storage_class(),
+                    ))
+                    .build()
+                    .unwrap();
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::BitwiseOr)
+                        .num_args(3)
+                        .push_argument(result_arg)
+                        .push_argument(first_operand_arg)
+                        .push_argument(second_operand_arg),
+                )
+            }
+            Expr::BitwiseAndExpr(bitwise_and_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let first_operand_builder = InstructionArgument::builder();
+                let second_operand_builder = InstructionArgument::builder();
+
+                let first_operand = bitwise_and_expr.first_operand().unwrap();
+                let second_operand = bitwise_and_expr.second_operand().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("BitwiseAndExpr: Result variable not found");
+                let first_operand_info = self
+                    .lookup_variable(first_operand.text())
+                    .expect("BitwiseAndExpr: First operand not found");
+                let second_operand_info = self
+                    .lookup_variable(second_operand.text())
+                    .expect("BitwiseAndExpr: Second operand not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let first_operand_arg = first_operand_builder
+                    .name(first_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&first_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let second_operand_arg = second_operand_builder
+                    .name(second_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&second_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(
+                        &second_operand_info.get_storage_class(),
+                    ))
+                    .build()
+                    .unwrap();
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::BitwiseAnd)
                         .num_args(3)
                         .push_argument(result_arg)
                         .push_argument(first_operand_arg)

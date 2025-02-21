@@ -142,6 +142,8 @@ pub enum TokenKind {
     GroupAnyExpr,
     GroupNonUniformAllExpr,
     GroupNonUniformAnyExpr,
+    BitwiseOrExpr,
+    BitwiseAndExpr,
 
     // Type expression
     TypeBoolExpr,
@@ -341,6 +343,11 @@ pub enum TokenKind {
     OpGroupNonUniformAll,
     #[regex("OpGroupNonUniformAny")]
     OpGroupNonUniformAny,
+
+    #[regex("OpBitwiseOr")]
+    OpBitwiseOr,
+    #[regex("OpBitwiseAnd")]
+    OpBitwiseAnd,
     // #[regex("Op[A-Za-z]*", |lex|
     //     let inst = lex.slice();
     //     if instruction_not_supported(inst) {

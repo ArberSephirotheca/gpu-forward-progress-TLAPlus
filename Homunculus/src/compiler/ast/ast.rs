@@ -90,6 +90,10 @@ pub struct GreaterThanExpr(SyntaxNode);
 pub struct LessThanEqualExpr(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
 pub struct GreaterThanEqualExpr(SyntaxNode);
+#[derive(Debug, ResultType, BinaryExpr)]
+pub struct BitwiseOrExpr(SyntaxNode);
+#[derive(Debug, ResultType, BinaryExpr)]
+pub struct BitwiseAndExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct AtomicExchangeExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
@@ -145,6 +149,8 @@ pub enum Expr {
     GreaterThanExpr(GreaterThanExpr),
     LessThanEqualExpr(LessThanEqualExpr),
     GreaterThanEqualExpr(GreaterThanEqualExpr),
+    BitwiseOrExpr(BitwiseOrExpr),
+    BitwiseAndExpr(BitwiseAndExpr),
     AtomicExchangeExpr(AtomicExchangeExpr),
     AtomicCompareExchangeExpr(AtomicCompareExchangeExpr),
     GroupAllExpr(GroupAllExpr),
@@ -214,6 +220,8 @@ impl Expr {
 
             TokenKind::LessThanExpr => Some(Self::LessThanExpr(LessThanExpr(node))),
             TokenKind::LessThanEqualExpr => Some(Self::LessThanEqualExpr(LessThanEqualExpr(node))),
+            TokenKind::BitwiseOrExpr => Some(Self::BitwiseOrExpr(BitwiseOrExpr(node))),
+            TokenKind::BitwiseAndExpr => Some(Self::BitwiseAndExpr(BitwiseAndExpr(node))),
             TokenKind::AtomicExchangeExpr => {
                 Some(Self::AtomicExchangeExpr(AtomicExchangeExpr(node)))
             }
