@@ -107,7 +107,7 @@ PopUntilBlock(seq, blockIdx) ==
         IF idxSet = {} THEN
             seq
         ELSE
-            SubSeq(seq, 1, Max(idxSet))
+            SubSeq(seq, 1, Max(idxSet) - 1)
 
 VarExists(workgroupId, var) == 
     \* IF IsShared(var) \/ IsGlobal(var) THEN 
