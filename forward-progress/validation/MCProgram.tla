@@ -6,11 +6,11 @@ LOCAL INSTANCE FiniteSets
 \* LOCAL INSTANCE MCLayout
 LOCAL INSTANCE TLC
 
-VARIABLES globalVars, threadLocals, CFG, MaxPathLength
+VARIABLES globalVars, threadLocals, state, DynamicNodeSet, globalCounter
+
 (* Layout Configuration *)
 
 Threads == {tid : tid \in 1..NumThreads}
-
 
 (* Variable *)
 Var(varScope, varName, varValue, index) == 
@@ -61,6 +61,28 @@ IsIntermediate(var) ==
     /\ IsVar(var)
     /\ var.scope = "intermediate"
 
+
+GlobalInvocationId(tid) == tid-1
+
+LocalInvocationId(tid) == GlobalInvocationId(tid) % WorkGroupSize
+
+WorkGroupId(tid) == GlobalInvocationId(tid) \div WorkGroupSize
+    
+SubgroupId(tid) == LocalInvocationId(tid) \div SubgroupSize
+
+SubgroupInvocationId(tid) == LocalInvocationId(tid) % SubgroupSize
+
+ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
+
+ThreadsWithinWorkGroupNonTerminated(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid /\ state[tid] # "terminated"}
+
+ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
+
+ThreadsWithinSubgroupNonTerminated(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid /\ state[tid] # "terminated"} \intersect ThreadsWithinWorkGroup(wgid)
+
+
+Inter(S) ==
+  { x \in UNION S : \A t \in S : x \in t }
 Range(f) == { f[x] : x \in DOMAIN f }
 Max(S) == CHOOSE s \in S : \A t \in S : s >= t
 Min(S) == CHOOSE s \in S : \A t \in S : s <= t
@@ -69,6 +91,23 @@ MinIndices(s, allowedIndices) ==
         minVal == IF allowedValues = {} THEN 1000
                   ELSE Min(allowedValues)
     IN {i \in DOMAIN s \cap allowedIndices : s[i] = minVal}
+
+Push(seq, x) ==
+    Append(seq, x)
+
+\* For simplicity we can pop an empty stack
+\* Which will be a noop
+Pop(seq) == 
+  SubSeq(seq, 1, Len(seq)-1)
+
+
+PopUntilBlock(seq, blockIdx) == 
+    LET idxSet == {i \in DOMAIN seq : seq[i].blockIdx = blockIdx}
+    IN
+        IF idxSet = {} THEN
+            seq
+        ELSE
+            SubSeq(seq, 1, Max(idxSet) - 1)
 
 VarExists(workgroupId, var) == 
     \* IF IsShared(var) \/ IsGlobal(var) THEN 
@@ -89,6 +128,8 @@ GetVar(workgroupId, var) ==
 Mangle(t, var) ==
     IF var.scope = "local" THEN
         Var(var.scope, Append(ToString(t), Append(var.scope, var.name)), var.value, var.index)
+    ELSE IF var.scope = "shared" THEN
+        Var(var.scope, Append(ToString(WorkGroupId(t)), Append(var.scope, var.name)), var.value, var.index)
     ELSE IF var.scope = "intermediate" THEN
         Var(var.scope, Append(ToString(t), Append(var.scope, var.name)), var.value, var.index)
     ELSE
@@ -216,33 +257,42 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
                 ELSE
                     FALSE
 
-GlobalInvocationId(tid) == tid-1
-
-LocalInvocationId(tid) == GlobalInvocationId(tid) % WorkGroupSize
-
-WorkGroupId(tid) == GlobalInvocationId(tid) \div WorkGroupSize
-    
-SubgroupId(tid) == LocalInvocationId(tid) \div SubgroupSize
-
-SubgroupInvocationId(tid) == LocalInvocationId(tid) % SubgroupSize
-
-ThreadsWithinWorkGroup(wgid) ==  {tid \in Threads : WorkGroupId(tid) = wgid}
-
-ThreadsWithinSubgroup(sid, wgid) == {tid \in Threads : SubgroupId(tid) = sid} \intersect ThreadsWithinWorkGroup(wgid)
-
 (* Thread Configuration *)
 InstructionSet == {"Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicIncrement" , "OpAtomicDecrement", "OpGroupAll", "OpGroupAny", "OpGroupNonUniformAll", "OpGroupNonUniformAny",
 "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpSwitch", "OpControlBarrier", "OpLoopMerge",
-"OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalOr", "OpLogicalAnd", "OpLogicalEqual", "OpLogicalNotEqual", "OpLogicalNot",
+"OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalOr", "OpLogicalAnd", "OpLogicalEqual", "OpLogicalNotEqual", "OpLogicalNot", "OpShiftLeftLogical", "OpBitcast", "OpBitwiseOr", "OpBitwiseAnd",
 "OpEqual", "OpNotEqual", "OpLess", "OpLessOrEqual", "OpGreater", "OpGreaterOrEqual",
-"OpAdd", "OpAtomicAdd", "OpSub", "OpAtomicSub", "OpMul"}
+"OpAdd", "OpAtomicAdd", "OpSub", "OpAtomicSub", "OpAtomicOr", "OpMul"}
 VariableScope == {"global", "shared", "local", "literal", "intermediate"}
 ScopeOperand == {"workgroup", "subgroup", "tangle"}
 MemoryOperationSet == {"OpAtomicLoad", "OpAtomicStore", "OpAtomicIncrement" , "OpAtomicDecrement", "OpAtomicAdd" , "OpAtomicSub", "OpAtomicCompareExchange" ,"OpAtomicExchange"}
 
 IsMemoryOperation(inst) == 
     inst \in MemoryOperationSet
+
+\* order matters so we use sequence instead of set
+\* currentThreadSet is the set of threads that are currently executing the block
+\* executeSet is the set of blocks that have been executed by the threads
+\* currentThreadSet != {} => executeSet != {}
+\* executeSet = {} => currentThreadSet = {}
+DynamicNode(currentThreadSet, executeSet, notExecuteSet, unknownSet, labelIdx, id, mergeStack, children) ==
+    [
+        currentThreadSet |-> currentThreadSet,
+        executeSet |-> executeSet,
+        notExecuteSet |-> notExecuteSet,
+        unknownSet |-> unknownSet,
+        labelIdx |-> labelIdx,
+        id |-> id,
+        mergeStack |-> mergeStack,
+        children |-> children
+    ]
+
+
 (* Program *)
+
+
+EntryLabel == Min({idx \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][idx] = "OpLabel"})
+(* CFG *)
 
 INSTANCE ProgramConf
 
@@ -251,44 +301,11 @@ TangledInstructionSet == {"OpControlBarrier, OpGroupAll", "OpGroupAny", "OpGroup
 MergedInstructionSet == {"OpLoopMerge", "OpSelectionMerge"}
 BlockTerminationInstructionSet == {"OpBranch", "OpBranchConditional", "OpSwitch", "Terminate"}
 BranchInstructionSet == {"OpBranch", "OpBranchConditional", "OpSwitch"}
+ConstructTypeSet == {"Selection", "Loop", "Switch", "Continue", "Case"}
 \* Tangle: 
 Tangle(ts) == 
     [threads |-> ts]
 
-
-\* Block: A contiguous sequence of instructions starting with an OpLabel, ending with a block termination instruction. 
-\* A block has no additional label or block termination instructions.
-\* block termination instruction: OpBranch, OpBranchConditional, Terminate
-\* OpLabel is define as a variable that has pc as its value field and its opLabel as its name field
-Block(opLabel, terminatedInstr, tangle, merge) == 
-    [opLabelIdx |-> opLabel,
-    terminatedInstrIdx |-> terminatedInstr,
-    tangle |-> tangle,
-    merge |-> merge]
-
-GenerateCFG(blocks, branch) == 
-    [node |-> blocks,
-    edge |-> branch]
-
-
-IsTerminationInstruction(instr) ==
-    instr \in BlockTerminationInstructionSet
-
-IsBranchInstruction(instr) ==
-    instr \in BranchInstructionSet
-
-IsMergedInstruction(instr) ==
-    instr \in MergedInstructionSet
-
-IsOpLabel(instr) ==
-    instr = "OpLabel"
-
-IsMergeBlock(block) ==
-    block.merge = TRUE
-
-\* helper function to extract the OpLabel field from the block
-ExtractOpLabelIdxSet(blocks) ==
-    {blocks[blockIdx].opLabelIdx : blockIdx \in 1..Len(blocks)}
 
 \* make non-order-sensitive sequence becomes enumerable
 SeqToSet(seq) == { seq[i]: i \in 1..Len(seq) }
@@ -299,13 +316,17 @@ newSeqOfSets(seq, idx, newSet) == [seq EXCEPT ![idx] = newSet]
 \* BoundedSeq: return a set of all sequences of length at most n, this helps to make the sequence enumerable
 BoundedSeq(S, N) == UNION { [1..n -> S]: n \in 0..N}
 
-(* Helper function to find the block that contains the given index *)
-FindCurrentBlock(blocks, index) == 
-    CHOOSE block \in SeqToSet(blocks): block.opLabelIdx <= index /\ block.terminatedInstrIdx >= index
 
-\* (* Helper function to find the block that starts with the given name to OpLabel *)
-\* FindBlockbyOpLabel(blocks, name) == 
-\*     CHOOSE k \in 1..Len(blocks) : \E j \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][j] = "OpLabel" /\ GetVal(ThreadArguments[1][blocks[k].opLabelIdx]) = j
+\* helper function to extract the OpLabel field from the block
+ExtractOpLabelIdxSet(blocks) ==
+    {blocks[blockIdx].opLabelIdx : blockIdx \in 1..Len(blocks)}
+
+        
+
+\* mergeBlock is the current merge block,
+\* return header block for current merge block
+FindHeaderBlock(blocks, mBlock) == 
+    CHOOSE block \in SeqToSet(blocks) : mBlock.opLabelIdx = block.mergeBlock
 
 (* Helper function to find the block that starts with the given index to OpLabel *)
 FindBlockbyOpLabelIdx(blocks, index) == 
@@ -314,6 +335,13 @@ FindBlockbyOpLabelIdx(blocks, index) ==
 (* Helper function to find the block that ends with the given index to termination instruction *)
 FindBlockByTerminationIns(blocks, index) == 
     CHOOSE block \in SeqToSet(blocks): block.terminatedInstrIdx = index
+
+GetSwitchTargets(block) ==
+    LET
+        switchInstrIdx == block.terminatedInstrIdx
+        switchTargets == {GetVal(-1, ThreadArguments[1][switchInstrIdx][i]) : i \in 2..Len(ThreadArguments[1][switchInstrIdx])}
+    IN
+        switchTargets
 
 
 \* function to determine if the merge instruction contains the given label as operand
@@ -337,6 +365,43 @@ MergeInstContainsLabelIdx(mergeInsIdx, opLabelIdx) ==
         FALSE
 
 
+IsTerminationInstruction(instr) ==
+    instr \in BlockTerminationInstructionSet
+
+IsBranchInstruction(instr) ==
+    instr \in BranchInstructionSet
+
+IsMergedInstruction(instr) ==
+    instr \in MergedInstructionSet
+
+IsOpLabel(instr) ==
+    instr = "OpLabel"
+
+IsMergeBlock(blockIdx) ==
+    /\ \E construct \in ControlFlowConstructs : construct.mergeBlock = blockIdx
+
+IsConstructHeaderBlock(blockIdx) ==
+    /\ \E construct \in ControlFlowConstructs : construct.headerBlock = blockIdx
+
+IsHeaderBlock(block) ==
+    block.mergeBlock # -1
+
+IsLoopHeaderBlock(block) ==
+    /\ IsHeaderBlock(block)
+    /\ block.constructType = "Loop"
+
+
+IsContinueBlockOf(currentBlock, headerBlock) ==
+    /\ IsLoopHeaderBlock(headerBlock)
+    /\ IsMergeBlock(currentBlock.opLabelIdx)
+    /\ headerBlock.continueBlock = currentBlock.opLabelIdx
+
+IsExitBlock(block) ==
+  IsTerminationInstruction(block.terminatedInstrIdx)
+(* Helper function to find the block that contains the given index *)
+FindCurrentBlock(blocks, index) == 
+    CHOOSE block \in SeqToSet(blocks): block.opLabelIdx <= index /\ block.terminatedInstrIdx >= index
+
 \* lookback function that helps to determine if the current block is a merge block
 \* startIdx is the pc of the instruction(OpLabel) that starts the current block
 DetermineBlockType(startIdx) ==
@@ -349,292 +414,562 @@ DetermineBlockType(startIdx) ==
         FALSE
 
 
-\* node is the index to the opLabel
-RECURSIVE DFS(_, _, _, _, _)
-DFS(node, cfg, visited, finished, backEdges) ==
-    LET
-        newVisited == visited \union {node}
-        successors == {n \in ExtractOpLabelIdxSet(cfg.node) : <<node, n>> \in cfg.edge}
-        newBackEdges == 
-            LET
-                newLoopEdges == 
-                    {<<node, s>> : s \in visited} \cap 
-                    {<<node, s>> : s \in successors}
-            IN
-            backEdges \union {edge \in newLoopEdges: edge[2] \notin finished}
+\* it is only possible for a thread to be in one DB at a time
+CurrentDynamicNode(wgid, tid) ==
+    CHOOSE DB \in DynamicNodeSet : tid \in DB.currentThreadSet[wgid]
+
+FindDB(labelIdx) ==
+    CHOOSE DB \in DynamicNodeSet : DB.labelIdx = labelIdx
+
+IsMergeBlockOfLoop(blockIdx) ==
+    /\ \E construct \in ControlFlowConstructs : construct.constructType = "Loop" /\ construct.mergeBlock = blockIdx
+
+GetConstructOfLoop(mergeBlockIdx) ==
+    CHOOSE construct \in ControlFlowConstructs : construct.constructType = "Loop" /\ construct.mergeBlock = mergeBlockIdx
+
+BlocksInSameLoopConstruct(headerIdx, mergeIdx) ==
+    CHOOSE  construct \in ControlFlowConstructs : construct.constructType = "Loop" /\ construct.headerBlock = headerIdx /\ construct.mergeBlock = mergeIdx
+
+IsBlockWithinLoop(blockIdx) ==
+    LET matchingConstructs == {c \in ControlFlowConstructs : blockIdx \in c.blocks}
     IN
-    IF node \in finished THEN
-        [visited |-> visited, finished |-> finished, backEdges |-> backEdges]
-    ELSE IF \A s \in successors : s \in visited
-    THEN 
-        [visited |-> newVisited, 
-         finished |-> finished \union {node}, 
-         backEdges |-> newBackEdges]
-    ELSE
-        LET
-            unvisitedSuccs == {s \in successors : s \notin visited}
-            RECURSIVE DFSAll(_, _, _, _)
-            DFSAll(nodes, v, f, b) ==
-                IF nodes = {} THEN [visited |-> v, finished |-> f, backEdges |-> b]
-                ELSE
-                    LET 
-                        next == CHOOSE n \in nodes : TRUE
-                        result == DFS(next, cfg, v, f, b)
-                    IN
-                    DFSAll(nodes \ {next}, result.visited, result.finished, result.backEdges)
-        IN
-        LET
-            result == DFSAll(unvisitedSuccs, newVisited, finished, newBackEdges)
-        IN
-        [visited |-> result.visited, 
-         finished |-> result.finished \union {node}, 
-         backEdges |-> result.backEdges]
+        /\ matchingConstructs # {}
+        /\ \E c \in matchingConstructs : c.constructType = "Loop" 
 
-\* Given a CFG, identify all the back edges in the CFG
-\* Node is the index to the opLabel
-IdentifyLoops(cfg) ==
-    LET
-        startNode == 1 \* Start from the entry block
-        result == DFS(startNode, cfg, {}, {}, {})
-    IN
-    result.backEdges
-
-RECURSIVE LoopNestingDepth(_, _, _, _)
-LoopNestingDepth(node, cfg, loops, visited) ==
-    LET
-        successors == {n \in ExtractOpLabelIdxSet(cfg.node) : <<node, n>> \in cfg.edge}
-        loopEdges == {e \in loops : e[2] = node}
-    IN
-    IF node \in visited THEN 0  \* Prevent infinite recursion on cycles
-    ELSE IF loopEdges = {} THEN 0
-    ELSE 1 + Max({LoopNestingDepth(e[1], cfg, loops \ {e}, visited \union {node}) : e \in loopEdges})
-
-MaxLoopNestingDepth(cfg) ==
-    LET 
-        loops == IdentifyLoops(cfg)
-    IN
-    Max({LoopNestingDepth(n, cfg, loops, {}) : n \in ExtractOpLabelIdxSet(cfg.node)})
+\* This function is useful because it helps to determine the blocks that are being affeced by the change of tangle of current block
+BlocksInSameConstruct(mergeIdx) ==
+    CHOOSE  construct \in ControlFlowConstructs : construct.mergeBlock = mergeIdx
 
 
-SuggestedPathLength(cfg) ==
-    LET
-        loopDepth == MaxLoopNestingDepth(cfg)
-        nodeCount == Cardinality(DOMAIN cfg.node)
-    IN
-        nodeCount * (2 ^ loopDepth)
-
-
-RECURSIVE GeneratePaths(_, _, _)
-GeneratePaths(node, cfg, length) ==
-  IF length = 0 THEN {<<>>}
-  ELSE
-    LET 
-      successors == {n \in ExtractOpLabelIdxSet(cfg.node) : <<node, n>> \in cfg.edge}
-      subpaths == UNION {GeneratePaths(s, cfg, length - 1) : s \in successors}
-    IN
-    {<<node>> \o path : path \in subpaths}
-
-ValidPaths(startNode, cfg, maxPathLength) == 
-    UNION {GeneratePaths(startNode, cfg, len) : len \in 1..MaxPathLength}
-
-\* return a set of all paths in graph G
-StructuredControlFlowPaths(G) == {
-    p \in ValidPaths(1, CFG, MaxPathLength) :
-        /\ p # <<>>(* p is not an empty sequence *)
-        /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
-    }
-
-
-\* fixme: maximum length of the path should be sounded.
-StructuredControlFlowPathsTo(B) =={
-    p \in ValidPaths(1, CFG, MaxPathLength) :
-        /\ p # <<>>(* p is not an empty sequence *)
-        /\ p[1] = 1
-        /\ p[Len(p)] = B
-        /\ \A i \in 1..(Len(p) - 1) : <<p[i], p[i+1]>> \in CFG.edge
-    }
-
-
-
-\* A block A structurally dominates a block B if every structured control flow path to B includes A
-\* A and B are the indice to the opLabel
-StructurallyDominates(A, B) == \A p \in StructuredControlFlowPathsTo(B) : \E i \in 1..Len(p) : p[i] = A
-
-\* A block A strictly structurally dominates a block B if A structurally dominates B and A != B
-\* A and B are the indice to the opLabel
-StrictlyStructurallyDominates(A, B) == 
-    /\ StructurallyDominates(A, B)
-    /\ A # B
-
-
-\* helper function that returns the index of the first OpLabel instruction
-\* We do not need to worry about empty set as we are guaranteed to have 
-\* at least one OpLabel instruction (entry block)
-EntryLabel(insts) ==
-    Min({idx \in 1..Len(insts) : insts[idx] = "OpLabel"})
+UniqueBlockId(blockIdx, counter) ==
+    [blockIdx |-> blockIdx,
+     counter |-> counter]
     
-\* Generate blocks from the instructions
-GenerateBlocks(insts) == 
-  [i \in 1..Len(insts) |-> 
-     IF IsOpLabel(insts[i]) THEN 
-       LET terminationIndex == Min({j \in i+1..Len(insts) : 
-        IsTerminationInstruction(insts[j])} \cup {Len(insts)})
-           tangle == IF 
-                        i = EntryLabel(insts) 
-                     THEN 
-                        [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroup(wg-1)] 
-                     ELSE 
-                        [wg \in 1..NumWorkGroups |-> {}]
-       IN 
-            Block(i, terminationIndex, tangle, DetermineBlockType(i))
-     ELSE Block(-1, <<>>, <<>>, FALSE)
-  ]
+    
+Iteration(blockIdx, iter) == 
+    [blockIdx |-> blockIdx,
+     iter |-> iter]
 
+FindIteration(blockIdx, iterationsVec, tid) ==
+    \* LET iterSet ==
+    \*     {iter \in DOMAIN iterationsVec : iterationsVec[iter].blockIdx = blockIdx}
+    \* IN
+    \*     IF iterSet # {} 
+    \*     THEN
+    \*         LET idx == CHOOSE iter \in iterSet : TRUE
+    \*             IN
+    \*                 iterationsVec[idx]
+    \*     ELSE
+    \*         Iteration(blockIdx, 0)
+    IF Len(iterationsVec) = 0
+    THEN
+        Iteration(blockIdx, 0)
+    ELSE IF iterationsVec[Len(iterationsVec)].blockIdx = blockIdx
+    THEN
+        iterationsVec[Len(iterationsVec)]
+    ELSE
+        Iteration(blockIdx, 0)
 
-\* startIndex is the pc of the instruction(OpLabel) that starts the block
-\* terminationIndex is the pc of the termination instruction that terminates the block
-\* return set of indices to the OpLabel instructions
-\* OpLabel is obtained from the merge instruction and branch instruction
-FindTargetBlocks(startIndex, terminationIndex) == 
+SameMergeStack(left, mergeBlock) ==
+    IF Len(mergeBlock) = 0 THEN 
+        TRUE
+    ELSE IF Len(left) >= Len(mergeBlock) THEN
+        SubSeq(left, 1, Len(mergeBlock)) = mergeBlock
+    ELSE 
+        FALSE
+    \* /\ Len(left) = Len(right)
+    \* /\ \A idx \in 1..Len(left):
+    \*     /\ left[idx].blockIdx = right[idx].blockIdx
+    \*     /\ left[idx].counter = right[idx].counter
+
+SameIterationVector(left, right) ==
+    /\ Len(left) = Len(right)
+    /\ \A idx \in 1..Len(left):
+        /\ left[idx].blockIdx = right[idx].blockIdx
+        /\ left[idx].iter = right[idx].iter
+
+CanMergeSameIterationVector(curr, remaining) ==
+    \E idx \in 1..Len(remaining):
+        SameIterationVector(curr, remaining[idx])
+
+\* 1. Push the merge block to the merge stack of current DB.
+\* 2. Update the iteration vector of current DB for current thread.
+\* LoopMergeUpdate(wgid, t, currentLabelIdx, mergeBlock) ==
+\*     LET
+
+\*         currentDB == CurrentDynamicNode(wgid, t)
+\*         \* updatedThreadMergeStack == Push(currentDB.mergeStack[t], mergeBlock)
+\*         currentIteration == FindIteration(currentLabelIdx, currentDB.children[t], t)
+\*         \* if new iteration is created, we need to add it to the iteration vector
+\*         \* otherwise we just need to increment the iteration number of top element of the iteration vector
+\*         updatedThreadIterationVec == IF currentIteration.iter = 0
+\*         THEN 
+\*             Push(currentDB.children[t], Iteration(currentLabelIdx, 1))
+\*         ELSE 
+\*             [currentDB.children[t] EXCEPT ![Len(currentDB.children[t])] = Iteration(currentIteration.blockIdx, currentIteration.iter + 1)]
+\*         hasExistingBlock == \E DB \in DynamicNodeSet : DB.labelIdx = currentLabelIdx /\ CanMergeSameIterationVector(updatedThreadIterationVec, DB.children)
+\*         filterDynamicNode == {DB \in DynamicNodeSet : t \notin DB.currentThreadSet[wgid]}
+\*     IN
+\*         \* if we has existing block with the same iteration vector, we need to merge the current block with the existing block
+\*         IF hasExistingBlock THEN
+\*             {
+\*                 IF DB.labelIdx = currentLabelIdx /\ CanMergeSameIterationVector(updatedThreadIterationVec, DB.children)
+\*                 THEN
+\*                     DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
+\*                     [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
+\*                     [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \ {t}],
+\*                     [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+\*                     DB.labelIdx,
+\*                     \* [DB.mergeStack EXCEPT ![t] = updatedThreadMergeStack],
+\*                     [DB.children EXCEPT ![t] = updatedThreadIterationVec])
+\*                 ELSE 
+\*                     DB
+\*                 : DB \in filterDynamicNode
+\*                 }
+\*         ELSE
+\*         filterDynamicNode
+\*         \union 
+\*         (
+\*              { DynamicNode(currentDB.currentThreadSet,
+\*                         currentDB.executeSet,
+\*                         currentDB.notExecuteSet,
+\*                         currentDB.unknownSet,
+\*                         currentLabelIdx,
+\*                         \* currentDB.mergeStack,
+\*                         [currentDB.children EXCEPT ![t] = updatedThreadIterationVec])
+\*             }
+\*         )
+        \* {
+        \*     IF t \in DB.currentThreadSet[wgid] THEN
+        \*       DynamicNode(currentDB.currentThreadSet,
+        \*                 currentDB.executeSet,
+        \*                 currentDB.notExecuteSet,
+        \*                 currentDB.unknownSet,
+        \*                 currentLabelIdx,
+        \*                 \* currentDB.mergeStack,
+        \*                 [currentDB.children EXCEPT ![t] = updatedThreadIterationVec])
+            
+        \*     ELSE 
+        \*         DB
+        \*     : DB \in DynamicNodeSet
+        \* }
+
+\* Dynamic node is uniquely identified by the combination of labelIdx and iteration stack.
+\* We define dynamic node N1 and N2 are the same if: N1 has the same sequence of dynamic instance as N2.
+\* We define dynamic node N1 and N2 are distinct if: N1 has different sequence of dynamic instance as N2.
+\* We can prove the combination of labelIdx and iteration stack is unique by contradiction:
+    \* Assume that there exist two distinct dynamic nodes N1 and N2 with the same labelIdx and iteration stack.
+    \* N1 and N2 have same labelIdx -> they are created from the same static block.
+    \* N1 and N2 have the same iteration stack -> they are created at the same loop iteration.
+    \* Then, we have a contradiction: 
+    \* By definition, dynamic instance of an instruction is created each time per execution.
+    \* In a structurde control flow, the only way for a thread to re-execute the same instruction is to loop back to the same block. (assume no function call)
+    \* If two dynamic nodes have the same labelIdx and iteration stack, they must have same sequence of dynamic instance of instructions as they are executing the same block at the same iteration.
+    \* Then, by definition, N1 and N2 are the same dynamic node.
+    \* Hence we have a contradiction.
+    \* Therefore, no two distinct dynamic nodes can have the same combination of labelIdx and iteration stack.
+
+\* Each time there is a divergent:
+    \* For current block, we need to:
+        \* 1. remove current thread from the current thread set.
+    \* For chosen block, we need to:
+        \* 1. If it creates a new dynamic node, then:
+            \* 1.1 create an empty current thread set and add current thread to it.
+            \* 1.2 create an empty execute set and add current thread to it.
+            \* 1.3 create an empty not execute set.
+            \* 1.4 create an unknown set filled with all non-terminated threads and remove current thread from it.
+            \* 1.5 copy the iteration stack of current block to the new dynamic node.
+        \* 2. If the dynamic block exists, then:
+            \* 2.1 add current thread to the current thread set.
+            \* 2.2 add current thread to the execute set.
+            \* 2.3 remove current thread from the unknown set.
+    \* For each unchosen block, we need to:
+        \* 1. If it creates a new dynamic node, then:
+            \* 1.1 create an empty current thread set.
+            \* 1.2 create an empty execute set.
+            \* 1.3 create an empty not execute set and add current thread to it.
+            \* 1.4 create an unknown set filled with all non-terminated threads and remove current thread from it.
+            \* 1.5 copy the iteration stack of current block to the new dynamic node.
+        \* 2. If the dynamic block exists, then:
+            \* 2.1 add current thread to the not execute set.
+            \* 2.2 remove current thread from the unknown set.
+\* After applying above update, we have additional rules if the dynamic node being updated or created is:
+    \* 1. a merge block of a loop (e.g. exit the loop):
+        \* 1.1 Pops the last element from the iteration stack of that DB.
+        \* 1.2 Add self to the not execute set of all DB within same loop construct that has the same iteration stack (after update).
+        \* 1.3 Remove self from the current thread set of all DB within same loop construct that has the same iteration stack (after update).
+        \* 1.4 Remove self from the unknown set of all DB within same loop construct that has the same iteration stack (after update).
+    \* 2. a loop body:
+        \* Increment the iteration number of last element of the iteration stack by one.
+    \* 3. a purely merge block:
+        \* remove self from the not execute set.
+BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
     LET
-        mergeInstr == IF 
-                        terminationIndex > startIndex 
-                      THEN 
-                      ThreadInstructions[1][terminationIndex - 1] 
-                      ELSE 
-                        <<>>
-    IN
-        IF mergeInstr = "OpLoopMerge" THEN
-            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1]), 
-                GetVal(-1, ThreadArguments[1][terminationIndex - 1][2])} \cup 
-                (IF ThreadInstructions[1][terminationIndex] = "OpBranch" THEN
-                    {GetVal(-1, ThreadArguments[1][terminationIndex][1])}
-                ELSE IF ThreadInstructions[1][terminationIndex] = "OpBranchConditional" THEN
-                    {GetVal(-1, ThreadArguments[1][terminationIndex][2]), 
-                        GetVal(-1, ThreadArguments[1][terminationIndex][3])}
-                ELSE
-                    {})
-        ELSE IF mergeInstr = "OpSelectionMerge" THEN
-            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1])} \cup 
-                (IF ThreadInstructions[1][terminationIndex] = "OpBranch" THEN
-                    {GetVal(-1, ThreadArguments[1][terminationIndex][1])}
-                ELSE IF ThreadInstructions[1][terminationIndex] = "OpBranchConditional" THEN
-                    {GetVal(-1, ThreadArguments[1][terminationIndex][2]), 
-                        GetVal(-1, ThreadArguments[1][terminationIndex][3])}
-                ELSE
-                    {})
-        ELSE 
-            IF ThreadInstructions[1][terminationIndex] = "OpBranch" THEN
-                {GetVal(-1, ThreadArguments[1][terminationIndex][1])}
-            ELSE IF ThreadInstructions[1][terminationIndex] = "OpBranchConditional" THEN
-                {GetVal(-1, ThreadArguments[1][terminationIndex][2]), 
-                    GetVal(-1, ThreadArguments[1][terminationIndex][3])}
+        currentCounter == globalCounter
+        currentBranchOptions == opLabelIdxVec
+        currentDB == CurrentDynamicNode(wgid, t)
+        falseLabelIdxSet == SeqToSet(opLabelIdxVec) \ {chosenBranchIdx}  
+        labelIdxSet == {DB.labelIdx : DB \in DynamicNodeSet}
+        choosenBlock == FindBlockbyOpLabelIdx(Blocks, chosenBranchIdx)
+        currentBlock == FindBlockbyOpLabelIdx(Blocks, currentDB.labelIdx)
+        currentChildren == currentDB.children
+        currentMergeStack == currentDB.mergeStack
+        \* it determines if the current db has already created the dynamic block for branching
+        childrenContainsAllBranchDB == \A i \in 1..Len(currentBranchOptions):
+            \E  child \in currentChildren: child.blockIdx = currentBranchOptions[i]
+        \* currentIteration == FindIteration(currentDB.labelIdx, currentDB.children, t)
+        \* if new iteration is created, we need to add it to the iteration vector
+        \* otherwise we just need to increment the iteration number of top element of the iteration vector
+        \* updatedThreadIterationVec == IF currentIteration.iter = 0
+        \* THEN 
+        \*     Push(currentDB.children, Iteration(currentDB.labelIdx, 1))
+        \* ELSE 
+        \*     [currentDB.children EXCEPT ![Len(currentDB.children)] = Iteration(currentIteration.blockIdx, currentIteration.iter + 1)]
+        isHeaderBlock == IsHeaderBlock(currentBlock)
+        isMergeBlock == IsMergeBlock(currentBlock.opLabelIdx)
+        \* check if current header block already has a merge block
+        mergeStackContainsCurrent == isHeaderBlock /\ Len(currentMergeStack) # 0 /\ currentMergeStack[Len(currentMergeStack)].blockIdx = currentBlock.mergeBlock
+        updatedMergeStack == 
+            IF mergeStackContainsCurrent \/ isHeaderBlock = FALSE THEN 
+                currentMergeStack
+            ELSE
+                Push(currentMergeStack, UniqueBlockId(currentBlock.mergeBlock, currentCounter + 1))
+        \* update the children if firstly reach the divergence
+        \* otherwise keep as it is
+        counterAfterMergeStack == 
+            IF isHeaderBlock = FALSE  \/ mergeStackContainsCurrent THEN
+                currentCounter
+            ELSE
+                currentCounter + 1
+        updatedChildren == 
+            IF childrenContainsAllBranchDB THEN
+                currentChildren
+            ELSE
+                currentChildren \union 
+                {
+                    IF IsMergeBlock(currentBranchOptions[i]) /\ \E index \in DOMAIN updatedMergeStack: updatedMergeStack[index].blockIdx = currentBranchOptions[i]
+                    THEN 
+                        UniqueBlockId(currentBranchOptions[i], updatedMergeStack[(CHOOSE index \in DOMAIN updatedMergeStack: updatedMergeStack[index].blockIdx = currentBranchOptions[i])].counter)
+                    ELSE
+                        UniqueBlockId(currentBranchOptions[i], counterAfterMergeStack + i)
+                    : i \in 1..Len(currentBranchOptions)
+                }
+        \* We only update the merge stack if the current block is a header block and if firstly reach the divergence
+        \* globalCounter is only updated when we firstly reach the divergence
+        updatedCounter == currentCounter + Cardinality(updatedChildren) - Cardinality(currentChildren) + Len(updatedMergeStack) - Len(currentMergeStack)
+        \* isLoopHeader == IsLoopHeaderBlock(currentBlock)
+        \* loopBranchIdx == IF isLoopHeader THEN
+        \*     ThreadArguments[t][pc][1].value
+        \* ELSE
+        \*     -1
+        
+        mergeBlock == currentBlock.mergeBlock
+        \* exsiting dynamic blocks for false labels
+        \* zheyuan: update this
+        existingFalseLabelIdxSet == {
+            falselabelIdx \in falseLabelIdxSet: 
+                \E DB \in DynamicNodeSet: DB.labelIdx = falselabelIdx /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id
+                
+        }
+        \* we want to update the blocks in loop construct as well as the continue target
+        \* loopConstructUpdate == 
+        \*     IF IsMergeBlockOfLoop(chosenBranchIdx) THEN
+        \*         LET loopConstruct == BlocksInSameLoopConstruct(currentDB.mergeStack[Len(currentDB.mergeStack)].blockIdx, chosenBranchIdx)
+        \*         IN
+        \*             loopConstruct.blocks \union {loopConstruct.continueTarget}
+        \*     ELSE
+        \*         {}
+        \* we want to update the blocks in construct if choosen block is merge block
+        constructUpdate == 
+            IF IsMergeBlock(chosenBranchIdx) THEN
+                LET construct == BlocksInSameConstruct(chosenBranchIdx)
+                IN
+                    construct.blocks \union {construct.continueTarget}
             ELSE
                 {}
-
-                    
-                    
-\* startIndex is the pc of the instruction(OpLabel) that starts the block
-\* terminationIndex is the pc of the termination instruction that terminates the block
-\* return set of indices to the OpLabel instructions of the merge block for current header block
-\* OpLabel is obtained from the merge instruction and branch instruction
-FindMergeBlocksIdx(startIndex, terminationIndex) == 
-    LET
-        mergeInstr == IF terminationIndex > startIndex THEN ThreadInstructions[1][terminationIndex - 1] ELSE <<>>
+        \* this is set of all threads that are not terminated and still in the current construct
+        unionSet == 
+            [wg \in 1..NumWorkGroups |-> currentDB.currentThreadSet[wg] \union currentDB.executeSet[wg] \union currentDB.notExecuteSet[wg] \union currentDB.unknownSet[wg]]
     IN
-        IF mergeInstr = "OpLoopMerge" THEN
-            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1]), GetVal(-1, ThreadArguments[1][terminationIndex - 1][2])}
-        ELSE IF mergeInstr = "OpSelectionMerge" THEN
-            {GetVal(-1, ThreadArguments[1][terminationIndex - 1][1])}
-        ELSE 
-            {}
+        << updatedCounter, 
+        \* update the existing dynamic blocks
+        {
+            \* if the constructUpdate is not empty, it means we are exiting a construct, all the dynamic blocks in that construct should be properly updated
+            \* remove current thread from all set as it is not partcipating in the construct anymore
+            IF DB.labelIdx \in constructUpdate /\ SameMergeStack(DB.mergeStack, currentMergeStack) THEN
+                DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
+                    DB.executeSet,
+                    DB.notExecuteSet,
+                    [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                    DB.labelIdx,
+                    DB.id,
+                    IF DB.labelIdx = currentDB.labelIdx /\ DB.id = currentDB.id THEN 
+                        updatedMergeStack
+                    ELSE 
+                        DB.mergeStack
+                    ,
+                    IF DB.labelIdx = currentDB.labelIdx /\ DB.id = currentDB.id THEN
+                        updatedChildren
+                    ELSE
+                    DB.children)
+            \* if encounter current dynamic block
+            ELSE IF DB.labelIdx = currentDB.labelIdx /\ DB.id = currentDB.id THEN
+                DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
+                    DB.executeSet,
+                    DB.notExecuteSet,
+                    DB.unknownSet,
+                    DB.labelIdx,
+                    DB.id,
+                    updatedMergeStack,
+                    updatedChildren)
 
-\* mergeBlock is the current merge block,
-\* return set of header blocks for current merge block
-FindHeaderBlocks(mergeBlock) == 
-    {block \in SeqToSet(CFG.node):
-        mergeBlock.opLabelIdx \in FindMergeBlocksIdx(block.opLabelIdx, block.terminatedInstrIdx)}
-
-\* Rule 4: If there exists termination instruction in the block, 
-\* then remove thread itself from the tangle of all merge blocks as well as current block
-\* for every header block that structurally dominates the current block
-TerminateUpdate(wgid, t, currentLabelIdx) ==
-    [i \in 1..Len(CFG.node) |->
-        IF IsMergeBlock(CFG.node[i]) /\ (\E block \in FindHeaderBlocks(CFG.node[i]) : 
-            StrictlyStructurallyDominates(block.opLabelIdx, currentLabelIdx)) 
-        THEN
-            Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
-            newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), 
-            CFG.node[i].merge)
-        ELSE
-            CFG.node[i]
-    ] 
-
-\* BranchUpdate: update the tangle of the blocks that are pointed by the branch instruction
-\* tangle is the tangle that is going to be updated to the blocks, each workgroup has its own tangle
-\* opLabelIdxSet is the set of indices to the opLabel instructions that are pointed by the branch instruction
-\* choosenBranchIdx is the index to the opLabel instruction that is choosen by the branch instruction
-BranchUpdate(wgid, t, tangle, opLabelIdxSet, choosenBranchIdx) ==
-    [i \in 1..Len(CFG.node) |-> 
-        IF CFG.node[i].opLabelIdx \in opLabelIdxSet THEN
-            \* rule 2: If a thread reaches a branch instruction and the block it points to has empty tangle,
-            \* update the tangle of tha block to the tangle of the merge instruction,
-            \* and remove the thread itself from the tangle of unchoosen block if that block is not a merge block
-            IF CFG.node[i].tangle[wgid] = {} THEN
-                \* unchoosen block and is not a merge block
-                IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].merge # TRUE THEN
-                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
-                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle \{t}), CFG.node[i].merge)
+            \* if encounter choosen dynamic block
+            \* whether its in current DB's children or on the top of the merge stack, we update it
+            ELSE IF DB.labelIdx = chosenBranchIdx 
+                    \* /\ ((IsMergeBlock(chosenBranchIdx) /\ updatedMergeStack[Len(updatedMergeStack)].blockIdx = DB.labelIdx /\ updatedMergeStack[Len(updatedMergeStack)].counter = DB.id) 
+                    /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id
+            THEN
+                DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
+                    [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
+                    DB.notExecuteSet,
+                    [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                    DB.labelIdx,
+                    DB.id,
+                    DB.mergeStack,
+                    DB.children)
+                \* IF  IsMergeBlock(chosenBranchIdx) /\ SameMergeStack(DB.mergeStack, Pop(updatedMergeStack)) THEN 
+                \*     DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
+                \*         [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
+                \*         DB.notExecuteSet,
+                \*         [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                \*         DB.labelIdx,
+                \*         DB.id,
+                \*         DB.mergeStack,
+                \*         DB.children)
+                \* \* if the choosen branch index is the header of a construct
+                \* \* zheyuan: has problem here
+                \* ELSE IF IsConstructHeaderBlock(DB.labelIdx) /\ SameMergeStack(DB.mergeStack, updatedMergeStack) THEN
+                \*     DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
+                \*         [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
+                \*         DB.notExecuteSet,
+                \*         [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                \*         DB.labelIdx,
+                \*         DB.id,
+                \*         DB.mergeStack,
+                \*         DB.children)
+                \* ELSE IF IsMergeBlock(DB.labelIdx) = FALSE /\ SameMergeStack(DB.mergeStack, updatedMergeStack) THEN 
+                \*     DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \union {t}],
+                \*         [DB.executeSet EXCEPT ![wgid] = DB.executeSet[wgid] \union {t}],
+                \*         DB.notExecuteSet,
+                \*         [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                \*         DB.labelIdx,
+                \*         DB.id,
+                \*         DB.mergeStack,
+                \*         DB.children)
+                \* ELSE
+                \*     DB
+            \* Encounter the block that is not choosen by the branch instruction
+            \* we don't update the existing set for merge block as threads will eventually reach there unless they terminate early
+            ELSE IF DB.labelIdx \in falseLabelIdxSet
+                /\ IsMergeBlock(DB.labelIdx) = FALSE
+                /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id
+                \* /\ (\/ (SameMergeStack(DB.mergeStack, currentDB.mergeStack))
+                \*     \/  ( SameMergeStack(DB.mergeStack, updatedMergeStack)))
+            
+            THEN
+                DynamicNode(DB.currentThreadSet,
+                    DB.executeSet,
+                    [DB.notExecuteSet EXCEPT ![wgid] = DB.notExecuteSet[wgid] \union {t}],
+                    [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+                    DB.labelIdx,
+                    DB.id,
+                    DB.mergeStack,
+                    DB.children)
+            
+            ELSE
+                DB
+            : DB \in DynamicNodeSet
+        }
+        \* union with the new true branch DB if does not exist
+        \union
+        (
+            IF \E DB \in DynamicNodeSet: 
+                DB.labelIdx = chosenBranchIdx /\ \E child \in updatedChildren: child.blockIdx = DB.labelIdx /\ child.counter = DB.id
+            THEN 
+                {} 
+            ELSE
+                \* zheyuan: is this even possible to happen? constructUpdate is non-empty only if we choose to exit the construct, try to test it
+                IF chosenBranchIdx \in constructUpdate THEN
+                    {DynamicNode([wg \in 1..NumWorkGroups |-> {}],
+                                [wg \in 1..NumWorkGroups |-> {}],
+                                [wg \in 1..NumWorkGroups |-> {}],
+                                [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+                                chosenBranchIdx,
+                                LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
+                                IN
+                                    child.counter,
+                                updatedMergeStack,
+                                {})
+                    }
+                \* if the choosen block is a merge block , we need to pop the merge stack of current DB.
+                ELSE IF IsMergeBlock(chosenBranchIdx) THEN 
+                    {
+                        DynamicNode([wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+                                    [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+                                    [wg \in 1..NumWorkGroups |-> {}],
+                                    \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
+                                    [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+                                    chosenBranchIdx,
+                                    LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
+                                    IN
+                                        child.counter,
+                                    PopUntilBlock(updatedMergeStack, chosenBranchIdx),
+                                    {}
+                                    )
+                    }
+                \* if the chosen block is a new block for loop body, we need to update the iteration vector. 
+                \* we can only go to the loop branch at loop header block, hence if a thread is not executing the loop header block, it will also not be executing the loop body
+                \* ELSE IF chosenBranchIdx = loopBranchIdx THEN
+                \*     {
+                \*         DynamicNode([wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+                \*                     [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+                \*                     \* zheyuan: do we need to update the notExecuteSet here? or just leave it blank
+                \*                     [currentDB.notExecuteSet EXCEPT ![wgid] = currentDB.notExecuteSet[wgid] \ {t}],
+                \*                     \* [currentDB.unknownSet EXCEPT ![wgid] = currentDB.unknownSet[wgid] \ {t}],
+                \*                     [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+                \*                     chosenBranchIdx,
+                \*                     LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
+                \*                     IN
+                \*                         child.counter,
+                \*                     updatedMergeStack,
+                \*                     {})
+                \*     }
                 ELSE
-                    Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx,
-                        newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge)
-            \* rule 3: If the unchoosen block has non-empty tangle and is not a merge block,
-            \* remove the thread from the tangle
-            ELSE IF CFG.node[i].opLabelIdx # choosenBranchIdx /\ CFG.node[i].merge # TRUE THEN
-                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx,
-                newSeqOfSets(CFG.node[i].tangle, wgid, CFG.node[i].tangle[wgid] \{t}), CFG.node[i].merge)
+                    {
+                        DynamicNode([wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+                                    [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+                                    [wg \in 1..NumWorkGroups |-> {}],
+                                    \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
+                                    [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+                                    chosenBranchIdx,
+                                    LET child == CHOOSE child \in updatedChildren: child.blockIdx = chosenBranchIdx
+                                    IN
+                                        child.counter,
+                                    updatedMergeStack,
+                                    {})
+                    }
+        )
+        \* union with the new false branch DB if does not exist
+        \union
+        (
+        {   
+            \* thread is exiting the construct, we also need to create a new dynamic block for false label and remove current thread from all sets of new block.
+            IF falselabelIdx \in constructUpdate THEN 
+                DynamicNode([wg \in 1..NumWorkGroups |-> {}],
+                            [wg \in 1..NumWorkGroups |-> {}],
+                            [wg \in 1..NumWorkGroups |-> {}],
+                            [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+                            falselabelIdx,
+                            LET child == CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
+                            IN
+                                child.counter,
+                            updatedMergeStack,
+                            {})
+            \* if new false branch is merge block, we need to pop the merge stack of current DB.
+            ELSE IF IsMergeBlock(falselabelIdx) = TRUE THEN 
+                DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
+                            [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
+                            \* We don't know if the threads executed in precedessor DB will execute the block or not
+                            [wg \in 1..NumWorkGroups |-> {}],
+                            \* we don't know if the threads executed in precedessor DB will execute the block or not
+                            \* [wg \in 1..NumWorkGroups |->  ThreadsWithinWorkGroupNonTerminated(wg-1)],
+                            [wg \in 1..NumWorkGroups |-> unionSet[wg]],
+                            falselabelIdx,
+                            LET child == CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
+                            IN
+                                child.counter,
+                            PopUntilBlock(updatedMergeStack, falselabelIdx),
+                            {})
+            \* ELSE IF IsMergeBlock(falselabelIdx) = TRUE THEN 
+            \*     DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
+            \*                 [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
+            \*                 \* current thread is not executed in the false block, but we don't know if the threads executed in precedessor DB will execute the block or not
+            \*                 [wg \in 1..NumWorkGroups |-> {}],
+            \*                 \* we don't know if the threads executed in precedessor DB will execute the block or not
+            \*                 \* [wg \in 1..NumWorkGroups |-> ThreadsWithinWorkGroupNonTerminated(wg-1)],
+            \*                 [wg \in 1..NumWorkGroups |-> unionSet[wg]],
+            \*                 falselabelIdx,
+            \*                 currentDB.children)
+            \* if the unchosen chosen block is a new block for loop body, we need to update the iteration vector. 
+            \* we can only go to the loop branch at loop header block, hence if a thread is not executing the loop header block, it will also not be executing the loop body
+            \* ELSE IF falselabelIdx = loopBranchIdx THEN
+            \*     DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
+            \*                 [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
+            \*                 \* current thread is not executed in the false block, but we don't know if the threads executed in precedessor DB will execute the block or not
+            \*                 [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+            \*                 \* we don't know if the threads executed in precedessor DB will execute the block or not
+            \*                 \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
+            \*                 [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+            \*                 falselabelIdx,
+            \*                 updatedThreadIterationVec)
             ELSE 
-                CFG.node[i]
-        ELSE 
-            CFG.node[i]
-    ]
+                DynamicNode([wg \in 1..NumWorkGroups |-> {}], \* currently no thread is executing the false block
+                            [wg \in 1..NumWorkGroups |-> {}], \* currently no thread has executed the false block
+                            \* current thread is not executed in the false block, but we don't know if the threads executed in precedessor DB will execute the block or not
+                            [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN {t} ELSE {}],
+                            \* we don't know if the threads executed in precedessor DB will execute the block or not
+                            \* [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN ThreadsWithinWorkGroupNonTerminated(wgid-1) \ {t}  ELSE ThreadsWithinWorkGroupNonTerminated(wg-1)],
+                            [wg \in 1..NumWorkGroups |-> IF wg = wgid THEN unionSet[wgid] \ {t}  ELSE unionSet[wg]],
+                            falselabelIdx,
+                            LET child == CHOOSE child \in updatedChildren: child.blockIdx = falselabelIdx
+                            IN
+                                child.counter,
+                            updatedMergeStack,
+                            {})
+            : falselabelIdx \in (falseLabelIdxSet \ existingFalseLabelIdxSet)
+        }
+        )>>
 
-\* Helper function that return the updated blocks in CFG regarding the merge instruction
-MergeUpdate(wgid, currentLabelIdx, tangle, opLabelIdxSet) ==
-    [i \in 1..Len(CFG.node) |-> 
-        IF CFG.node[i].opLabelIdx \in opLabelIdxSet THEN
-            \* rule 1: If a thread reaches a merge instruction and the block it points to has empty tangle, 
-            \* update the tangle of tha block to the tangle of the merge instruction
-            IF CFG.node[i].tangle[wgid] = {} THEN
-                Block(CFG.node[i].opLabelIdx, CFG.node[i].terminatedInstrIdx, 
-                    newSeqOfSets(CFG.node[i].tangle, wgid, tangle), CFG.node[i].merge) 
-            ELSE 
-                CFG.node[i]
-        ELSE
-            CFG.node[i]
-    ]
-
-
-
-\* GetLabelPc(label) == 
-\*     CHOOSE i \in 1..Len(ThreadInstructions[1]) : ThreadInstructions[1][i] = "OpLabel" /\ GetVal(-1, ThreadArguments[1][i][1]) = GetVal(-1, label)
-    
-InitCFG == 
-    LET blocks == SelectSeq(GenerateBlocks(ThreadInstructions[1]), LAMBDA b: b.opLabelIdx # -1)
-        graph == GenerateCFG(blocks, 
-                UNION { {<<blocks[i].opLabelIdx, target>> : 
-                    target \in FindTargetBlocks(blocks[i].opLabelIdx, blocks[i].terminatedInstrIdx)} : i \in DOMAIN blocks }
-                )
-    IN 
-        /\  CFG = graph
-        /\  MaxPathLength = SuggestedPathLength(graph)
+TerminateUpdate(wgid, t) ==
+    {
+        DynamicNode([DB.currentThreadSet EXCEPT ![wgid] = DB.currentThreadSet[wgid] \ {t}],
+            DB.executeSet,
+            DB.notExecuteSet,
+            [DB.unknownSet EXCEPT ![wgid] = DB.unknownSet[wgid] \ {t}],
+            DB.labelIdx,
+            DB.id,
+            DB.mergeStack,
+            DB.children)
+        : DB \in DynamicNodeSet
+    }
 
 (* Global Variables *)
 
-InitProgram ==
-    /\ InitCFG
-    /\ InitGPU
 
+InitGlobalCounter ==
+    globalCounter = 0
+
+InitProgram ==
+    /\ InitDB
+    /\ InitGPU
+    /\ InitGlobalCounter
+
+\* Invariant: Each thread belongs to exactly one DB
+ThreadBelongsExactlyOne ==
+    /\ \A t \in Threads:
+        \E DB \in DynamicNodeSet:
+            t \in DB.currentThreadSet[WorkGroupId(t) + 1]
+    /\ \A t1, t2 \in Threads:
+        IF WorkGroupId(t1) = WorkGroupId(t2) THEN 
+            /\ \A DB1, DB2 \in DynamicNodeSet:
+                (t1 \in DB1.currentThreadSet[WorkGroupId(t1) + 1] /\ t2 \in DB2.currentThreadSet[WorkGroupId(t2) + 1]) => DB1 = DB2
+        ELSE
+            TRUE
+
+\* Invariant: Each dynamic execution graph has a unique block sequence
+UniquelabelIdxuence ==
+    \A DB1, DB2 \in DynamicNodeSet:
+        DB1.labelIdx = DB2.labelIdx => DB1 = DB2
 ====
 
 

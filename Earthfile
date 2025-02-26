@@ -5,6 +5,7 @@ tlaplusbuild-image:
     RUN apt-get update && apt-get install -y git bash sudo curl graphviz clang cmake
     RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
     ENV PATH="/root/.cargo/bin:${PATH}"
+    RUN git config --global http.postBuffer 157286400
     RUN git clone https://github.com/pmer/tla-bin.git
     # RUN git clone https://github.com/KhronosGroup/glslang.git
     WORKDIR /tla-bin
@@ -30,6 +31,7 @@ tlaplus-image:
     COPY Homunculus Homunculus
     RUN CARGO_TARGET_DIR=Homunculus/target cargo build --release --manifest-path=Homunculus/Cargo.toml
     IF [ "$LITMUS_TESTS" = "TRUE" ]
+        
         COPY litmus_tests litmus_tests
         RUN mkdir -p litmus_tests_spv
         RUN mkdir -p litmus_tests_dis
@@ -61,12 +63,12 @@ tlaplus-image:
         SAVE ARTIFACT spirv-asm.txt AS LOCAL ./build/
         RUN Homunculus/target/release/homunculus ./spirv-asm.txt 
         IF [ "$OUT" = "text" ]
-            RUN tlc forward-progress/validation/MCProgressModel  > output.txt 2>&1 || true
+            RUN JAVA_OPTS="-Xmx24G -XX:+UseParallelGC" tlc forward-progress/validation/MCProgressModel -view -fpmem .25 -workers 20 2>&1 | tee output.txt || true
         ELSE IF [ "$OUT" = "dot" ]
-            RUN tlc forward-progress/validation/MCProgressModel -dump dot,actionlabels,colorize output.dot 2>&1 || true 
+            RUN JAVA_OPTS="-Xmx24G" tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 20 -dump dot output.dot 2>&1 | tee output.txt || true 
         ELSE IF [ "$OUT" = "all" ]
-            RUN tlc forward-progress/validation/MCProgressModel  -dump dot,actionlabels,colorize output.dot 2>&1 || true 
-            RUN tlc forward-progress/validation/MCProgressModel > output.txt 2>&1 || true
+            RUN JAVA_OPTS="-Xmx32G" tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 15 -maxSetSize 100 -dump dot output.dot 2>&1 | tee output.txt || true 
+            RUN JAVA_OPTS="-Xmx32G" tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 15 -maxSetSize 100 > output.txt 2>&1 || true
         ELSE
             RUN echo "Invalid output format"
         END

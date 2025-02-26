@@ -7,21 +7,26 @@ layout(local_size_x = 2) in;
 layout(tla_subgroup_size = 2) in;
 layout(tla_num_workgroups = 2) in;
 
-layout(std430, binding = 0) buffer Msg {
-    uint msg;
+
+layout(std430, binding = 0) buffer Lock {
+    uint lock;
 };
 
-
 void main() {
-    uint gid = gl_GlobalInvocationID.x;
+    // 1
     bool done = false;
-    do {
-        if(!done) {
-            if (gid == atomicLoad(msg, 4, 0, 0)){
-                atomicStore(msg, gid + 1, 4, 0, 0);
+    do { // 6
+        if (!done) { // 9
+            // 13
+            uint old = atomicCompSwap(lock, 0, 1);
+            if (old == 0) {
+                // 19
                 done = true;
+                atomicStore(lock, uint(0), 4, 0, 0);
             }
+            // 23
         }
-    } while (!subgroupAll(done));
+        // 25
+    } while (!subgroupAll(done)); // 27
+    // 31
 }
-

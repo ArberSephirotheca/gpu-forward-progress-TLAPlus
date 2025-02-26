@@ -5,10 +5,10 @@ use codegen::common::Scheduler;
 use codegen::context::CodegenCx;
 use compiler::parse::parser::parse;
 use eyre::{eyre, Context, Report, Result};
-use std::{env, path};
 use std::fs::File;
 use std::io::Read;
 use std::io::{self};
+use std::{env, path};
 
 static DEFAULT_PROGRAM_FILE: &str = "./forward-progress/validation/MCProgram.tla";
 static DEFAULT_SCHEDULER: Scheduler = Scheduler::OBE;
@@ -29,8 +29,7 @@ fn compile(
     work_group_size: u32,
     num_workgroup: u32,
     scheduler: Scheduler,
-    path    : &str,
-    
+    path: &str,
 ) -> Result<()> {
     let syntax = parse(spirv_code).syntax();
     let mut codegen_ctx = CodegenCx::new(sub_group_size, work_group_size, num_workgroup, scheduler);
@@ -44,10 +43,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
 
     if args.len() > 4 {
-        eprintln!(
-            "Usage: {} <spirv_dis> option<validation/path>",
-            args[0]
-        );
+        eprintln!("Usage: {} <spirv_dis> option<validation/path>", args[0]);
         return;
     }
     let filename = &args[1];

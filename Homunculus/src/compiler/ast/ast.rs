@@ -68,9 +68,13 @@ pub struct LogicalNotEqual(SyntaxNode);
 #[derive(Debug, ResultType, UnaryExpr)]
 pub struct LogicalNot(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
+pub struct ShiftLeftLogicalExpr(SyntaxNode);
+#[derive(Debug, ResultType, BinaryExpr)]
 pub struct AddExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct AtomicAddExpr(SyntaxNode);
+#[derive(Debug, ResultType)]
+pub struct AtomicOrExpr(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
 pub struct SubExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
@@ -90,6 +94,12 @@ pub struct GreaterThanExpr(SyntaxNode);
 pub struct LessThanEqualExpr(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
 pub struct GreaterThanEqualExpr(SyntaxNode);
+#[derive(Debug, ResultType, BinaryExpr)]
+pub struct BitwiseOrExpr(SyntaxNode);
+#[derive(Debug, ResultType, BinaryExpr)]
+pub struct BitwiseAndExpr(SyntaxNode);
+#[derive(Debug, ResultType, UnaryExpr)]
+pub struct BitcastExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct AtomicExchangeExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
@@ -134,10 +144,12 @@ pub enum Expr {
     LogicalEqual(LogicalEqual),
     LogicalNotEqual(LogicalNotEqual),
     LogicalNot(LogicalNot),
+    ShiftLeftLogicalExpr(ShiftLeftLogicalExpr),
     AddExpr(AddExpr),
     AtomicAddExpr(AtomicAddExpr),
     SubExpr(SubExpr),
     AtomicSubExpr(AtomicAddExpr),
+    AtomicOrExpr(AtomicOrExpr),
     MulExpr(MulExpr),
     EqualExpr(EqualExpr),
     NotEqualExpr(NotEqualExpr),
@@ -145,6 +157,9 @@ pub enum Expr {
     GreaterThanExpr(GreaterThanExpr),
     LessThanEqualExpr(LessThanEqualExpr),
     GreaterThanEqualExpr(GreaterThanEqualExpr),
+    BitwiseOrExpr(BitwiseOrExpr),
+    BitwiseAndExpr(BitwiseAndExpr),
+    BitcastExpr(BitcastExpr),
     AtomicExchangeExpr(AtomicExchangeExpr),
     AtomicCompareExchangeExpr(AtomicCompareExchangeExpr),
     GroupAllExpr(GroupAllExpr),
@@ -190,7 +205,9 @@ impl Expr {
             TokenKind::LoadExpr => Some(Self::LoadExpr(LoadExpr(node))),
             TokenKind::AtomicLoadExpr => Some(Self::AtomicLoadExpr(AtomicLoadExpr(node))),
             TokenKind::ConstantExpr => Some(Self::ConstExpr(ConstExpr(node))),
-            TokenKind::ConstantCompositeExpr => Some(Self::ConstCompositeExpr(ConstCompositeExpr(node))),
+            TokenKind::ConstantCompositeExpr => {
+                Some(Self::ConstCompositeExpr(ConstCompositeExpr(node)))
+            }
             TokenKind::ConstantTrueExpr => Some(Self::ConstTrueExpr(ConstTrueExpr(node))),
             TokenKind::ConstantFalseExpr => Some(Self::ConstFalseExpr(ConstFalseExpr(node))),
             TokenKind::LogicalOrExpr => Some(Self::LogicalOr(LogicalOr(node))),
@@ -198,10 +215,12 @@ impl Expr {
             TokenKind::LogicalEqualExpr => Some(Self::LogicalEqual(LogicalEqual(node))),
             TokenKind::LogicalNotEqualExpr => Some(Self::LogicalNotEqual(LogicalNotEqual(node))),
             TokenKind::LogicalNotExpr => Some(Self::LogicalNot(LogicalNot(node))),
+            TokenKind::ShiftLeftLogicalExpr => Some(Self::ShiftLeftLogicalExpr(ShiftLeftLogicalExpr(node))),
             TokenKind::AddExpr => Some(Self::AddExpr(AddExpr(node))),
             TokenKind::AtomicAddExpr => Some(Self::AtomicAddExpr(AtomicAddExpr(node))),
             TokenKind::SubExpr => Some(Self::SubExpr(SubExpr(node))),
             TokenKind::AtomicSubExpr => Some(Self::AtomicAddExpr(AtomicAddExpr(node))),
+            TokenKind::AtomicOrExpr => Some(Self::AtomicOrExpr(AtomicOrExpr(node))),
             TokenKind::MulExpr => Some(Self::MulExpr(MulExpr(node))),
             TokenKind::EqualExpr => Some(Self::EqualExpr(EqualExpr(node))),
             TokenKind::NotEqualExpr => Some(Self::NotEqualExpr(NotEqualExpr(node))),
@@ -212,6 +231,9 @@ impl Expr {
 
             TokenKind::LessThanExpr => Some(Self::LessThanExpr(LessThanExpr(node))),
             TokenKind::LessThanEqualExpr => Some(Self::LessThanEqualExpr(LessThanEqualExpr(node))),
+            TokenKind::BitwiseOrExpr => Some(Self::BitwiseOrExpr(BitwiseOrExpr(node))),
+            TokenKind::BitwiseAndExpr => Some(Self::BitwiseAndExpr(BitwiseAndExpr(node))),
+            TokenKind::BitcastExpr => Some(Self::BitcastExpr(BitcastExpr(node))),
             TokenKind::AtomicExchangeExpr => {
                 Some(Self::AtomicExchangeExpr(AtomicExchangeExpr(node)))
             }
@@ -370,7 +392,6 @@ impl TypeExpr {
             .find(|x| x.kind() == TokenKind::OpTypeBool || x.kind() == TokenKind::OpTypeInt)
     }
 }
-
 
 impl VariableExpr {
     pub(crate) fn ty_name(&self) -> Option<SyntaxToken> {
@@ -543,7 +564,7 @@ impl ConstExpr {
     }
 }
 
-impl ConstCompositeExpr{
+impl ConstCompositeExpr {
     pub(crate) fn constituents(&self) -> Vec<SyntaxToken> {
         let mut tokens_iter = self
             .0
@@ -560,7 +581,7 @@ impl ConstCompositeExpr{
         while let Some(constituent) = tokens_iter.next() {
             if constituent.kind() == TokenKind::Ident {
                 result.push(constituent);
-            } else{
+            } else {
                 panic!("Invalid constituent {:#?}", constituent);
             }
         }
@@ -647,6 +668,45 @@ impl AtomicSubExpr {
             .nth(4)
     }
 }
+
+impl AtomicOrExpr {
+    pub(crate) fn pointer(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn memory(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
+    }
+
+    pub(crate) fn memory_semantics(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(3)
+    }
+
+    pub(crate) fn value(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(
+                |x: &rowan::SyntaxToken<crate::compiler::parse::syntax::AsukaLanguage>| {
+                    x.kind() == TokenKind::Ident
+                },
+            )
+            .nth(4)
+    }
+}
+
 impl MulExpr {
     pub(crate) fn expr(&self) -> Option<Expr> {
         self.0.children().find_map(Expr::cast)
@@ -884,7 +944,7 @@ impl DecorateStatement {
     }
 }
 
-impl DecorateStringStatement{
+impl DecorateStringStatement {
     pub(crate) fn tla_builtin(&self) -> Option<SyntaxToken> {
         self.0
             .children_with_tokens()

@@ -1,10 +1,11 @@
 ---- MODULE MCProgressModel ----
-EXTENDS Integers, Naturals, Sequences, MCThreads, TLC
+EXTENDS Integers, Naturals, Sequences, MCThreads, TLC, FiniteSets
 
 VARIABLES fairExecutionSet, selected, runningThread
 
-vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, CFG, MaxPathLength>>
+vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicNodeSet, snapShotMap, globalCounter>>
 
+UniverseOfAllWGs == {0, 1}
 
 InitState ==
     /\ selected = -1
@@ -29,6 +30,8 @@ Init ==
     /\  InitThreads
     /\  InitScheduler
     /\  InitState
+    /\  InitSnapShotMap
+    \* /\  converge = FALSE
 
 OBEUpdateFairExecutionSet(t) ==
     \* get the workgroup id of thread t, and update fair execution set based on the workgroup id of t
@@ -59,38 +62,52 @@ UpdateFairExecutionSet(t) ==
         ELSE
         /\  Print("Uknown Scheduler", FALSE)
 
-\* This fairness property ensures that every workgroup in the fair execution set will be scheduled at some point indefinitely
-\* So we don't have a unfairness problem where some workgroup in the fair execution set is never scheduled/only scheduled once
+GetMaxIterDifference(nodeSet) ==
+    LET SetMax(S) == CHOOSE s \in S : \A t \in S : s.iter >= t.iter
+        SetMin(S) == CHOOSE s \in S : \A t \in S : s.iter <= t.iter
+    IN
+        SetMax(nodeSet).iter - SetMin(nodeSet).iter
+        
+IterationNotExceedsBound ==
+    \A DB \in DynamicNodeSet:
+        LET iterationStack == DB.iterationVec IN
+            \A i \in 1..Len(iterationStack): iterationStack[i].iter <= 4
+
+\* PickAnyWorkGroupInFairExecutionSet ==
+\*            <>[] (\A wg \in fairExecutionSet:  selected = wg)
+
 PickAnyWorkGroupInFairExecutionSet ==
-            <>[](\A wg \in fairExecutionSet: selected = wg)
-    
+    \A wg \in UniverseOfAllWGs :
+        [] ( wg \in fairExecutionSet => <> (selected = wg) )
+
 Execute(t) == 
         /\  ExecuteInstruction(t)
         /\  UpdateFairExecutionSet(t)
         /\  selected' = WorkGroupId(t)
         /\  runningThread' = t
 
-
 Step ==
     LET ThreadsReady == {t \in Threads: state[t] = "ready"}
-    IN
-        \*if there is any thread that is not terminated, execute it
-        IF ThreadsReady # {} THEN
-            IF runningThread = -1 \/ IsMemoryOperation(ThreadInstructions[runningThread][pc[runningThread]]) \/ runningThread \notin ThreadsReady THEN
-                \E t \in ThreadsReady:
-                    /\  Execute(t)
-            ELSE
-                /\  Execute(runningThread)
+        IN
+            \*if there is any thread that is not terminated, execute it
+            IF ThreadsReady # {} THEN
+                IF runningThread = -1 \/ IsMemoryOperation(ThreadInstructions[runningThread][pc[runningThread]]) \/ runningThread \notin ThreadsReady THEN
+                    \E t \in ThreadsReady:
+                        /\  Execute(t)
+                ELSE
+                    /\  Execute(runningThread)
         
-        \* IF ThreadsReady # {} THEN
-        \*     \E t \in ThreadsReady:
-        \*         /\  Execute(t)
-        ELSE
-            /\ UNCHANGED vars
+            ELSE
+                /\ UNCHANGED vars
+                /\ UNCHANGED snapShotMap
+                /\ UNCHANGED globalCounter
 \* Deadlock means reaching a state in which Next is not enabled.
 Next ==
     Step
 
+ViewFunction == <<pc, state, threadLocals, globalVars, DynamicNodeSet, selected, runningThread>>
+
+(* Fairness properties *)
 
 Fairness ==
     /\  <>[](ENABLED <<Step>>_vars) => ([]<><<Step>>_vars /\ PickAnyWorkGroupInFairExecutionSet)
@@ -101,10 +118,13 @@ Spec ==
     /\ [][Next]_vars
     /\ Fairness
 
-\* eventually all threads are always terminatedac
+\* eventually all threads are always terminated
 EventuallyAlwaysTerminated ==
-    \A t \in Threads: <>[](pc[t] = Len(ThreadInstructions[t]))
+    \A t \in Threads: <>[](state[t] = "terminated")
 
+CounterConstraint == globalCounter <= 60
+
+    
 Liveness == 
     /\  EventuallyAlwaysTerminated
 
