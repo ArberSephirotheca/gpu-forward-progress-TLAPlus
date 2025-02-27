@@ -596,8 +596,8 @@ impl CFG {
             InstructionName::Switch => {
                 default_block = inst.arguments.arguments[1].value.parse().unwrap() as i32;
                 if let Some(cases) = &inst.vec_arguments {
-                    for case in cases {
-                        targets.insert(case.arguments[1].value.parse().unwrap() as i32);
+                    for label in &cases[1].arguments {
+                        targets.insert(label.value.parse().unwrap() as i32);
                     }
                 }
             }
@@ -630,8 +630,8 @@ impl CFG {
                 let default_block = inst.arguments.arguments[1].value.parse().unwrap();
                 targets.insert(default_block);
                 if let Some(cases) = &inst.vec_arguments {
-                    for case in cases {
-                        targets.insert(case.arguments[1].value.parse().unwrap());
+                    for label in &cases[1].arguments {
+                        targets.insert(label.value.parse().unwrap());
                     }
                 }
             }

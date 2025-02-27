@@ -1,9 +1,7 @@
-mod codegen;
-mod compiler;
 use camino::Utf8Path;
-use codegen::common::Scheduler;
-use codegen::context::CodegenCx;
-use compiler::parse::parser::parse;
+use compiler::codegen::common::Scheduler;
+use compiler::codegen::context::CodegenCx;
+use compiler::compiler::parse::parser::parse;
 use eyre::{eyre, Context, Report, Result};
 use std::fs::File;
 use std::io::Read;

@@ -4,7 +4,7 @@ use num_traits::{FromPrimitive, ToPrimitive};
 use std::fmt;
 
 #[derive(Debug, Hash, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum AsukaLanguage {}
+pub enum AsukaLanguage {}
 
 impl rowan::Language for AsukaLanguage {
     type Kind = TokenKind;

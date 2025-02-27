@@ -77,17 +77,21 @@ pub enum InstructionName {
     GroupNonUniformAny,
 }
 
-pub(crate) static TERMINATION_INSTRUCTIONS: [InstructionName; 4] = [
+pub static BRANCH_INSTRUCTIONS: [InstructionName; 3] = [
+    InstructionName::Branch,
+    InstructionName::BranchConditional,
+    InstructionName::Switch,
+];
+
+pub static TERMINATION_INSTRUCTIONS: [InstructionName; 4] = [
     InstructionName::Branch,
     InstructionName::BranchConditional,
     InstructionName::Switch,
     InstructionName::Return,
 ];
 
-pub(crate) static TANGLED_INSTRUCTIONS: [InstructionName; 5] = [
+pub static TANGLED_INSTRUCTIONS: [InstructionName; 3] = [
     InstructionName::ControlBarrier,
-    InstructionName::GroupAll,
-    InstructionName::GroupAny,
     InstructionName::GroupNonUniformAll,
     InstructionName::GroupNonUniformAny,
 ];
@@ -303,7 +307,7 @@ impl Display for InstructionValue {
 }
 
 impl InstructionValue {
-    pub(crate) fn parse(&self) -> Result<u32> {
+    pub fn parse(&self) -> Result<u32> {
         match self {
             InstructionValue::Int(value) => Ok(*value as u32),
             InstructionValue::UInt(value) => Ok(*value),

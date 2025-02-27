@@ -2889,7 +2889,7 @@ impl CodegenCx {
                     .scope(VariableScope::Literal)
                     .build()
                     .unwrap();
-                for target_label in target_labels {
+                for target_label in &target_labels {
                     let literal = target_label.0.text().parse::<i32>().unwrap();
                     let literal_arg = InstructionArgument::builder()
                         .name("".to_string())
@@ -3066,7 +3066,7 @@ impl CodegenCx {
         }
     }
 
-    pub(crate) fn generate_code(&mut self, root: SyntaxNode) -> Program {
+    pub fn generate_code(&mut self, root: SyntaxNode) -> Program {
         let mut program_builder = Program::builder();
         let root = Root::cast(root).unwrap();
         // first pass: construct symbol table
