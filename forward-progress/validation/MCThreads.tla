@@ -1220,7 +1220,7 @@ OpBranch(t, label) ==
             workGroupId == WorkGroupId(t)+1
             newPc == [pc EXCEPT ![t] = GetVal(-1, label)]
         IN
-            LET counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], <<labelVal>>, labelVal)
+            LET counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], {labelVal}, labelVal, {labelVal})
                 newCounter == counterNewDBSet[1]
                 newDBSet == counterNewDBSet[2]
                 newState == StateUpdate(workGroupId, t, newDBSet)
@@ -1254,7 +1254,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
 
         IN
             IF EvalExpr(t, WorkGroupId(t)+1, condition) = TRUE THEN
-                /\  LET counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], <<trueLabelVal, falseLabelVal>>, trueLabelVal)
+                /\  LET counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], {trueLabelVal, falseLabelVal}, trueLabelVal, {trueLabelVal, falseLabelVal})
                         newCounter == counterNewDBSet[1]
                         newDBSet == counterNewDBSet[2]
                         newState == StateUpdate(workGroupId, t, newDBSet)
@@ -1277,7 +1277,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
                                 /\ pc' = previousState.pc
                                 /\ UNCHANGED  <<threadLocals, globalVars, snapShotMap>>
             ELSE
-                /\  LET counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], <<trueLabelVal, falseLabelVal>>, falseLabelVal)
+                /\  LET counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], {trueLabelVal, falseLabelVal}, falseLabelVal, {trueLabelVal, falseLabelVal})
                         newCounter == counterNewDBSet[1]
                         newDBSet == counterNewDBSet[2]
                         newState == StateUpdate(workGroupId, t, newDBSet)
@@ -1305,6 +1305,7 @@ OpBranchConditional(t, condition, trueLabel, falseLabel) ==
     
 \* zheyuan: need more tests
 \* need to update it
+\* make the false label sets to be the block that is post domianted by the choosen label
 OpSwitch(t, selector, default, literals, ids) ==
     /\  LET defaultVal == GetVal(-1, default)
             literalsVal == [idx \in 1..Len(literals) |-> GetVal(-1, literals[idx])]
@@ -1315,7 +1316,9 @@ OpSwitch(t, selector, default, literals, ids) ==
                 LET val == EvalExpr(t, WorkGroupId(t)+1, selector)
                     index == CHOOSE i \in 1..Len(literalsVal): literalsVal[i] = val 
                 IN
-                    /\  LET counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], idsVal, idsVal[index])
+                    /\  LET labelSet == SeqToSet(idsVal) \union {defaultVal}
+                            falseLabelSet == (CHOOSE postDom \in PostDominated: postDom.node = idsVal[index]).postDominated \intersect labelSet
+                            counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], labelSet, idsVal[index], falseLabelSet)
                             newCounter == counterNewDBSet[1]
                             newDBSet == counterNewDBSet[2]
                             newState == StateUpdate(workGroupId, t, newDBSet)
@@ -1338,7 +1341,9 @@ OpSwitch(t, selector, default, literals, ids) ==
                                     /\ pc' = previousState.pc
                                     /\ UNCHANGED  <<threadLocals, globalVars, snapShotMap>>
             ELSE
-                /\  LET counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], idsVal, defaultVal)
+                /\  LET labelSet == SeqToSet(idsVal) \union {defaultVal}
+                        falseLabelSet == (CHOOSE postDom \in PostDominated: postDom.node = defaultVal).postDominated \intersect (SeqToSet(idsVal) \union {defaultVal})
+                        counterNewDBSet == BranchUpdate(workGroupId, t, pc[t], labelSet, defaultVal, falseLabelSet)
                         newCounter == counterNewDBSet[1]
                         newDBSet == counterNewDBSet[2]
                         newState == StateUpdate(workGroupId, t, newDBSet)

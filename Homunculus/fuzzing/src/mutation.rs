@@ -2,7 +2,7 @@ use compiler::codegen::common::{Instruction, InstructionName, Program};
 use rand::{rng, seq::SliceRandom};
 
 fn mutation(program: &mut Program) {
-    program.instructions
+    // program.instructions
 }
 
 fn available_label(program: &Program) -> Vec<u32> {
@@ -15,7 +15,10 @@ fn available_label(program: &Program) -> Vec<u32> {
     labels
 }
 
-fn modify_condition(instruction: &mut Instruction)
+fn modify_condition(instruction: &mut Instruction){
+
+}
+
 fn switch_branch_label(instruction: &mut Instruction) {
     match &mut instruction.name {
         InstructionName::Branch => {
@@ -27,7 +30,7 @@ fn switch_branch_label(instruction: &mut Instruction) {
         }
         InstructionName::Switch => {
             let mut rng = rng();
-            // shuffle the targets
+            // shuffle the labels
             if let Some(labels) = &mut instruction.vec_arguments{
                 labels.shuffle(&mut rng);
             }

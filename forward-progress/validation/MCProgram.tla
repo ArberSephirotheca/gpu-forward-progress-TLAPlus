@@ -306,6 +306,7 @@ ConstructTypeSet == {"Selection", "Loop", "Switch", "Continue", "Case"}
 Tangle(ts) == 
     [threads |-> ts]
 
+OrderSet(set) == CHOOSE seq \in [1..Cardinality(set) -> set]: Range(seq) = set
 
 \* make non-order-sensitive sequence becomes enumerable
 SeqToSet(seq) == { seq[i]: i \in 1..Len(seq) }
@@ -386,10 +387,13 @@ IsConstructHeaderBlock(blockIdx) ==
 IsHeaderBlock(block) ==
     block.mergeBlock # -1
 
+
 IsLoopHeaderBlock(block) ==
     /\ IsHeaderBlock(block)
     /\ block.constructType = "Loop"
 
+IsContinueBlock(blockIdx) == 
+    /\ \E construct \in ControlFlowConstructs : construct.constructType = "Loop" /\ construct.continueTarget = blockIdx
 
 IsContinueBlockOf(currentBlock, headerBlock) ==
     /\ IsLoopHeaderBlock(headerBlock)
@@ -482,6 +486,23 @@ SameMergeStack(left, mergeBlock) ==
     \*     /\ left[idx].blockIdx = right[idx].blockIdx
     \*     /\ left[idx].counter = right[idx].counter
 
+SameSwitchHeader(targetDB, currentDB) ==
+    /\ \E DB \in DynamicNodeSet : 
+        \* find DB that is the switch header block
+        /\  \E construct \in ControlFlowConstructs : 
+                /\  construct.constructType = "Switch" 
+                /\  construct.headerBlock = DB.labelIdx 
+        \*  and contains the target DB as its child
+        /\  \E child \in DB.children : child.blockIdx = targetDB.labelIdx /\ child.counter = targetDB.id
+        \*  and contains the current DB as its child
+        /\  \E child \in DB.children : child.blockIdx = currentDB.labelIdx /\ child.counter = currentDB.id
+
+FindSwitchHeader(block) ==
+    CHOOSE DB \in DynamicNodeSet : 
+        \E construct \in ControlFlowConstructs : 
+            /\  construct.constructType = "Switch" 
+            /\  construct.headerBlock = DB.labelIdx 
+            /\ construct.mergeBlock = DB.mergeStack[Len(DB.mergeStack)].blockIdx
 SameIterationVector(left, right) ==
     /\ Len(left) = Len(right)
     /\ \A idx \in 1..Len(left):
@@ -554,61 +575,15 @@ CanMergeSameIterationVector(curr, remaining) ==
         \*     : DB \in DynamicNodeSet
         \* }
 
-\* Dynamic node is uniquely identified by the combination of labelIdx and iteration stack.
-\* We define dynamic node N1 and N2 are the same if: N1 has the same sequence of dynamic instance as N2.
-\* We define dynamic node N1 and N2 are distinct if: N1 has different sequence of dynamic instance as N2.
-\* We can prove the combination of labelIdx and iteration stack is unique by contradiction:
-    \* Assume that there exist two distinct dynamic nodes N1 and N2 with the same labelIdx and iteration stack.
-    \* N1 and N2 have same labelIdx -> they are created from the same static block.
-    \* N1 and N2 have the same iteration stack -> they are created at the same loop iteration.
-    \* Then, we have a contradiction: 
-    \* By definition, dynamic instance of an instruction is created each time per execution.
-    \* In a structurde control flow, the only way for a thread to re-execute the same instruction is to loop back to the same block. (assume no function call)
-    \* If two dynamic nodes have the same labelIdx and iteration stack, they must have same sequence of dynamic instance of instructions as they are executing the same block at the same iteration.
-    \* Then, by definition, N1 and N2 are the same dynamic node.
-    \* Hence we have a contradiction.
-    \* Therefore, no two distinct dynamic nodes can have the same combination of labelIdx and iteration stack.
 
-\* Each time there is a divergent:
-    \* For current block, we need to:
-        \* 1. remove current thread from the current thread set.
-    \* For chosen block, we need to:
-        \* 1. If it creates a new dynamic node, then:
-            \* 1.1 create an empty current thread set and add current thread to it.
-            \* 1.2 create an empty execute set and add current thread to it.
-            \* 1.3 create an empty not execute set.
-            \* 1.4 create an unknown set filled with all non-terminated threads and remove current thread from it.
-            \* 1.5 copy the iteration stack of current block to the new dynamic node.
-        \* 2. If the dynamic block exists, then:
-            \* 2.1 add current thread to the current thread set.
-            \* 2.2 add current thread to the execute set.
-            \* 2.3 remove current thread from the unknown set.
-    \* For each unchosen block, we need to:
-        \* 1. If it creates a new dynamic node, then:
-            \* 1.1 create an empty current thread set.
-            \* 1.2 create an empty execute set.
-            \* 1.3 create an empty not execute set and add current thread to it.
-            \* 1.4 create an unknown set filled with all non-terminated threads and remove current thread from it.
-            \* 1.5 copy the iteration stack of current block to the new dynamic node.
-        \* 2. If the dynamic block exists, then:
-            \* 2.1 add current thread to the not execute set.
-            \* 2.2 remove current thread from the unknown set.
-\* After applying above update, we have additional rules if the dynamic node being updated or created is:
-    \* 1. a merge block of a loop (e.g. exit the loop):
-        \* 1.1 Pops the last element from the iteration stack of that DB.
-        \* 1.2 Add self to the not execute set of all DB within same loop construct that has the same iteration stack (after update).
-        \* 1.3 Remove self from the current thread set of all DB within same loop construct that has the same iteration stack (after update).
-        \* 1.4 Remove self from the unknown set of all DB within same loop construct that has the same iteration stack (after update).
-    \* 2. a loop body:
-        \* Increment the iteration number of last element of the iteration stack by one.
-    \* 3. a purely merge block:
-        \* remove self from the not execute set.
-BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
+\* opLabelIdxSet is used to update the children of the current DB
+\* f
+BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx, falseLabels) ==
     LET
         currentCounter == globalCounter
-        currentBranchOptions == opLabelIdxVec
+        currentBranchOptions == OrderSet(opLabelIdxSet)
         currentDB == CurrentDynamicNode(wgid, t)
-        falseLabelIdxSet == SeqToSet(opLabelIdxVec) \ {chosenBranchIdx}  
+        falseLabelIdxSet == falseLabels \ {chosenBranchIdx}  
         labelIdxSet == {DB.labelIdx : DB \in DynamicNodeSet}
         choosenBlock == FindBlockbyOpLabelIdx(Blocks, chosenBranchIdx)
         currentBlock == FindBlockbyOpLabelIdx(Blocks, currentDB.labelIdx)
@@ -650,6 +625,9 @@ BranchUpdate(wgid, t, pc, opLabelIdxVec, chosenBranchIdx) ==
                     IF IsMergeBlock(currentBranchOptions[i]) /\ \E index \in DOMAIN updatedMergeStack: updatedMergeStack[index].blockIdx = currentBranchOptions[i]
                     THEN 
                         UniqueBlockId(currentBranchOptions[i], updatedMergeStack[(CHOOSE index \in DOMAIN updatedMergeStack: updatedMergeStack[index].blockIdx = currentBranchOptions[i])].counter)
+                    \* treat switch construct specially
+                    ELSE IF \E DB \in DynamicNodeSet: DB.labelIdx = currentBranchOptions[i] /\ SameSwitchHeader(DB, currentDB) THEN
+                        UniqueBlockId(currentBranchOptions[i], (CHOOSE DB \in DynamicNodeSet: DB.labelIdx = currentBranchOptions[i] /\ SameSwitchHeader(DB, currentDB)).id)
                     ELSE
                         UniqueBlockId(currentBranchOptions[i], counterAfterMergeStack + i)
                     : i \in 1..Len(currentBranchOptions)
