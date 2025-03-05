@@ -69,12 +69,14 @@ pub enum InstructionName {
     AtomicSub,
     AtomicOr,
     Mul,
+    Mod,
     AtomicExchange,
     AtomicCompareExchange,
     GroupAll,
     GroupAny,
     GroupNonUniformAll,
     GroupNonUniformAny,
+    GroupNonUniformBroadcast,
 }
 
 pub static BRANCH_INSTRUCTIONS: [InstructionName; 3] = [
@@ -90,10 +92,11 @@ pub static TERMINATION_INSTRUCTIONS: [InstructionName; 4] = [
     InstructionName::Return,
 ];
 
-pub static TANGLED_INSTRUCTIONS: [InstructionName; 3] = [
+pub static TANGLED_INSTRUCTIONS: [InstructionName; 4] = [
     InstructionName::ControlBarrier,
     InstructionName::GroupNonUniformAll,
     InstructionName::GroupNonUniformAny,
+    InstructionName::GroupNonUniformBroadcast,
 ];
 
 pub(crate) static MERGE_INSTRUCTIONS: [InstructionName; 2] =
@@ -135,12 +138,14 @@ impl Display for InstructionName {
             InstructionName::AtomicSub => write!(f, "OpAtomicSub"),
             InstructionName::AtomicOr => write!(f, "OpAtomicOr"),
             InstructionName::Mul => write!(f, "OpMul"),
+            InstructionName::Mod => write!(f, "OpMod"),
             InstructionName::AtomicExchange => write!(f, "OpAtomicExchange"),
             InstructionName::AtomicCompareExchange => write!(f, "OpAtomicCompareExchange"),
             InstructionName::GroupAll => write!(f, "OpGroupAll"),
             InstructionName::GroupAny => write!(f, "OpGroupAny"),
             InstructionName::GroupNonUniformAll => write!(f, "OpGroupNonUniformAll"),
             InstructionName::GroupNonUniformAny => write!(f, "OpGroupNonUniformAny"),
+            InstructionName::GroupNonUniformBroadcast => write!(f, "OpGroupNonUniformBroadcast"),
         }
     }
 }

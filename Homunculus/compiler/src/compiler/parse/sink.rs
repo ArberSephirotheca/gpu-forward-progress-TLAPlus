@@ -1,7 +1,7 @@
-use super::{event::Event, parser::Parse, parser_error::ParseError, syntax::AsukaLanguage};
+use super::{event::Event, parser::Parse, parser_error::ParseError, syntax::{AsukaLanguage, SyntaxToken}};
 use crate::compiler::parse::lexer::Token;
 use rowan::{GreenNodeBuilder, Language};
-use std::mem;
+use std::{collections::HashMap, mem};
 
 pub(super) struct Sink<'l, 't> {
     builder: GreenNodeBuilder<'static>,
@@ -9,6 +9,8 @@ pub(super) struct Sink<'l, 't> {
     cursor: usize,
     events: Vec<Event>,
     errors: Vec<ParseError>,
+    /// For each green token we add, store the original token index.
+    token_index_map: Vec<usize>,
 }
 
 impl<'l, 't> Sink<'l, 't> {
@@ -19,16 +21,20 @@ impl<'l, 't> Sink<'l, 't> {
             cursor: 0,
             events,
             errors: Vec::new(),
+            token_index_map: Vec::new(),
         }
     }
 
     pub(super) fn finish(mut self) -> Parse {
         for idx in 0..self.events.len() {
             match mem::replace(&mut self.events[idx], Event::Placeholder) {
-                Event::AddToken => self.token(),
+                Event::AddToken {token_index} => {
+                    self.token(token_index);
+                },
                 Event::StartNode {
                     kind,
                     forward_parent,
+                    line,
                 } => {
                     let mut kinds = vec![kind];
 
@@ -44,6 +50,7 @@ impl<'l, 't> Sink<'l, 't> {
                         forward_parent = if let Event::StartNode {
                             kind,
                             forward_parent,
+                            line,
                         } =
                             mem::replace(&mut self.events[idx], Event::Placeholder)
                         {
@@ -71,6 +78,7 @@ impl<'l, 't> Sink<'l, 't> {
         Parse {
             green_node: self.builder.finish(),
             errors: self.errors,
+            token_index_map: self.token_index_map,
         }
     }
 
@@ -80,13 +88,14 @@ impl<'l, 't> Sink<'l, 't> {
                 break;
             }
 
-            self.token();
+            self.token(self.cursor);
         }
     }
-    fn token(&mut self) {
-        let Token { kind, text, .. } = self.tokens[self.cursor];
+    fn token(&mut self, token_index: usize) {
+        let Token { kind, text, line, pos, .. } = self.tokens[self.cursor];
         self.builder
             .token(AsukaLanguage::kind_to_raw(kind), text.into());
+        self.token_index_map.push(token_index);
         self.cursor += 1;
     }
 

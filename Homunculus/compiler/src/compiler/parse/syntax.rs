@@ -132,6 +132,7 @@ pub enum TokenKind {
     SubExpr,
     AtomicSubExpr,
     MulExpr,
+    ModExpr,
     EqualExpr,
     NotEqualExpr,
     GreaterThanExpr,
@@ -144,6 +145,7 @@ pub enum TokenKind {
     GroupAnyExpr,
     GroupNonUniformAllExpr,
     GroupNonUniformAnyExpr,
+    GroupNonUniformBroadcastExpr,
     BitwiseOrExpr,
     BitwiseAndExpr,
     BitcastExpr,
@@ -314,6 +316,8 @@ pub enum TokenKind {
     OpAtomicSub,
     #[regex("OpIMul")]
     OpIMul,
+    #[regex("OpUMod")]
+    OpUMod,
     #[regex("OpIEqual")]
     OpIEqual,
     #[regex("OpINotEqual")]
@@ -352,6 +356,8 @@ pub enum TokenKind {
     OpGroupNonUniformAll,
     #[regex("OpGroupNonUniformAny")]
     OpGroupNonUniformAny,
+    #[regex("OpGroupNonUniformBroadcast")]
+    OpGroupNonUniformBroadcast,
 
     #[regex("OpBitwiseOr")]
     OpBitwiseOr,

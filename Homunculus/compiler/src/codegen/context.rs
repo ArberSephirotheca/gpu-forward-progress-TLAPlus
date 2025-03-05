@@ -1,8 +1,10 @@
+use std::collections::HashMap;
+
 use crate::compiler::ast::ast::{BinaryExpr, Expr, ResultType, Root, Stmt, UnaryExpr};
 /// `CodegenCx` is a struct that holds the compilation unit of the codegen.
 use crate::compiler::parse::symbol_table::*;
-use crate::compiler::parse::syntax::{SyntaxNode, TokenKind};
-
+use crate::compiler::parse::syntax::{SyntaxNode, SyntaxToken, TokenKind};
+use crate::compiler::parse::lexer::Token;
 use super::builder::InstructionArgumentsBuilder;
 use super::common::{
     ExecutionScope, Instruction, InstructionArgument, InstructionArguments,
@@ -539,6 +541,29 @@ impl CodegenCx {
                 self.insert_variable(var_name, var_info);
                 self.increment_inst_position();
             }
+            Expr::ModExpr(mod_expr) => {
+                let result_type = mod_expr.result_type().unwrap();
+                // let storage_class = add_expr.storage_class().unwrap();
+                // get the actual type of the variable
+                let spirv_type = match self.lookup_type(result_type.text()) {
+                    Some(ty) => ty,
+                    None => panic!("Type {} not found", result_type),
+                };
+
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                    // self.resolve_spirv_type_to_default_value(spirv_type).0,
+                );
+
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
             Expr::EqualExpr(_) => {
                 let var_info = VariableInfo::new(
                     var_name.clone(),
@@ -814,6 +839,19 @@ impl CodegenCx {
                 self.increment_inst_position();
             }
             Expr::GroupNonUniformAnyExpr(_) => {
+                let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    SpirvType::Bool,
+                    vec![],
+                    StorageClass::Local,
+                    None,
+                    None,
+                    InstructionValue::None,
+                );
+                self.insert_variable(var_name, var_info);
+                self.increment_inst_position();
+            }
+            Expr::GroupNonUniformBroadcastExpr(_) => {
                 let var_info = VariableInfo::new(
                     var_name.clone(),
                     SpirvType::Bool,
@@ -1686,6 +1724,61 @@ impl CodegenCx {
                 Some(
                     inst_args_builder
                         .name(InstructionName::Mul)
+                        .num_args(3)
+                        .push_argument(result_arg)
+                        .push_argument(first_operand_arg)
+                        .push_argument(second_operand_arg),
+                )
+            }
+            Expr::ModExpr(mod_expr) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
+
+                let first_operand = mod_expr.first_operand().unwrap();
+                let second_operand = mod_expr.second_operand().unwrap();
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("ModExpr: Result variable not found");
+                let first_operand_info = self
+                    .lookup_variable(first_operand.text())
+                    .expect("ModExpr: First operand not found");
+
+                let second_operand_info = self
+                    .lookup_variable(second_operand.text())
+                    .expect("ModExpr: Second operand not found");
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let first_operand_arg = inst_arg1_builder
+                    .name(first_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&first_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&first_operand_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let second_operand_arg = inst_arg2_builder
+                    .name(second_operand_info.get_var_name())
+                    .value(self.construct_instruction_value(&second_operand_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(
+                        &second_operand_info.get_storage_class(),
+                    ))
+                    .build()
+                    .unwrap();
+
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::Mod)
                         .num_args(3)
                         .push_argument(result_arg)
                         .push_argument(first_operand_arg)
@@ -2622,6 +2715,84 @@ impl CodegenCx {
 
                 Some(inst_args)
             }
+            Expr::GroupNonUniformBroadcastExpr(group_nonuniform_broadcast) => {
+                let inst_args_builder = InstructionArguments::builder();
+                let result_arg_builder = InstructionArgument::builder();
+                let value_arg_builder = InstructionArgument::builder();
+                let id_arg_builder = InstructionArgument::builder();
+
+                let execution_scope = group_nonuniform_broadcast
+                    .execution_scope()
+                    .expect("GroupNonUniformBroadcastExpr: Scope not found");
+                let value = group_nonuniform_broadcast
+                    .value()
+                    .expect("GroupNonUniformBroadcastExpr: Value not found");
+                let id = group_nonuniform_broadcast
+                    .id()
+                    .expect("GroupNonUniformBroadcastExpr: ID not found");
+
+                let result_info = self
+                    .lookup_variable(&var_name)
+                    .expect("GroupNonUniformBroadcastExpr: Result not found");
+                let value_info = self
+                    .lookup_variable(value.text())
+                    .expect("GroupNonUniformBroadcastExpr: Value not found");
+                let id_info = self
+                    .lookup_variable(id.text())
+                    .expect("GroupNonUniformBroadcastExpr: ID not found");
+                let scope_info = self
+                    .lookup_variable(execution_scope.text())
+                    .expect("GroupNonUniformBroadcastExpr: Scope not found");
+                let scope = scope_info
+                    .const_value
+                    .as_ref()
+                    .expect("GroupNonUniformBroadcastExpr: Scope is not a constant")
+                    .get_int_value();
+
+                let result_arg = result_arg_builder
+                    .name(result_info.get_var_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let value_arg: InstructionArgument = value_arg_builder
+                    .name(value_info.get_var_name())
+                    .value(self.construct_instruction_value(&value_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&value_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+                
+                let id_arg = id_arg_builder
+                    .name(id_info.get_var_name())
+                    .value(self.construct_instruction_value(&id_info))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&id_info.get_storage_class()))
+                    .build()
+                    .unwrap();
+
+                let scope_arg = InstructionArgument::builder()
+                    .name(scope_info.get_var_name())
+                    .value(InstructionValue::String(
+                        ExecutionScope::from(scope).to_string(),
+                    ))
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::Literal)
+                    .build()
+                    .unwrap();
+
+                let inst_args = inst_args_builder
+                    .name(InstructionName::GroupNonUniformBroadcast)
+                    .num_args(4)
+                    .push_argument(result_arg)
+                    .push_argument(scope_arg)
+                    .push_argument(value_arg)
+                    .push_argument(id_arg);
+
+                Some(inst_args)
+            }
             // todo: implement the rest of the expressions
             _ => unimplemented!(),
         }
@@ -3092,6 +3263,33 @@ impl CodegenCx {
             .build()
             .unwrap()
     }
+
+    pub fn generate_code_with_origin_line_number(&mut self, root: SyntaxNode, map: HashMap<SyntaxToken, usize>) -> Program {
+        let mut program_builder = Program::builder();
+        let root = Root::cast(root).unwrap();
+        // first pass: construct symbol table
+        self.symbol_table_construction_pass(&root);
+        self.reset_position();
+        for stmt in root.stmts() {
+            let inst = self.generate_code_for_stmt(&stmt);
+            match inst {
+                Some(i) => program_builder = program_builder.push_instruction(i),
+                None => { /* do nothing */ }
+            }
+        }
+
+        let global_variables = self.get_global_variables();
+        program_builder
+            .global_var(global_variables)
+            .num_work_groups(self.num_work_group)
+            .work_group_size(self.work_group_size)
+            .subgroup_size(self.sub_group_size)
+            .num_threads(self.num_work_group * self.work_group_size)
+            .scheduler(self.scheduler.clone())
+            .build()
+            .unwrap()
+    }
+
 
     pub(crate) fn get_global_variables(&self) -> Vec<VariableInfo> {
         self.variable_table.get_global_variables()

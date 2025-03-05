@@ -9,12 +9,15 @@ pub enum Event {
     StartNode {
         kind: TokenKind,
         forward_parent: Option<usize>,
+        line: usize,
     },
     StartNodeAt {
         kind: TokenKind,
         checkpoint: usize,
     },
-    AddToken,
+    AddToken {
+        token_index: usize,
+    },
     FinishNode,
     Placeholder,
     Error(ParseError),

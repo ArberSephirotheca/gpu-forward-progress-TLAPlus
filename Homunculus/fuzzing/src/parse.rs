@@ -1,6 +1,6 @@
 use compiler::codegen::common::{Program, Scheduler};
 use compiler::codegen::context::CodegenCx;
-use compiler::compiler::parse::parser::parse;
+use compiler::compiler::parse::parser::{parse, parse_save_tokens};
 use std::fs::File;
 use std::io::Read;
 use std::io::{self};
@@ -19,45 +19,15 @@ fn read_spir_v_file(file_path: &str) -> io::Result<String> {
     Ok(content)
 }
 
-fn compile(
-    spirv_code: &str,
-    sub_group_size: u32,
-    work_group_size: u32,
-    num_workgroup: u32,
-    scheduler: Scheduler,
-) -> Program {
-    let syntax = parse(spirv_code).syntax();
-    let mut codegen_ctx = CodegenCx::new(sub_group_size, work_group_size, num_workgroup, scheduler);
-    codegen_ctx.generate_code(syntax)
-}
-
-// fn parse() -> Res {
-//     // Get the command-line arguments
-//     let args: Vec<String> = env::args().collect();
-
-//     if args.len() > 4 {
-//         eprintln!("Usage: {} <spirv_dis> option<validation/path>", args[0]);
-//         return;
-//     }
-//     let filename = &args[1];
-//     let path = if args.len() == 3 {
-//         &args[2]
-//     } else {
-//         DEFAULT_PROGRAM_FILE
-//     };
-//     // Read the GLSL file
-//     match read_spir_v_file(filename) {
-//         Ok(spirv_code) => {
-//             compile(
-//                 &spirv_code,
-//                 DEFAULT_SUBGROUP_SIZE,
-//                 DEFAULT_WORKGROUP_SIZE,
-//                 DEFAULT_NUM_WORKGROUPS,
-//                 DEFAULT_SCHEDULER.clone(),
-//                 path,
-//             )
-//             .unwrap();
-//         }
-//         Err(e) => eprintln!("Failed to read SPIR-V file '{}': {}", filename, e),
-//     }
+// fn fuzz(
+//     spirv_code: &str,
+//     sub_group_size: u32,
+//     work_group_size: u32,
+//     num_workgroup: u32,
+//     scheduler: Scheduler,
+// ) -> Program {
+//     let (parse, tokens) = parse_save_tokens(spirv_code);
+//     let syntax = parse.syntax();
+//     let mut codegen_ctx = CodegenCx::new(sub_group_size, work_group_size, num_workgroup, scheduler);
+//     codegen_ctx.generate_code_with_origin_line_number(syntax, &tokens);
 // }

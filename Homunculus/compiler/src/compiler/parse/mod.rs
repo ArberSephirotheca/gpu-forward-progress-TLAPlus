@@ -1,6 +1,6 @@
 mod event;
 mod grammar;
-mod lexer;
+pub mod lexer;
 mod marker;
 pub mod parser;
 mod parser_error;

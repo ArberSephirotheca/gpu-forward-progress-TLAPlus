@@ -2,6 +2,7 @@ use rowan::TokenAtOffset;
 use smallvec::smallvec;
 use syntax_node_derive::{BinaryExpr, ResultType, UnaryExpr};
 
+use crate::compiler::parse::lexer::Token;
 use crate::compiler::parse::symbol_table::{SpirvType, StorageClass};
 use crate::compiler::parse::syntax::{
     SyntaxElement, SyntaxNode, SyntaxToken, TokenKind, BUILT_IN_VARIABLE_SET, TLA_BUILTIN_SET,
@@ -81,7 +82,8 @@ pub struct SubExpr(SyntaxNode);
 pub struct AtomicSubExpr(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
 pub struct MulExpr(SyntaxNode);
-
+#[derive(Debug, ResultType, BinaryExpr)]
+pub struct ModExpr(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
 pub struct EqualExpr(SyntaxNode);
 #[derive(Debug, ResultType, BinaryExpr)]
@@ -112,6 +114,8 @@ pub struct GroupAnyExpr(SyntaxNode);
 pub struct GroupNonUniformAllExpr(SyntaxNode);
 #[derive(Debug, ResultType)]
 pub struct GroupNonUniformAnyExpr(SyntaxNode);
+#[derive(Debug, ResultType)]
+pub struct GroupNonUniformBroadcastExpr(SyntaxNode);
 #[derive(Debug)]
 pub struct ReturnStatement(SyntaxNode);
 #[derive(Debug)]
@@ -151,6 +155,7 @@ pub enum Expr {
     AtomicSubExpr(AtomicAddExpr),
     AtomicOrExpr(AtomicOrExpr),
     MulExpr(MulExpr),
+    ModExpr(ModExpr),
     EqualExpr(EqualExpr),
     NotEqualExpr(NotEqualExpr),
     LessThanExpr(LessThanExpr),
@@ -166,6 +171,7 @@ pub enum Expr {
     GroupAnyExpr(GroupAnyExpr),
     GroupNonUniformAllExpr(GroupNonUniformAllExpr),
     GroupNonUniformAnyExpr(GroupNonUniformAnyExpr),
+    GroupNonUniformBroadcastExpr(GroupNonUniformBroadcastExpr),
 }
 
 #[derive(Debug)]
@@ -222,6 +228,7 @@ impl Expr {
             TokenKind::AtomicSubExpr => Some(Self::AtomicAddExpr(AtomicAddExpr(node))),
             TokenKind::AtomicOrExpr => Some(Self::AtomicOrExpr(AtomicOrExpr(node))),
             TokenKind::MulExpr => Some(Self::MulExpr(MulExpr(node))),
+            TokenKind::ModExpr => Some(Self::ModExpr(ModExpr(node))),
             TokenKind::EqualExpr => Some(Self::EqualExpr(EqualExpr(node))),
             TokenKind::NotEqualExpr => Some(Self::NotEqualExpr(NotEqualExpr(node))),
             TokenKind::GreaterThanExpr => Some(Self::GreaterThanExpr(GreaterThanExpr(node))),
@@ -248,6 +255,9 @@ impl Expr {
             }
             TokenKind::GroupNonUniformAnyExpr => {
                 Some(Self::GroupNonUniformAnyExpr(GroupNonUniformAnyExpr(node)))
+            }
+            TokenKind::GroupNonUniformBroadcastExpr => {
+                Some(Self::GroupNonUniformBroadcastExpr(GroupNonUniformBroadcastExpr(node)))
             }
             _ => None,
         }
@@ -286,6 +296,7 @@ impl Stmt {
             _ => Some(Self::Expr(Expr::cast(node)?)),
         }
     }
+
 }
 
 impl Root {
@@ -903,6 +914,32 @@ impl GroupNonUniformAnyExpr {
             .filter_map(|x| x.into_token())
             .filter(|x| x.kind() == TokenKind::Ident)
             .nth(2)
+    }
+}
+
+impl GroupNonUniformBroadcastExpr {
+    pub(crate) fn execution_scope(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(1)
+    }
+
+    pub(crate) fn value(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(2)
+    }
+
+    pub(crate) fn id(&self) -> Option<SyntaxToken> {
+        self.0
+            .children_with_tokens()
+            .filter_map(|x| x.into_token())
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .nth(3)
     }
 }
 

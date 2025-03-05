@@ -7,13 +7,17 @@ pub(crate) struct Lexer<'t> {
     inner: logos::Lexer<'t, TokenKind>,
     tokens_to_capture: Vec<Token<'t>>, // Store captured tokens
     inside_function: bool,
+    line: usize,
+    cursor: usize,
 }
 
 #[derive(Debug, PartialEq)]
-pub(crate) struct Token<'t> {
+pub struct Token<'t> {
     pub(crate) kind: TokenKind,
     pub(crate) text: &'t str,
     pub(crate) range: TextRange,
+    pub(crate) line: usize,
+    pub(crate) pos: usize,
 }
 
 impl<'t> Lexer<'t> {
@@ -22,7 +26,14 @@ impl<'t> Lexer<'t> {
             inner: TokenKind::lexer(input),
             tokens_to_capture: Vec::new(),
             inside_function: false,
+            // make it 5 to skip the version info
+            line: 5,
+            cursor: 0,
         }
+    }
+
+    pub fn line(&self) -> usize {
+        self.line
     }
 }
 
@@ -42,7 +53,11 @@ impl<'t> Iterator for Lexer<'t> {
 
             TextRange::new(start, end)
         };
-        Some(Self::Item { kind, text, range })
+        if kind == TokenKind::Newline {
+            self.line += 1;
+        }
+        self.cursor += 1;
+        Some(Self::Item { kind, text, range, line: self.line, pos: self.cursor})
     }
 
     // /// this function is called when we call next() on Lexer

@@ -618,6 +618,19 @@ OpMul(t, var, operand1, operand2) ==
                 /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                 /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>
 
+OpMod(t, var, operand1, operand2) ==
+    LET workGroupId == WorkGroupId(t)+1
+        MangleVar == Mangle(t, var)
+        mangledOperand1 == Mangle(t, operand1)
+        mangledOperand2 == Mangle(t, operand2)
+
+    IN
+        /\  LET operand1Val == GetVal(workGroupId, mangledOperand1)
+                operand2Val == GetVal(workGroupId, mangledOperand2)
+            IN
+                Assignment(t, {Var(MangleVar.scope, MangleVar.name, operand1Val % operand2Val, Index(-1))})
+                /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
+                /\  UNCHANGED <<state, DynamicNodeSet, globalCounter, snapShotMap>>
 
 GetGlobalId(t, result) ==
     LET mangledResult == Mangle(t, result)
@@ -1084,7 +1097,7 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
                         IF unknown_subgroup_threads # {} \/ \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
                             /\  state' = [state EXCEPT ![t] = "subgroup"]
                             /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
-                        ELSE IF \E sthread \in active_subgroup_threads: EvalExpr(sthread, workGroupId+1, predicate) = TRUE THEN 
+                        ELSE IF \E sthread \in active_subgroup_threads: EvalExpr(sthread, workGroupId, predicate) = TRUE THEN 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, TRUE, Index(-1)): sthread \in active_subgroup_threads})
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                     tid \in Threads |->
@@ -1103,6 +1116,51 @@ OpGroupNonUniformAny(t, result, scope, predicate) ==
                             /\ UNCHANGED <<globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
                         ELSE 
                             /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, FALSE, Index(-1)): sthread \in active_subgroup_threads })
+                            /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
+                                    tid \in Threads |->
+                                        IF tid \in active_subgroup_threads THEN 
+                                            "ready" 
+                                        ELSE 
+                                            state[tid]
+                                ]
+                            /\  pc' = [
+                                    tid \in Threads |->
+                                        IF tid \in active_subgroup_threads THEN 
+                                            pc[tid] + 1
+                                        ELSE 
+                                            pc[tid]
+                                ]
+                            /\ UNCHANGED <<globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
+            ELSE
+                /\  FALSE
+
+OpGroupNonUniformBroadcast(t, result, scope, value, id) ==
+    LET mangledResult == Mangle(t, result)
+    IN
+        /\  
+            \/  /\  IsVariable(result)
+            \/  IsIntermediate(result)
+        /\  scope.value \in ScopeOperand
+        /\  IF scope.value = "subgroup" THEN
+                /\  LET workGroupId == WorkGroupId(t) + 1
+                        sthreads == ThreadsWithinSubgroupNonTerminated(SubgroupId(t), WorkGroupId(t))
+                        currentDB == CurrentDynamicNode(workGroupId, t)
+                        tidVal == EvalExpr(t, workGroupId, id) + 1
+                        active_subgroup_threads == currentDB.currentThreadSet[workGroupId] \intersect sthreads
+                        not_excecuteing_subgroup_threads == currentDB.notExecuteSet[workGroupId] \intersect sthreads
+                        unknown_subgroup_threads == currentDB.unknownSet[workGroupId] \intersect sthreads
+                    IN
+                        \*  resulting value is undefined if Id is not part of the scope restricted tangle, or is greater than or equal to the size of the scope.
+                        IF (tidVal > SubgroupSize) \/ (tidVal \in not_excecuteing_subgroup_threads) THEN
+                            Print("UB: Id is not part of the scope restricted tangle, or is greater than or equal to the size of the scope.", FALSE)
+                        ELSE IF unknown_subgroup_threads # {} \/ \E sthread \in active_subgroup_threads: pc[sthread] # pc[t] THEN
+                            /\  state' = [state EXCEPT ![t] = "subgroup"]
+                            /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicNodeSet, globalCounter, snapShotMap>>
+                        \*  behavior is undefined when Id is not dynamically uniform
+                        ELSE IF \E sthread \in sthreads: (EvalExpr(sthread, workGroupId, id) + 1) # tidVal THEN 
+                            Print("UB: Id is not dynamically uniform", FALSE)
+                        ELSE 
+                            /\  Assignment(t, {Var(result.scope, Mangle(sthread, result).name, EvalExpr(tidVal, WorkGroupId(tidVal) + 1, value), Index(-1)): sthread \in active_subgroup_threads })
                             /\  state' = [\* release all barrier in the subgroup, marking barrier as ready
                                     tid \in Threads |->
                                         IF tid \in active_subgroup_threads THEN 
@@ -1457,6 +1515,8 @@ ExecuteInstruction(t) ==
                 OpAtomicOr(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpMul" THEN
                 OpMul(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpMod" THEN
+                OpMod(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicExchange" THEN
                 OpAtomicExchange(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpAtomicCompareExchange" THEN
@@ -1481,6 +1541,8 @@ ExecuteInstruction(t) ==
                 OpGroupNonUniformAll(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpGroupNonUniformAny" THEN
                 OpGroupNonUniformAny(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3])
+            ELSE IF ThreadInstructions[t][pc[t]] = "OpGroupNonUniformBroadcast" THEN
+                OpGroupNonUniformBroadcast(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2], ThreadArguments[t][pc[t]][3], ThreadArguments[t][pc[t]][4])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpLoopMerge" THEN
                 OpLoopMerge(t, ThreadArguments[t][pc[t]][1], ThreadArguments[t][pc[t]][2])
             ELSE IF ThreadInstructions[t][pc[t]] = "OpSelectionMerge" THEN

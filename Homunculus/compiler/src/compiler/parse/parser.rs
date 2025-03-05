@@ -1,5 +1,6 @@
 use super::grammar::grammar;
 use super::marker::Marker;
+use super::syntax::SyntaxToken;
 use super::{
     event::Event, lexer::Lexer, parser_error::AsukaError, parser_error::ParseError, sink::Sink,
 };
@@ -8,7 +9,8 @@ use crate::compiler::parse::source::Source;
 use crate::compiler::parse::syntax::SyntaxNode;
 use crate::compiler::parse::syntax::TokenKind;
 use core::mem;
-use rowan::GreenNode;
+use std::collections::HashMap;
+use rowan::{GreenNode, NodeOrToken};
 type AsukaResult<T> = Result<T, AsukaError>;
 
 const RECOVERY_SET: [TokenKind; 1] = [TokenKind::Newline];
@@ -17,6 +19,7 @@ pub(crate) struct Parser<'l, 't> {
     source: Source<'l, 't>,
     pub(crate) events: Vec<Event>,
     expected_kinds: Vec<TokenKind>,
+    line: usize,
 }
 
 impl<'l, 't> Parser<'l, 't> {
@@ -25,6 +28,7 @@ impl<'l, 't> Parser<'l, 't> {
             source,
             events: Vec::new(),
             expected_kinds: Vec::new(),
+            line: 0,
         }
     }
 
@@ -38,6 +42,7 @@ impl<'l, 't> Parser<'l, 't> {
         self.events.push(Event::StartNode {
             kind,
             forward_parent: None,
+            line: self.line,
         })
     }
     pub(crate) fn start_node_at(&mut self, checkpoint: usize, kind: TokenKind) {
@@ -54,9 +59,11 @@ impl<'l, 't> Parser<'l, 't> {
 
     pub(crate) fn bump(&mut self) {
         self.expected_kinds.clear();
-        self.source.next_token().unwrap();
+        let token = self.source.next_token().unwrap();
 
-        self.events.push(Event::AddToken)
+        self.events.push(Event::AddToken{
+            token_index: token.pos
+        });
     }
 
     pub(crate) fn peek(&mut self) -> Option<TokenKind> {
@@ -116,7 +123,7 @@ impl<'l, 't> Parser<'l, 't> {
         if !self.at_end() {
             let m = self.start();
             self.bump();
-            m.complete(self, TokenKind::Error);
+            m.complete(self, TokenKind::Error, self.line);
         }
     }
 
@@ -127,11 +134,20 @@ impl<'l, 't> Parser<'l, 't> {
     pub(crate) fn at_end(&mut self) -> bool {
         self.peek().is_none()
     }
+
+    pub(crate) fn get_line(&self) -> usize {
+        self.line
+    }
+
+    pub(crate) fn increment_line(&mut self) {
+        self.line += 1;
+    }
 }
 
 pub struct Parse {
     pub(crate) green_node: GreenNode,
     pub(crate) errors: Vec<ParseError>,
+    pub token_index_map: Vec<usize>,
 }
 impl Parse {
     pub fn debug_tree(&self) -> String {
@@ -153,6 +169,20 @@ impl Parse {
     pub fn syntax(&self) -> SyntaxNode {
         SyntaxNode::new_root(self.green_node.clone())
     }
+
+    pub fn make_token_map(&self) -> HashMap<SyntaxToken, usize> {
+        let root_node = self.syntax();
+        let mut map = HashMap::new();
+        let mut token_count = 0;
+        for element in root_node.descendants_with_tokens() {
+            if let NodeOrToken::Token(tok) = element {
+                let token_index = self.token_index_map[token_count];
+                map.insert(tok, token_index);
+                token_count += 1;
+            }
+        }
+        map
+    }
 }
 
 pub fn parse(input: &str) -> Parse {
@@ -163,6 +193,16 @@ pub fn parse(input: &str) -> Parse {
     let sink = Sink::new(&tokens, events);
     sink.finish()
 }
+
+pub fn parse_save_tokens(input: &str) -> (Parse, Vec<Token>) {
+    let tokens: Vec<_> = Lexer::new(input).collect();
+    let source = Source::new(&tokens);
+    let parser = Parser::new(source);
+    let events = parser.parse();
+    let sink = Sink::new(&tokens, events);
+    (sink.finish(), tokens)
+}
+
 #[cfg(test)]
 mod test {
     use crate::compiler::parse::parser::parse;

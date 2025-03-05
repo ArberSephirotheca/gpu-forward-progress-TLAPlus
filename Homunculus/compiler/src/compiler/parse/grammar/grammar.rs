@@ -7,5 +7,5 @@ pub(crate) fn root(p: &mut Parser) -> CompletedMarker {
     while !p.at_end() {
         stmt(p);
     }
-    m.complete(p, TokenKind::Root)
+    m.complete(p, TokenKind::Root, p.get_line())
 }

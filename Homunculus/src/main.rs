@@ -1,7 +1,9 @@
 use camino::Utf8Path;
 use compiler::codegen::common::Scheduler;
 use compiler::codegen::context::CodegenCx;
-use compiler::compiler::parse::parser::parse;
+use compiler::compiler::ast::ast::Root;
+use compiler::compiler::parse::parser::{parse, parse_save_tokens};
+use compiler::compiler::parse::syntax::TokenKind;
 use eyre::{eyre, Context, Report, Result};
 use std::fs::File;
 use std::io::Read;
@@ -29,7 +31,14 @@ fn compile(
     scheduler: Scheduler,
     path: &str,
 ) -> Result<()> {
-    let syntax = parse(spirv_code).syntax();
+    let (parse, tokens) = parse_save_tokens(spirv_code);
+    let syntax = parse.syntax();
+    // println!("{:?}", tokens);
+    let map = parse.make_token_map();
+    let op_func_end = syntax.last_token().unwrap();
+    println!("{:?}",tokens);
+    println!("{:?}",op_func_end);
+    println!("{}",map[&op_func_end]);
     let mut codegen_ctx = CodegenCx::new(sub_group_size, work_group_size, num_workgroup, scheduler);
     let program = codegen_ctx.generate_code(syntax);
     let utf8_path = Utf8Path::new(path);

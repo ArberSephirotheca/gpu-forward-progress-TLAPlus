@@ -2,7 +2,7 @@ VERSION 0.6
 
 tlaplusbuild-image:
     FROM openjdk:23-slim
-    RUN apt-get update && apt-get install -y git bash sudo curl graphviz clang cmake
+    RUN apt-get update && apt-get install -y git bash sudo curl graphviz clang cmake spirv-cross
     RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
     ENV PATH="/root/.cargo/bin:${PATH}"
     RUN git config --global http.postBuffer 157286400
@@ -69,6 +69,8 @@ tlaplus-image:
         ELSE IF [ "$OUT" = "all" ]
             RUN JAVA_OPTS="-Xmx32G" tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 15 -maxSetSize 100 -dump dot output.dot 2>&1 | tee output.txt || true 
             RUN JAVA_OPTS="-Xmx32G" tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 15 -maxSetSize 100 > output.txt 2>&1 || true
+        ELSE IF [ "$OUT" = "fuzz" ]
+            RUN spirv-cross --version 450 --no-es $INPUT.spv --output output.comp
         ELSE
             RUN echo "Invalid output format"
         END
