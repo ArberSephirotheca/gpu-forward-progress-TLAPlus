@@ -38,6 +38,7 @@ impl InstructionArgument {
 
 #[derive(Default)]
 pub struct InstructionArgumentBuilder {
+    ssa_id: Option<String>,
     name: Option<String>,
     scope: Option<VariableScope>,
     value: Option<InstructionValue>,
@@ -45,6 +46,11 @@ pub struct InstructionArgumentBuilder {
 }
 
 impl InstructionArgumentBuilder {
+    pub fn ssa_id(mut self, ssa_id: String) -> Self {
+        self.ssa_id = Some(ssa_id);
+        self
+    }
+    
     pub fn name(mut self, name: String) -> Self {
         self.name = Some(name);
         self
@@ -67,6 +73,7 @@ impl InstructionArgumentBuilder {
 
     pub fn build(self) -> Result<InstructionArgument> {
         Ok(InstructionArgument {
+            ssa_id: self.ssa_id.ok_or_else(|| eyre!("SSA ID is required"))?,
             name: self.name.ok_or_else(|| eyre!("Name is required"))?,
             scope: self.scope.ok_or_else(|| eyre!("Scope is required"))?,
             value: self.value.ok_or_else(|| eyre!("Value is required"))?,
@@ -142,6 +149,7 @@ pub struct InstructionBuilder {
     scope: Option<ExecutionScope>,
     arguments: Option<InstructionArguments>,
     vec_arguments: Option<Vec<InstructionArguments>>,
+    line: Option<usize>,
 }
 
 impl InstructionBuilder {
@@ -170,6 +178,11 @@ impl InstructionBuilder {
         self
     }
 
+    pub fn line(mut self, line: usize) -> Self {
+        self.line = Some(line);
+        self
+    }
+
     pub fn build(self) -> Result<Instruction> {
         Ok(Instruction {
             position: self.position.ok_or_else(|| eyre!("Position is required"))?,
@@ -181,6 +194,7 @@ impl InstructionBuilder {
                 .arguments
                 .ok_or_else(|| eyre!("Arguments are required"))?,
             vec_arguments: self.vec_arguments,
+            line: self.line.ok_or_else(|| eyre!("Line is required"))?,
         })
     }
 }
@@ -226,6 +240,7 @@ pub struct ProgramBuilder {
     // thread: SmallVec<[Thread; 8]>,
     instructions: SmallVec<[Instruction; 10]>,
     constants: SmallVec<[Constant; 10]>,
+    func_start_line: Option<usize>,
 }
 
 impl ProgramBuilder {
@@ -269,6 +284,11 @@ impl ProgramBuilder {
         self
     }
 
+    pub fn func_start_line(mut self, func_start_line: usize) -> Self {
+        self.func_start_line = Some(func_start_line);
+        self
+    }
+
     pub fn build(self) -> Result<Program> {
         Ok(Program {
             global_vars: self.global_vars,
@@ -289,6 +309,7 @@ impl ProgramBuilder {
                 .ok_or_else(|| eyre!("Scheduler is required"))?,
             instructions: self.instructions,
             constants: self.constants,
+            func_start_line: self.func_start_line.ok_or_else(|| eyre!("Function start line is required"))?,
         })
     }
 }

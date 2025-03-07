@@ -262,6 +262,50 @@ impl Expr {
             _ => None,
         }
     }
+
+    fn token(&self) -> SyntaxToken {
+        match self {
+            Self::VariableExpr(x) => x.0.first_token().unwrap(),
+            Self::TypeExpr(x) => x.0.first_token().unwrap(),
+            Self::VariableRef(x) => x.0.first_token().unwrap(),
+            Self::LabelExpr(x) => x.0.first_token().unwrap(),
+            Self::LoadExpr(x) => x.0.first_token().unwrap(),
+            Self::AtomicLoadExpr(x) => x.0.first_token().unwrap(),
+            Self::ConstExpr(x) => x.0.first_token().unwrap(),
+            Self::ConstCompositeExpr(x) => x.0.first_token().unwrap(),
+            Self::ConstTrueExpr(x) => x.0.first_token().unwrap(),
+            Self::ConstFalseExpr(x) => x.0.first_token().unwrap(),
+            Self::LogicalOr(x) => x.0.first_token().unwrap(),
+            Self::LogicalAnd(x) => x.0.first_token().unwrap(),
+            Self::LogicalEqual(x) => x.0.first_token().unwrap(),
+            Self::LogicalNotEqual(x) => x.0.first_token().unwrap(),
+            Self::LogicalNot(x) => x.0.first_token().unwrap(),
+            Self::ShiftLeftLogicalExpr(x) => x.0.first_token().unwrap(),
+            Self::AddExpr(x) => x.0.first_token().unwrap(),
+            Self::AtomicAddExpr(x) => x.0.first_token().unwrap(),
+            Self::SubExpr(x) => x.0.first_token().unwrap(),
+            Self::AtomicSubExpr(x) => x.0.first_token().unwrap(),
+            Self::AtomicOrExpr(x)   => x.0.first_token().unwrap(),
+            Self::MulExpr(x) => x.0.first_token().unwrap(),
+            Self::ModExpr(x) => x.0.first_token().unwrap(),
+            Self::EqualExpr(x) => x.0.first_token().unwrap(),
+            Self::NotEqualExpr(x) => x.0.first_token().unwrap(),
+            Self::GreaterThanExpr(x) => x.0.first_token().unwrap(),
+            Self::GreaterThanEqualExpr(x) => x.0.first_token().unwrap(),
+            Self::LessThanExpr(x) => x.0.first_token().unwrap(),
+            Self::LessThanEqualExpr(x) => x.0.first_token().unwrap(),
+            Self::BitwiseOrExpr(x) => x.0.first_token().unwrap(),
+            Self::BitwiseAndExpr(x) => x.0.first_token().unwrap(),
+            Self::BitcastExpr(x) => x.0.first_token().unwrap(),
+            Self::AtomicExchangeExpr(x) => x.0.first_token().unwrap(),
+            Self::AtomicCompareExchangeExpr(x) => x.0.first_token().unwrap(),
+            Self::GroupAllExpr(x) => x.0.first_token().unwrap(),
+            Self::GroupAnyExpr(x) => x.0.first_token().unwrap(),
+            Self::GroupNonUniformAllExpr(x) => x.0.first_token().unwrap(),
+            Self::GroupNonUniformAnyExpr(x) => x.0.first_token().unwrap(),
+            Self::GroupNonUniformBroadcastExpr(x) => x.0.first_token().unwrap(),
+        }
+    }
 }
 
 impl Stmt {
@@ -294,6 +338,26 @@ impl Stmt {
                 Some(Self::SelectionMergeStatement(SelectionMergeStatement(node)))
             }
             _ => Some(Self::Expr(Expr::cast(node)?)),
+        }
+    }
+
+    pub(crate) fn token(&self) -> SyntaxToken{
+        match self {
+            Self::ExecutionMode(x) => x.0.first_token().unwrap(),
+            Self::DecorateStatement(x) => x.0.first_token().unwrap(),
+            Self::DecorateStringStatement(x) => x.0.first_token().unwrap(),
+            Self::VariableDef(x) => x.0.first_token().unwrap(),
+            Self::ReturnStatement(x) => x.0.first_token().unwrap(),
+            Self::StoreStatement(x) => x.0.first_token().unwrap(),
+            Self::AtomicStoreStatement(x) => x.0.first_token().unwrap(),
+            Self::FuncStatement(x) => x.0.first_token().unwrap(),
+            Self::BranchConditionalStatement(x) => x.0.first_token().unwrap(),
+            Self::BranchStatement(x) => x.0.first_token().unwrap(),
+            Self::SwitchStatement(x) => x.0.first_token().unwrap(),
+            Self::ControlBarrierStatement(x) => x.0.first_token().unwrap(),
+            Self::LoopMergeStatement(x) => x.0.first_token().unwrap(),
+            Self::SelectionMergeStatement(x) => x.0.first_token().unwrap(),
+            Self::Expr(x) => x.token(),
         }
     }
 

@@ -45,7 +45,7 @@ impl fmt::Display for StorageClass {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum BuiltInVariable {
+pub enum BuiltInVariable {
     NumWorkgroups,
     WorkgroupSize,
     WorkgroupId,
@@ -212,6 +212,7 @@ pub enum AccessStep {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct VariableInfo {
+    pub ssa_id: String,
     pub id: String,
     pub ty: SpirvType,
     pub access_chain: Vec<AccessStep>,
@@ -227,6 +228,7 @@ impl VariableInfo {
         // it is different from the SSA name as it may be reused
         // by multiple variables in different scopes
         // such as OpAccessChain and OpLoad
+        ssa_id: String,
         id: String,
         ty: SpirvType,
         access_chain: Vec<AccessStep>,
@@ -236,6 +238,7 @@ impl VariableInfo {
         default_value: InstructionValue,
     ) -> Self {
         Self {
+            ssa_id,
             id,
             ty,
             access_chain,
@@ -248,6 +251,7 @@ impl VariableInfo {
 
     pub(crate) fn new_const_int(id: String, value: i32, signed: bool) -> Self {
         Self {
+            ssa_id: id.clone(),
             id,
             ty: SpirvType::Int { width: 32, signed },
             access_chain: vec![],
@@ -259,6 +263,7 @@ impl VariableInfo {
     }
     pub(crate) fn new_const_bool(id: String, value: bool) -> Self {
         Self {
+            ssa_id: id.clone(),
             id,
             ty: SpirvType::Bool,
             access_chain: vec![],
@@ -269,6 +274,9 @@ impl VariableInfo {
         }
     }
 
+    pub(crate) fn get_ssa_name(&self) -> String {
+        self.ssa_id.clone()
+    }
     pub(crate) fn get_var_name(&self) -> String {
         self.id.clone()
     }

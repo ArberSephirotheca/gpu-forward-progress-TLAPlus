@@ -93,6 +93,10 @@ impl CodegenCx {
         self.label_table.lookup(label)
     }
 
+    pub fn get_variable_table(&self) -> &VariableSymbolTable {
+        &self.variable_table
+    }
+
     // only builtin and constant variable can be resolved to a value
     fn construct_instruction_value(&self, info: &VariableInfo) -> InstructionValue {
         if !info.access_chain.is_empty() {
@@ -193,6 +197,7 @@ impl CodegenCx {
                     // variable expression would be a variable declaration, so its SSA form is the same as the variable name
                     let var_info = VariableInfo::new(
                         var_name.clone(),
+                        var_name.clone(),
                         spirv_type.clone(),
                         vec![],
                         storage_class.clone(),
@@ -240,6 +245,8 @@ impl CodegenCx {
 
                 // Build the final variable information after applying the access chain
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
+                    // base_var_name.text().to_string(),
                     base_var_info.get_var_name(),
                     spirv_type.clone(),
                     access_chain,
@@ -283,6 +290,7 @@ impl CodegenCx {
 
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     spirv_type.clone(),
                     vec![],
                     StorageClass::Local,
@@ -303,6 +311,7 @@ impl CodegenCx {
                 };
 
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     spirv_type.clone(),
                     vec![],
@@ -325,6 +334,7 @@ impl CodegenCx {
 
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     spirv_type.clone(),
                     vec![],
                     StorageClass::Local,
@@ -346,6 +356,7 @@ impl CodegenCx {
 
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     spirv_type.clone(),
                     vec![],
                     StorageClass::Local,
@@ -366,6 +377,7 @@ impl CodegenCx {
                 };
 
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     spirv_type.clone(),
                     vec![],
@@ -389,6 +401,7 @@ impl CodegenCx {
 
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     spirv_type.clone(),
                     vec![],
                     StorageClass::Local,
@@ -411,6 +424,7 @@ impl CodegenCx {
 
                 // variable expression would be a variable declaration, so its SSA form is the same as the variable name
                 let var_info = VariableInfo::new(
+                    var_name.clone(), 
                     var_name.clone(),
                     spirv_type.clone(),
                     vec![],
@@ -436,6 +450,7 @@ impl CodegenCx {
                 // variable expression would be a variable declaration, so its SSA form is the same as the variable name
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     spirv_type.clone(),
                     vec![],
                     StorageClass::Local,
@@ -458,6 +473,7 @@ impl CodegenCx {
                 };
 
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     spirv_type.clone(),
                     vec![],
@@ -483,6 +499,7 @@ impl CodegenCx {
 
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     spirv_type.clone(),
                     vec![],
                     StorageClass::Local,
@@ -505,6 +522,7 @@ impl CodegenCx {
                 };
 
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     spirv_type.clone(),
                     vec![],
@@ -529,6 +547,7 @@ impl CodegenCx {
 
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     spirv_type.clone(),
                     vec![],
                     StorageClass::Local,
@@ -552,6 +571,7 @@ impl CodegenCx {
 
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     spirv_type.clone(),
                     vec![],
                     StorageClass::Local,
@@ -566,6 +586,7 @@ impl CodegenCx {
             }
             Expr::EqualExpr(_) => {
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     SpirvType::Bool,
                     vec![],
@@ -582,6 +603,7 @@ impl CodegenCx {
             Expr::NotEqualExpr(_) => {
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     SpirvType::Bool,
                     vec![],
                     StorageClass::Local,
@@ -596,6 +618,7 @@ impl CodegenCx {
             }
             Expr::LessThanExpr(_) => {
                 let var_info: VariableInfo = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     SpirvType::Bool,
                     vec![],
@@ -612,6 +635,7 @@ impl CodegenCx {
             Expr::LessThanEqualExpr(_) => {
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     SpirvType::Bool,
                     vec![],
                     StorageClass::Local,
@@ -626,6 +650,7 @@ impl CodegenCx {
             }
             Expr::GreaterThanExpr(_) => {
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     SpirvType::Bool,
                     vec![],
@@ -642,6 +667,7 @@ impl CodegenCx {
             Expr::GreaterThanEqualExpr(_) => {
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     SpirvType::Bool,
                     vec![],
                     StorageClass::Local,
@@ -657,6 +683,7 @@ impl CodegenCx {
             Expr::BitwiseOrExpr(_) => {
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     SpirvType::Int { width: 32, signed: true },
                     vec![],
                     StorageClass::Local,
@@ -671,6 +698,7 @@ impl CodegenCx {
             }
             Expr::BitwiseAndExpr(_) => {
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     SpirvType::Int { width: 32, signed: true },
                     vec![],
@@ -693,6 +721,7 @@ impl CodegenCx {
                 };
 
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     spirv_type.clone(),
                     vec![],
@@ -720,7 +749,7 @@ impl CodegenCx {
                 self.insert_variable(
                     var_name.clone(),
                     VariableInfo::new(
-                        // var_name,
+                        var_name.clone(),
                         pointer_info.get_var_name(),
                         pointer_info.get_ty(),
                         pointer_info.access_chain.clone(),
@@ -742,6 +771,7 @@ impl CodegenCx {
                 self.insert_variable(
                     var_name.clone(),
                     VariableInfo::new(
+                        var_name.clone(),
                         var_name,
                         // pointer_info.get_var_name(),
                         pointer_info.get_ty(),
@@ -756,6 +786,7 @@ impl CodegenCx {
             }
             // fixme: consider memory scope in the future
             Expr::AtomicExchangeExpr(atomic_exch_expr) => {
+                let pointer_ssa_id = atomic_exch_expr.pointer().unwrap();
                 let result_type = atomic_exch_expr.result_type().unwrap();
                 // get the actual type of the variable
                 let spirv_type = match self.lookup_type(result_type.text()) {
@@ -764,6 +795,7 @@ impl CodegenCx {
                 };
 
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     spirv_type.clone(),
                     vec![],
@@ -778,6 +810,7 @@ impl CodegenCx {
             }
 
             Expr::AtomicCompareExchangeExpr(atomic_cmp_exch_expr) => {
+                let pointer_ssa_id = atomic_cmp_exch_expr.pointer().unwrap();
                 let result_type = atomic_cmp_exch_expr.result_type().unwrap();
                 // get the actual type of the variable
                 let spirv_type = match self.lookup_type(result_type.text()) {
@@ -786,6 +819,7 @@ impl CodegenCx {
                 };
 
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     spirv_type.clone(),
                     vec![],
@@ -799,8 +833,9 @@ impl CodegenCx {
                 self.increment_inst_position();
             }
 
-            Expr::GroupAllExpr(_) => {
+            Expr::GroupAllExpr(expr) => {
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     SpirvType::Bool,
                     vec![],
@@ -815,6 +850,7 @@ impl CodegenCx {
             Expr::GroupAnyExpr(_) => {
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     SpirvType::Bool,
                     vec![],
                     StorageClass::Local,
@@ -827,6 +863,7 @@ impl CodegenCx {
             }
             Expr::GroupNonUniformAllExpr(_) => {
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     SpirvType::Bool,
                     vec![],
@@ -841,6 +878,7 @@ impl CodegenCx {
             Expr::GroupNonUniformAnyExpr(_) => {
                 let var_info = VariableInfo::new(
                     var_name.clone(),
+                    var_name.clone(),
                     SpirvType::Bool,
                     vec![],
                     StorageClass::Local,
@@ -853,6 +891,7 @@ impl CodegenCx {
             }
             Expr::GroupNonUniformBroadcastExpr(_) => {
                 let var_info = VariableInfo::new(
+                    var_name.clone(),
                     var_name.clone(),
                     SpirvType::Bool,
                     vec![],
@@ -899,6 +938,7 @@ impl CodegenCx {
                 self.insert_variable(
                     name.clone(),
                     VariableInfo::new(
+                        name.clone(),
                         name,
                         SpirvType::Int {
                             width: 32,
@@ -1031,6 +1071,7 @@ impl CodegenCx {
 
                         // fixme: avoid using unwrap, use better error handling instead
                         let arg = inst_arg_builder
+                            .ssa_id(var.get_ssa_name())
                             .name(var.get_var_name())
                             .value(var.initial_value())
                             .index(var.get_index())
@@ -1112,6 +1153,7 @@ impl CodegenCx {
                     .expect("LogicalOr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1120,6 +1162,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1128,6 +1171,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1167,6 +1211,7 @@ impl CodegenCx {
                     .expect("LogicalAnd: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1175,6 +1220,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1183,6 +1229,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1222,6 +1269,7 @@ impl CodegenCx {
                     .expect("LogicalEqual: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1230,6 +1278,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1238,6 +1287,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1277,6 +1327,7 @@ impl CodegenCx {
                     .expect("LogicalNotEqual: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1285,6 +1336,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1293,6 +1345,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1326,6 +1379,7 @@ impl CodegenCx {
                     .expect("LogicalNot: Operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1334,6 +1388,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let operand_arg = operand_arg_builder
+                    .ssa_id(operand_info.get_ssa_name())
                     .name(operand_info.get_var_name())
                     .value(self.construct_instruction_value(&operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1371,6 +1426,7 @@ impl CodegenCx {
                     .expect("ShiftLeftLogicalExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1379,6 +1435,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1387,6 +1444,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1426,6 +1484,7 @@ impl CodegenCx {
                     .expect("AddExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1434,6 +1493,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1442,6 +1502,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1481,6 +1542,7 @@ impl CodegenCx {
                     .expect("AtomicAddExpr: value not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1489,6 +1551,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let pointer_arg = inst_arg1_builder
+                    .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     .value(self.construct_instruction_value(&pointer_info))
                     .index(IndexKind::Literal(-1))
@@ -1497,6 +1560,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let value_arg = inst_arg2_builder
+                    .ssa_id(value_info.get_ssa_name())
                     .name(value_info.get_var_name())
                     .value(self.construct_instruction_value(&value_info))
                     .index(IndexKind::Literal(-1))
@@ -1535,6 +1599,7 @@ impl CodegenCx {
                     .expect("SubExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1543,6 +1608,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1551,6 +1617,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1590,6 +1657,7 @@ impl CodegenCx {
                     .expect("AtomicSubExpr: value not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1598,6 +1666,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let pointer_arg = inst_arg1_builder
+                    .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     .value(self.construct_instruction_value(&pointer_info))
                     .index(IndexKind::Literal(-1))
@@ -1606,6 +1675,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let value_arg = inst_arg2_builder
+                    .ssa_id(value_info.get_ssa_name())
                     .name(value_info.get_var_name())
                     .value(self.construct_instruction_value(&value_info))
                     .index(IndexKind::Literal(-1))
@@ -1643,6 +1713,7 @@ impl CodegenCx {
                     .expect("AtomicOrExpr: value not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1651,6 +1722,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let pointer_arg = inst_arg1_builder
+                    .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     .value(self.construct_instruction_value(&pointer_info))
                     .index(IndexKind::Literal(-1))
@@ -1659,6 +1731,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let value_arg = inst_arg2_builder
+                    .ssa_id(value_info.get_ssa_name())
                     .name(value_info.get_var_name())
                     .value(self.construct_instruction_value(&value_info))
                     .index(IndexKind::Literal(-1))
@@ -1696,6 +1769,7 @@ impl CodegenCx {
                     .expect("MulExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1704,6 +1778,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1712,6 +1787,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1751,6 +1827,7 @@ impl CodegenCx {
                     .expect("ModExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1759,6 +1836,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1767,6 +1845,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1807,6 +1886,7 @@ impl CodegenCx {
                     .expect("EqualExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1815,6 +1895,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = inst_arg1_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1823,6 +1904,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = inst_arg2_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1861,6 +1943,7 @@ impl CodegenCx {
                     .expect("NotEqualExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1869,6 +1952,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = first_operand_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1877,6 +1961,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = second_operand_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1912,6 +1997,7 @@ impl CodegenCx {
                     .expect("LessThanExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1920,6 +2006,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = first_operand_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1928,6 +2015,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = second_operand_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1964,6 +2052,7 @@ impl CodegenCx {
                     .expect("LessThanEqualExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -1972,6 +2061,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = first_operand_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -1980,6 +2070,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = second_operand_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2018,6 +2109,7 @@ impl CodegenCx {
                     .expect("GreaterThanExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2026,6 +2118,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = first_operand_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2034,6 +2127,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = second_operand_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2072,6 +2166,7 @@ impl CodegenCx {
                     .expect("GreaterThanEqualExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2080,6 +2175,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = first_operand_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2088,6 +2184,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = second_operand_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2125,6 +2222,7 @@ impl CodegenCx {
                     .expect("BitwiseOrExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2133,6 +2231,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = first_operand_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2141,6 +2240,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = second_operand_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2178,6 +2278,7 @@ impl CodegenCx {
                     .expect("BitwiseAndExpr: Second operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2186,6 +2287,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let first_operand_arg = first_operand_builder
+                    .ssa_id(first_operand_info.get_ssa_name())
                     .name(first_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&first_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2194,6 +2296,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let second_operand_arg = second_operand_builder
+                    .ssa_id(second_operand_info.get_ssa_name())
                     .name(second_operand_info.get_var_name())
                     .value(self.construct_instruction_value(&second_operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2226,6 +2329,7 @@ impl CodegenCx {
                     .expect("BitcastExpr: Operand not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2234,6 +2338,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let operand_arg = operand_arg_builder
+                    .ssa_id(operand_info.get_ssa_name())
                     .name(operand_info.get_var_name())
                     .value(self.construct_instruction_value(&operand_info))
                     .index(IndexKind::Literal(-1))
@@ -2254,6 +2359,7 @@ impl CodegenCx {
                 let inst_arg_builder = InstructionArgument::builder();
 
                 let arg1 = inst_arg_builder
+                    .ssa_id(var_name.clone())
                     .index(IndexKind::Literal(-1))
                     .name(var_name.clone())
                     .scope(VariableScope::Global)
@@ -2323,6 +2429,7 @@ impl CodegenCx {
                 let pointer_info = self.lookup_variable(pointer_ssa_id.text()).unwrap();
                 // first arg is the pointer to load into
                 let result = inst_arg1_builder
+                    .ssa_id(var_info.get_ssa_name())
                     .name(var_info.get_var_name())
                     // it is intializing a ssa, so the value is None
                     .value(InstructionValue::None)
@@ -2333,6 +2440,7 @@ impl CodegenCx {
 
                 // second arg is the pointer to load from
                 let pointer = inst_arg2_builder
+                    .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     .value(self.construct_instruction_value(&pointer_info))
                     .index(IndexKind::Literal(-1))
@@ -2369,6 +2477,7 @@ impl CodegenCx {
                     .expect("AtomicExchangeExpr: Value not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2377,6 +2486,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let pointer_arg = pointer_arg_builder
+                    .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2385,6 +2495,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let value_arg = value_arg_builder
+                    .ssa_id(value_info.get_ssa_name())
                     .name(value_info.get_var_name())
                     .value(self.construct_instruction_value(&value_info))
                     .index(IndexKind::Literal(-1))
@@ -2426,6 +2537,7 @@ impl CodegenCx {
                     .expect("AtomicExchangeExpr: Comparator not found");
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2434,6 +2546,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let pointer_arg = pointer_arg_builder
+                    .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2442,6 +2555,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let value_arg = value_arg_builder
+                    .ssa_id(value_info.get_ssa_name())
                     .name(value_info.get_var_name())
                     .value(self.construct_instruction_value(&value_info))
                     .index(IndexKind::Literal(-1))
@@ -2450,6 +2564,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let comparator_arg = comparator_arg_builder
+                    .ssa_id(comparator_info.get_ssa_name())
                     .name(comparator_info.get_var_name())
                     .value(self.construct_instruction_value(&comparator_info))
                     .index(IndexKind::Literal(-1))
@@ -2495,6 +2610,7 @@ impl CodegenCx {
                     .get_int_value();
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2503,6 +2619,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let predicate_arg = predicate_arg_builder
+                    .ssa_id(predicate_info.get_ssa_name())
                     .name(predicate_info.get_var_name())
                     .value(self.construct_instruction_value(&predicate_info))
                     .index(IndexKind::Literal(-1))
@@ -2511,6 +2628,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let scope_arg = InstructionArgument::builder()
+                    .ssa_id(scope_info.get_ssa_name())
                     .name(scope_info.get_var_name())
                     .value(InstructionValue::String(
                         ExecutionScope::from(scope).to_string(),
@@ -2557,6 +2675,7 @@ impl CodegenCx {
                     .get_int_value();
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2565,6 +2684,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let predicate_arg = predicate_arg_builder
+                    .ssa_id(predicate_info.get_ssa_name())
                     .name(predicate_info.get_var_name())
                     .value(self.construct_instruction_value(&predicate_info))
                     .index(IndexKind::Literal(-1))
@@ -2573,6 +2693,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let scope_arg = InstructionArgument::builder()
+                    .ssa_id(scope_info.get_ssa_name())
                     .name(scope_info.get_var_name())
                     .value(InstructionValue::String(
                         ExecutionScope::from(scope).to_string(),
@@ -2619,6 +2740,7 @@ impl CodegenCx {
                     .get_int_value();
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2627,6 +2749,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let predicate_arg = predicate_arg_builder
+                    .ssa_id(predicate_info.get_ssa_name())
                     .name(predicate_info.get_var_name())
                     .value(self.construct_instruction_value(&predicate_info))
                     .index(IndexKind::Literal(-1))
@@ -2635,6 +2758,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let scope_arg = InstructionArgument::builder()
+                    .ssa_id(scope_info.get_ssa_name())
                     .name(scope_info.get_var_name())
                     .value(InstructionValue::String(
                         ExecutionScope::from(scope).to_string(),
@@ -2681,6 +2805,7 @@ impl CodegenCx {
                     .get_int_value();
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2689,6 +2814,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let predicate_arg = predicate_arg_builder
+                    .ssa_id(predicate_info.get_ssa_name())
                     .name(predicate_info.get_var_name())
                     .value(self.construct_instruction_value(&predicate_info))
                     .index(IndexKind::Literal(-1))
@@ -2697,6 +2823,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let scope_arg = InstructionArgument::builder()
+                    .ssa_id(scope_info.get_ssa_name())
                     .name(scope_info.get_var_name())
                     .value(InstructionValue::String(
                         ExecutionScope::from(scope).to_string(),
@@ -2750,6 +2877,7 @@ impl CodegenCx {
                     .get_int_value();
 
                 let result_arg = result_arg_builder
+                    .ssa_id(result_info.get_ssa_name())
                     .name(result_info.get_var_name())
                     .value(InstructionValue::None)
                     .index(IndexKind::Literal(-1))
@@ -2758,6 +2886,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let value_arg: InstructionArgument = value_arg_builder
+                    .ssa_id(value_info.get_ssa_name())
                     .name(value_info.get_var_name())
                     .value(self.construct_instruction_value(&value_info))
                     .index(IndexKind::Literal(-1))
@@ -2766,6 +2895,7 @@ impl CodegenCx {
                     .unwrap();
                 
                 let id_arg = id_arg_builder
+                    .ssa_id(id_info.get_ssa_name())
                     .name(id_info.get_var_name())
                     .value(self.construct_instruction_value(&id_info))
                     .index(IndexKind::Literal(-1))
@@ -2774,6 +2904,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let scope_arg = InstructionArgument::builder()
+                    .ssa_id(scope_info.get_ssa_name())
                     .name(scope_info.get_var_name())
                     .value(InstructionValue::String(
                         ExecutionScope::from(scope).to_string(),
@@ -2798,7 +2929,7 @@ impl CodegenCx {
         }
     }
 
-    fn generate_code_for_stmt(&mut self, stmt: &Stmt) -> Option<Instruction> {
+    fn generate_code_for_stmt(&mut self, stmt: &Stmt, line: usize) -> Option<Instruction> {
         match stmt {
             // fixme: handle execution mode
             Stmt::ReturnStatement(_) => {
@@ -2813,6 +2944,7 @@ impl CodegenCx {
                         .name(InstructionName::Return)
                         .scope(ExecutionScope::None)
                         .position(self.increment_inst_position())
+                        .line(line)
                         .build()
                         .unwrap(),
                 )
@@ -2847,6 +2979,7 @@ impl CodegenCx {
                             .name(inst_name)
                             .scope(ExecutionScope::None)
                             .position(self.increment_inst_position())
+                            .line(line)
                             .build()
                             .unwrap(),
                     )
@@ -2870,6 +3003,7 @@ impl CodegenCx {
 
                 // first arg is the pointer to load into
                 let pointer_arg = inst_arg1_builder
+                    .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     // it is intializing a ssa, so the value is None
                     .value(InstructionValue::None)
@@ -2879,6 +3013,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let value_arg = inst_arg2_builder
+                    .ssa_id(object_info.get_ssa_name())
                     .name(object_info.get_var_name())
                     .value(self.construct_instruction_value(&object_info))
                     .index(IndexKind::Literal(-1))
@@ -2899,6 +3034,7 @@ impl CodegenCx {
                         .name(InstructionName::Store)
                         .scope(ExecutionScope::None)
                         .position(self.increment_inst_position())
+                        .line(line)
                         .build()
                         .unwrap(),
                 )
@@ -2917,6 +3053,7 @@ impl CodegenCx {
 
                 // first arg is the pointer to load into
                 let pointer_arg = inst_arg1_builder
+                    .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     // it is intializing a ssa, so the value is None
                     .value(InstructionValue::None)
@@ -2926,6 +3063,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let value_arg = inst_arg2_builder
+                    .ssa_id(var_info.get_ssa_name())
                     .name(var_info.get_var_name())
                     .value(self.construct_instruction_value(&var_info))
                     .index(IndexKind::Literal(-1))
@@ -2946,6 +3084,7 @@ impl CodegenCx {
                         .name(InstructionName::AtomicStore)
                         .scope(ExecutionScope::None)
                         .position(self.increment_inst_position())
+                        .line(line)
                         .build()
                         .unwrap(),
                 )
@@ -2956,6 +3095,7 @@ impl CodegenCx {
                 let label = branch_stmt.label().unwrap();
                 let label_position = self.lookup_label(label.text()).unwrap();
                 let arg = inst_arg_builder
+                    .ssa_id(label.text().to_string())
                     .name(label.text().to_string())
                     .value(InstructionValue::Int(label_position.clone() as i32))
                     .index(IndexKind::Literal(-1))
@@ -2974,6 +3114,7 @@ impl CodegenCx {
                         .name(InstructionName::Branch)
                         .scope(ExecutionScope::None)
                         .position(self.increment_inst_position())
+                        .line(line)
                         .build()
                         .unwrap(),
                 )
@@ -2991,6 +3132,7 @@ impl CodegenCx {
 
                 let condition_info = self.lookup_variable(condition.text()).unwrap();
                 let condition_arg = inst_arg1_builder
+                    .ssa_id(condition_info.get_ssa_name())
                     .name(condition_info.get_var_name())
                     .value(self.construct_instruction_value(&condition_info))
                     .index(IndexKind::Literal(-1))
@@ -2999,6 +3141,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let truel_label_arg = inst_arg2_builder
+                    .ssa_id(true_label.text().to_string())
                     .name(true_label.text().to_string())
                     .value(InstructionValue::Int(*true_label_position as i32))
                     .index(IndexKind::Literal(-1))
@@ -3007,6 +3150,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let false_label_arg = inst_arg3_builder
+                    .ssa_id(false_label.text().to_string())
                     .name(false_label.text().to_string())
                     .value(InstructionValue::Int(*false_label_position as i32))
                     .index(IndexKind::Literal(-1))
@@ -3029,6 +3173,7 @@ impl CodegenCx {
                         .name(InstructionName::BranchConditional)
                         .scope(ExecutionScope::None)
                         .position(self.increment_inst_position())
+                        .line(line)
                         .build()
                         .unwrap(),
                 )
@@ -3046,6 +3191,7 @@ impl CodegenCx {
                 let default_label_position = self.lookup_label(default_label.text()).unwrap();
 
                 let selector_arg = inst_arg1_builder
+                    .ssa_id(selector_info.get_ssa_name())
                     .name(selector_info.get_var_name())
                     .value(self.construct_instruction_value(&selector_info))
                     .index(IndexKind::Literal(-1))
@@ -3054,6 +3200,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let default_label_arg = inst_arg2_builder
+                    .ssa_id(default_label.text().to_string())
                     .name(default_label.text().to_string())
                     .value(InstructionValue::Int(*default_label_position as i32))
                     .index(IndexKind::Literal(-1))
@@ -3063,6 +3210,7 @@ impl CodegenCx {
                 for target_label in &target_labels {
                     let literal = target_label.0.text().parse::<i32>().unwrap();
                     let literal_arg = InstructionArgument::builder()
+                        .ssa_id("".to_string())
                         .name("".to_string())
                         .value(InstructionValue::Int(literal))
                         .index(IndexKind::Literal(-1))
@@ -3072,6 +3220,7 @@ impl CodegenCx {
 
                     let target_label_position = self.lookup_label(target_label.1.text()).unwrap();
                     let target_label_arg = InstructionArgument::builder()
+                        .ssa_id(target_label.1.text().to_string())
                         .name(target_label.1.text().to_string())
                         .value(InstructionValue::Int(*target_label_position as i32))
                         .index(IndexKind::Literal(-1))
@@ -3111,6 +3260,7 @@ impl CodegenCx {
                         .name(InstructionName::Switch)
                         .scope(ExecutionScope::None)
                         .position(self.increment_inst_position())
+                        .line(line)
                         .build()
                         .unwrap(),
                 )
@@ -3132,6 +3282,7 @@ impl CodegenCx {
                     .get_int_value();
 
                 let scope_arg = InstructionArgument::builder()
+                    .ssa_id(scope_info.get_ssa_name())
                     .name(scope_info.get_var_name())
                     .value(InstructionValue::String(
                         ExecutionScope::from(scope).to_string(),
@@ -3154,6 +3305,7 @@ impl CodegenCx {
                         .name(InstructionName::ControlBarrier)
                         .scope(ExecutionScope::None)
                         .position(self.increment_inst_position())
+                        .line(line)
                         .build()
                         .unwrap(),
                 )
@@ -3168,6 +3320,7 @@ impl CodegenCx {
                 let continue_label_position = self.lookup_label(continue_label.text()).unwrap();
 
                 let merge_block_arg = merge_block_arg_builder
+                    .ssa_id(merge_label.text().to_string())
                     .name(merge_label.text().to_string())
                     .value(InstructionValue::Int(*merge_label_position as i32))
                     .index(IndexKind::Literal(-1))
@@ -3176,6 +3329,7 @@ impl CodegenCx {
                     .unwrap();
 
                 let continue_block_arg = continue_block_arg_builder
+                    .ssa_id(continue_label.text().to_string())
                     .name(continue_label.text().to_string())
                     .value(InstructionValue::Int(*continue_label_position as i32))
                     .index(IndexKind::Literal(-1))
@@ -3197,6 +3351,7 @@ impl CodegenCx {
                         .name(InstructionName::LoopMerge)
                         .scope(ExecutionScope::None)
                         .position(self.increment_inst_position())
+                        .line(line)
                         .build()
                         .unwrap(),
                 )
@@ -3208,6 +3363,7 @@ impl CodegenCx {
                 let merge_label_position = self.lookup_label(merge_label.text()).unwrap();
 
                 let arg = inst_arg1_builder
+                    .ssa_id(merge_label.text().to_string())
                     .name(merge_label.text().to_string())
                     .value(InstructionValue::Int(*merge_label_position as i32))
                     .index(IndexKind::Literal(-1))
@@ -3228,6 +3384,7 @@ impl CodegenCx {
                         .name(InstructionName::SelectionMerge)
                         .scope(ExecutionScope::None)
                         .position(self.increment_inst_position())
+                        .line(line)
                         .build()
                         .unwrap(),
                 )
@@ -3237,15 +3394,45 @@ impl CodegenCx {
         }
     }
 
-    pub fn generate_code(&mut self, root: SyntaxNode) -> Program {
+    // pub fn generate_code(&mut self, root: SyntaxNode) -> Program {
+    //     let mut program_builder = Program::builder();
+    //     let root = Root::cast(root).unwrap();
+    //     // first pass: construct symbol table
+    //     self.symbol_table_construction_pass(&root);
+    //     self.reset_position();
+
+    //     for stmt in root.stmts() {
+    //         let inst = self.generate_code_for_stmt(&stmt);
+    //         match inst {
+    //             Some(i) => program_builder = program_builder.push_instruction(i),
+    //             None => { /* do nothing */ }
+    //         }
+    //     }
+
+    //     let global_variables = self.get_global_variables();
+    //     program_builder
+    //         .global_var(global_variables)
+    //         .num_work_groups(self.num_work_group)
+    //         .work_group_size(self.work_group_size)
+    //         .subgroup_size(self.sub_group_size)
+    //         .num_threads(self.num_work_group * self.work_group_size)
+    //         .scheduler(self.scheduler.clone())
+    //         .build()
+    //         .unwrap()
+    // }
+
+    pub fn generate_code_with_origin_line_number(&mut self, root: SyntaxNode, map: &HashMap<SyntaxToken, usize>, tokens: &Vec<Token>) -> Program {
         let mut program_builder = Program::builder();
         let root = Root::cast(root).unwrap();
+        let mut line = 0;
         // first pass: construct symbol table
         self.symbol_table_construction_pass(&root);
         self.reset_position();
-
         for stmt in root.stmts() {
-            let inst = self.generate_code_for_stmt(&stmt);
+            let idx = map[&stmt.token()];
+            let pos = tokens[idx].line;
+            line = line.min(pos);
+            let inst = self.generate_code_for_stmt(&stmt, pos);
             match inst {
                 Some(i) => program_builder = program_builder.push_instruction(i),
                 None => { /* do nothing */ }
@@ -3260,32 +3447,7 @@ impl CodegenCx {
             .subgroup_size(self.sub_group_size)
             .num_threads(self.num_work_group * self.work_group_size)
             .scheduler(self.scheduler.clone())
-            .build()
-            .unwrap()
-    }
-
-    pub fn generate_code_with_origin_line_number(&mut self, root: SyntaxNode, map: HashMap<SyntaxToken, usize>) -> Program {
-        let mut program_builder = Program::builder();
-        let root = Root::cast(root).unwrap();
-        // first pass: construct symbol table
-        self.symbol_table_construction_pass(&root);
-        self.reset_position();
-        for stmt in root.stmts() {
-            let inst = self.generate_code_for_stmt(&stmt);
-            match inst {
-                Some(i) => program_builder = program_builder.push_instruction(i),
-                None => { /* do nothing */ }
-            }
-        }
-
-        let global_variables = self.get_global_variables();
-        program_builder
-            .global_var(global_variables)
-            .num_work_groups(self.num_work_group)
-            .work_group_size(self.work_group_size)
-            .subgroup_size(self.sub_group_size)
-            .num_threads(self.num_work_group * self.work_group_size)
-            .scheduler(self.scheduler.clone())
+            .func_start_line(line)
             .build()
             .unwrap()
     }

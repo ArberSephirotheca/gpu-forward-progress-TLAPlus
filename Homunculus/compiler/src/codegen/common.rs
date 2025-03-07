@@ -347,6 +347,7 @@ impl FromStr for Scheduler {
 }
 #[derive(Debug, Clone)]
 pub struct InstructionArgument {
+    pub ssa_id: String,
     pub name: String,
     pub scope: VariableScope,
     pub value: InstructionValue,
@@ -390,6 +391,7 @@ pub struct Instruction {
     // this is used when some instructions
     //have undetermined number of arguments (e.g. OpSwitch)
     pub vec_arguments: Option<Vec<InstructionArguments>>,
+    pub line: usize,
 }
 
 #[derive(Debug)]
@@ -415,6 +417,7 @@ pub struct Program {
     pub scheduler: Scheduler,
     pub instructions: SmallVec<[Instruction; 10]>,
     pub constants: SmallVec<[Constant; 10]>,
+    pub func_start_line: usize,
 }
 
 impl Program {

@@ -6,5 +6,5 @@ pub mod parser;
 mod parser_error;
 mod sink;
 mod source;
-pub(crate) mod symbol_table;
+pub mod symbol_table;
 pub mod syntax;
