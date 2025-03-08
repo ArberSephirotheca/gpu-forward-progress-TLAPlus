@@ -26,8 +26,8 @@ pub fn fuzz(
     let mut codegen_ctx = CodegenCx::new(sub_group_size, work_group_size, num_workgroup, scheduler);
     let program = codegen_ctx.generate_code_with_origin_line_number(syntax, &map, &tokens);
     let symbol_table = codegen_ctx.get_variable_table();
-    for instruction in &program.instructions {
-        println!("{:?}", instruction);
-    }
+    // for instruction in &program.instructions {
+    //     println!("{:?}", instruction);
+    // }
     MutCtx::new(program, path.to_string(), symbol_table).mutation().write_to_file()
 }

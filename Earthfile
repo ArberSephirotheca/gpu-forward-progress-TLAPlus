@@ -58,7 +58,7 @@ tlaplus-image:
         RUN echo "No input file provided"
     ELSE
         COPY $INPUT $INPUT
-        RUN glslang/build/install/bin/glslang -V --target-env vulkan1.3 $INPUT -o $INPUT.spv
+        RUN glslang/build/install/bin/glslang -V --target-env spirv1.5 $INPUT -o $INPUT.spv
         SAVE ARTIFACT $INPUT.spv AS LOCAL ./build/
         RUN glslang/build/install/bin/spirv-dis $INPUT.spv > spirv-asm.txt 2>&1 || true
         SAVE ARTIFACT spirv-asm.txt AS LOCAL ./build/
@@ -76,9 +76,12 @@ tlaplus-image:
             RUN JAVA_OPTS="-Xmx32G" tlc forward-progress/validation/MCProgressModel -view -fpmem .50 -workers 15 -maxSetSize 100 > output.txt 2>&1 || true
             SAVE ARTIFACT output.* AS LOCAL ./build/
         ELSE IF [ "$OUT" = "fuzz" ]
-            RUN Homunculus/target/release/homunculus fuzz ./spirv-asm.txt 
-            # RUN spirv-cross --version 450 --no-es $INPUT.spv --output output.comp
+            RUN Homunculus/target/release/homunculus fuzz ./spirv-asm.txt
+            RUN glslang/build/install/bin/spirv-as --target-env spv1.5 -o fuzz.spv spirv-asm.txt.fuzz.txt
+            RUN spirv-cross --version 460 --no-es fuzz.spv --output fuzz.comp
             SAVE ARTIFACT *.txt AS LOCAL ./build/
+            SAVE ARTIFACT fuzz.spv AS LOCAL ./build/
+            SAVE ARTIFACT fuzz.comp AS LOCAL ./build/
         ELSE
             RUN echo "Invalid output format"
         END

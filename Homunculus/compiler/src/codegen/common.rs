@@ -345,7 +345,7 @@ impl FromStr for Scheduler {
         }
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InstructionArgument {
     pub ssa_id: String,
     pub name: String,
@@ -363,7 +363,7 @@ impl Display for InstructionArgument {
         )
     }
 }
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InstructionArguments {
     pub name: InstructionName,
     pub num_args: u32,

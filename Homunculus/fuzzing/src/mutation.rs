@@ -11,10 +11,11 @@ use eyre::{Result, eyre};
 pub struct MutCtx<'a >{
     pub program: Program,
     pub file: String,
-    // vector of tuples of instructions and their index
-    pub added_instructions: Vec<(Instruction, usize)>,
+    // vector of tuples of instructions and if really mutated
+    pub added_instructions: Vec<Instruction>,
     pub added_constants: Vec<Constant>,
     variable_table: &'a VariableSymbolTable,
+    used_const: Vec<i32>,
 }
 impl<'a> MutCtx<'a> {
     pub fn new(program: Program, file: String, table: &'a VariableSymbolTable) -> Self {
@@ -24,6 +25,7 @@ impl<'a> MutCtx<'a> {
             added_instructions: Vec::new(),
             added_constants: Vec::new(),
             variable_table: table,
+            used_const: Vec::new(),
         }
     }
 
@@ -86,8 +88,8 @@ impl<'a> MutCtx<'a> {
                 continue;
                 
             } 
-            if let Some(&(ref instruction, instr_idx)) = instruction_iter.peek() {
-                if  idx == *instr_idx {
+            if let Some(&instruction) = instruction_iter.peek() {
+                if  idx == instruction.line {
                     writeln!(writer, "{}", Self::to_spirv(&instruction)?)?;
                     instruction_iter.next();
                     stmts.next();
@@ -105,8 +107,24 @@ impl<'a> MutCtx<'a> {
         Ok(())
     }
 
-
     pub(crate) fn mutation(mut self) -> Self {
+        loop {
+            self.trivial_mutation();
+            if !self.added_instructions.is_empty() {
+                break;
+            } else{
+                self.clean();
+            }
+        }
+        self
+    }
+
+    fn clean(&mut self) {
+        self.added_instructions.clear();
+        self.added_constants.clear();
+    }
+
+    fn trivial_mutation(&mut self) {
         for (idx, instruction) in self.program.instructions.clone().into_iter().enumerate() {
             match instruction.name {
                 // InstructionName::BranchConditional => {
@@ -121,16 +139,17 @@ impl<'a> MutCtx<'a> {
                 | InstructionName::LessThanEqual
                 | InstructionName::GreaterThan
                 | InstructionName::GreaterThanEqual => {
-                    let (instruction, line) = self.fuzz_comparison_condition(instruction);
-                    self.added_instructions.push((instruction, line));
+                        let mutated_ins = self.fuzz_comparison_condition(instruction.clone());
+                        if mutated_ins.arguments != instruction.arguments {
+                            self.added_instructions.push(mutated_ins);
+                        }
                 }
                 _ => {}
             }
         }
-        self
     }
 
-    ///
+    // add additional constant to the program
     fn additional_constant(&mut self, const_val: i32) {
         if !self.exists_constant(const_val) {
             let constant = Constant {
@@ -142,7 +161,8 @@ impl<'a> MutCtx<'a> {
     }
 
     fn exists_constant(&self, const_val: i32) -> bool {
-        self.variable_table.lookup(&format!("%uint_{}", const_val)).is_some()
+        self.variable_table.lookup(&format!("%uint_{}", const_val)).is_some() | self.added_constants.iter().any(|con| 
+            con.name == format!("%uint_{}", const_val))
     }
 
     fn available_labels(&self) -> Vec<u32> {
@@ -159,17 +179,16 @@ impl<'a> MutCtx<'a> {
         todo!()
     }
 
-    fn fuzz_comparison_condition(&mut self, mut instruction:Instruction) -> (Instruction, usize){
+    fn fuzz_comparison_condition(&mut self, mut instruction:Instruction) -> Instruction{
         let operand_1 = &instruction.arguments.arguments[1].value;
         let operand_2 = &instruction.arguments.arguments[2].value;
         let operand_1_name = &instruction.arguments.arguments[1].name;
         let operand_2_name = &instruction.arguments.arguments[2].name;
-        if let InstructionValue::Int(_) = operand_1 {
+        if let InstructionValue::Int(val) = operand_1 {
             if let Some(built_in) =  self.variable_table.lookup(operand_2_name).unwrap().built_in {
                 match built_in {
                     BuiltInVariable::GlobalInvocationId => {
-                        let totoal_threads =
-                            (self.program.work_group_size * self.program.num_work_groups) as i32;
+                        let totoal_threads = (self.program.work_group_size * self.program.num_work_groups) as i32;
                         let rand_val = random_range(0..totoal_threads);
                         self.additional_constant(rand_val);
                         instruction.arguments.arguments[1].value = InstructionValue::Int(rand_val);
@@ -238,7 +257,7 @@ impl<'a> MutCtx<'a> {
                     }
                 }
             }
-        } else if let InstructionValue::Int(_) = operand_2 {
+        } else if let InstructionValue::Int(val) = operand_2 {
             if let Some(built_in) =  self.variable_table.lookup(operand_1_name).unwrap().built_in {
                 match built_in {
                     BuiltInVariable::GlobalInvocationId => {
@@ -314,8 +333,7 @@ impl<'a> MutCtx<'a> {
                 }
             }
         }
-        let line = instruction.line.clone();
-        (instruction, line)
+        instruction
     }
 
     fn fuzz_branch_condition(instruction: &mut Instruction) {
