@@ -1,0 +1,141 @@
+#!amber
+
+DEVICE_FEATURE SubgroupSizeControl.subgroupSizeControl
+
+SET ENGINE_DATA fence_timeout_ms 10000
+
+SHADER compute test GLSL
+#version 460
+
+#ifndef REDUCER
+#define _GLF_ZERO(X, Y)                   (Y)
+#define _GLF_ONE(X, Y)                    (Y)
+#define _GLF_FALSE(X, Y)                  (Y)
+#define _GLF_TRUE(X, Y)                   (Y)
+#define _GLF_IDENTITY(X, Y)               (Y)
+#define _GLF_DEAD(X)                      (X)
+#define _GLF_FUZZED(X)                    (X)
+#define _GLF_WRAPPED_LOOP(X)              X
+#define _GLF_WRAPPED_IF_TRUE(X)           X
+#define _GLF_WRAPPED_IF_FALSE(X)          X
+#define _GLF_SWITCH(X)                    X
+#define _GLF_MAKE_IN_BOUNDS_INT(IDX, SZ)  clamp(IDX, 0, SZ - 1)
+#define _GLF_MAKE_IN_BOUNDS_UINT(IDX, SZ) clamp(IDX, 0u, SZ - 1u)
+#endif
+
+
+layout(set = 0, binding = 1) uniform buf1 {
+ vec2 injectionSwitch;
+};
+#extension GL_KHR_shader_subgroup_vote : enable
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_EXT_maximal_reconvergence : enable
+layout(set = 0, binding = 0) buffer Buf {
+ uint buf[];
+};
+layout(set = 0, binding = 2) buffer WriteVal {
+ uint write_val;
+};
+layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+ uint subgroup_id = gl_SubgroupID;
+ uint subgroup_size = gl_SubgroupSize;
+ uint subgroup_local_id = gl_SubgroupInvocationID;
+ uint num_workgroup = gl_NumWorkGroups.x;
+ uint workgroup_size = gl_WorkGroupSize.x;
+ uint workgroup_id = gl_WorkGroupID.x;
+ uint workgroup_base = workgroup_size * workgroup_id;
+ uint subgroup_base = subgroup_id * subgroup_size;
+ uint virtual_gid = workgroup_base + subgroup_base + subgroup_local_id;
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   switch(_GLF_SWITCH(0))
+    {
+     case 37:
+     if(greaterThanEqual(uvec4(161747u, 194440u, 104740u, 189163u), uvec4(192800u, 109578u, 2662u, 133538u))[1])
+      {
+       switch(_GLF_SWITCH(0))
+        {
+         case 1:
+         {
+          bvec4(false, (uvec2(148778u, 117319u) == clamp(uvec2(176211u, 8484u), num_workgroup, num_workgroup)), bvec2(false, false));
+          ivec2(-98910, -97090);
+          uvec2(70158u, 186294u);
+          bvec2(false, true);
+          ;
+          (uvec3(179508u, 6997u, 116906u) * subgroup_local_id);
+          ;
+          ;
+          mat2(1714.8287, 593.056, 264.250, -978.925);
+         }
+         case 0:
+         case 92:
+         case 41:
+         mat4x2 _GLF_SWITCH_0_0v;
+         case 49:
+         case 67:
+         bitfieldExtract(((36828 % -47368)), 58923, -20035);
+         case 32:
+         case 8:
+         if(true)
+          {
+           {
+            mat4x3(-2.1, 8511.3735, -4887.8626, -7.0, 4627.1151, -51.00, 8.2, -8.6, -5534.1325, 5110.8097, -855.667, -55.45);
+            (mat2(7049.7695, 4595.1136, 830.269, 8585.1585) * injectionSwitch);
+            ;
+           }
+           mat2x4(580.483, -613.105, -6177.5283, 6.3, 97.75, 1.2, -27.64, -30.41);
+           (7.8 / (- mat3x2(-1063.8687, -55.58, 8240.9927, 7.8, 94.73, -2484.3484)));
+           abs(vec3(153.789, -6.4, -9.5));
+          }
+         ;
+         case 76:
+         case 68:
+         vec2 _GLF_SWITCH_0_1v, _GLF_SWITCH_0_2v;
+         break;
+         case 51:
+         (uvec3(31340u, 36520u, 118677u) - uvec3(88610u, 83306u, 82791u));
+         default:
+         1;
+        }
+      }
+     case 0:
+     case 56:
+     case 48:
+     atomicStore(write_val, uint(virtual_gid), 1, 64, 4);
+     break;
+     default:
+     1;
+    }
+  }
+ else
+  {
+  }
+ uint read_val = atomicLoad(write_val, 1, 64, 2);
+ buf[virtual_gid] = uint(subgroupAllEqual(read_val));
+}
+
+END
+
+BUFFER tester DATA_TYPE uint32 SIZE 8388096 FILL 0
+BUFFER expected DATA_TYPE uint32 SIZE 8388096 FILL 1
+BUFFER write DATA_TYPE uint32 SIZE 1 FILL 0
+BUFFER injection DATA_TYPE vec2<float> DATA
+ 0.0 1.0
+END
+
+PIPELINE compute test_pipe
+  ATTACH test
+  BIND BUFFER tester AS storage DESCRIPTOR_SET 0 BINDING 0 
+  BIND BUFFER injection AS uniform DESCRIPTOR_SET 0 BINDING 1 
+  BIND BUFFER write AS storage DESCRIPTOR_SET 0 BINDING 2 
+
+  SUBGROUP test
+	  VARYING_SIZE on
+  END
+END
+
+RUN test_pipe 65532 1 1
+EXPECT tester EQ_BUFFER expected

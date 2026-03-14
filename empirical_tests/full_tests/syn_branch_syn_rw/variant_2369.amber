@@ -1,0 +1,3651 @@
+#!amber
+
+DEVICE_FEATURE SubgroupSizeControl.subgroupSizeControl
+
+SET ENGINE_DATA fence_timeout_ms 10000
+
+SHADER compute test GLSL
+#version 460
+
+#ifndef REDUCER
+#define _GLF_ZERO(X, Y)                   (Y)
+#define _GLF_ONE(X, Y)                    (Y)
+#define _GLF_FALSE(X, Y)                  (Y)
+#define _GLF_TRUE(X, Y)                   (Y)
+#define _GLF_IDENTITY(X, Y)               (Y)
+#define _GLF_DEAD(X)                      (X)
+#define _GLF_FUZZED(X)                    (X)
+#define _GLF_WRAPPED_LOOP(X)              X
+#define _GLF_WRAPPED_IF_TRUE(X)           X
+#define _GLF_WRAPPED_IF_FALSE(X)          X
+#define _GLF_SWITCH(X)                    X
+#define _GLF_MAKE_IN_BOUNDS_INT(IDX, SZ)  clamp(IDX, 0, SZ - 1)
+#define _GLF_MAKE_IN_BOUNDS_UINT(IDX, SZ) clamp(IDX, 0u, SZ - 1u)
+#endif
+
+
+layout(set = 0, binding = 1) uniform buf1 {
+ vec2 injectionSwitch;
+};
+#extension GL_KHR_shader_subgroup_vote : enable
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_EXT_maximal_reconvergence : enable
+layout(set = 0, binding = 0) buffer Buf {
+ uint buf[];
+};
+layout(set = 0, binding = 2) buffer Checker {
+ uint checker[];
+};
+layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+ uvec4 GLF_merged2_0_3_94_3_1_14GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupworkgroup_base;
+ uvec4 GLF_merged3_0_2_41_2_1_13_3_1_11GLF_merged2_0_1_4_1_1_13readsubgroup_basenum_workgroupsubgroup_id;
+ uvec4 GLF_merged2_0_3_61_3_1_17GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizesubgroup_local_id;
+ uvec4 GLF_merged2_0_3_73_3_1_14GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeworkgroup_base;
+ uvec4 GLF_merged2_0_2_55_2_2_56GLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base;
+ uvec4 GLF_merged2_0_2_52_2_2_41GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_4_1_1_13readsubgroup_base;
+ uvec4 GLF_merged2_0_3_61_3_1_12GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizeworkgroup_id;
+ uvec4 GLF_merged2_0_2_52_2_2_52GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_sizeGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size;
+ uvec2 GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_size;
+ GLF_merged2_0_2_52_2_2_52GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_sizeGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy = GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_size;
+ uvec3 GLF_merged2_0_2_41_2_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basesubgroup_base;
+ uvec4 GLF_merged3_0_2_56_2_1_17_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basesubgroup_local_idworkgroup_base;
+ uvec4 GLF_merged3_0_2_50_2_1_13_3_1_11GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizesubgroup_sizevirtual_gid;
+ uvec3 GLF_merged2_0_2_56_2_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_base;
+ uvec4 GLF_merged2_0_3_73_3_1_13GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_base;
+ uvec4 GLF_merged2_0_2_52_2_2_56GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base;
+ uvec4 GLF_merged2_0_3_60_3_1_4GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseread;
+ uvec4 GLF_merged3_0_2_41_2_1_16_3_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basenext_virtual_gidsubgroup_size;
+ uvec4 GLF_merged2_0_2_50_2_2_41GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizeGLF_merged2_0_1_13_1_1_4num_workgroupread;
+ uvec4 GLF_merged4_0_1_4_1_1_11_2_1_11_3_1_14readsubgroup_idvirtual_gidworkgroup_size;
+ uvec4 GLF_merged2_0_2_48_2_2_50GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size;
+ uvec2 GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size;
+ GLF_merged3_0_2_50_2_1_13_3_1_11GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizesubgroup_sizevirtual_gid.xy = GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size;
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(7), int(7))) >> _GLF_IDENTITY(int(7), _GLF_IDENTITY(int(7), 0 | (int(7)))))); _injected_loop_counter ++)
+  {
+   GLF_merged2_0_2_50_2_2_41GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizeGLF_merged2_0_1_13_1_1_4num_workgroupread.xy = GLF_merged3_0_2_50_2_1_13_3_1_11GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizesubgroup_sizevirtual_gid.xy;
+  }
+ do
+  {
+   GLF_merged2_0_2_48_2_2_50GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size.zw = GLF_merged2_0_2_50_2_2_41GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizeGLF_merged2_0_1_13_1_1_4num_workgroupread.xy;
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ uvec4 GLF_merged2_0_3_73_3_1_4GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeread;
+ uvec4 GLF_merged2_0_2_41_2_2_55GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size;
+ uvec4 GLF_merged2_0_2_56_2_2_41GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseGLF_merged2_0_1_4_1_1_13readsubgroup_base;
+ uvec4 GLF_merged2_0_3_61_3_1_16GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenext_virtual_gid;
+ uvec4 GLF_merged3_0_2_52_2_1_11_3_1_14GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizevirtual_gidworkgroup_size;
+ uvec2 GLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size;
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   GLF_merged2_0_2_55_2_2_56GLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.xy = GLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size;
+  }
+ else
+  {
+  }
+ do
+  {
+   for(int _injected_loop_counter = ((0 << _GLF_IDENTITY(int(7), int(7))) << _GLF_IDENTITY(int(0), int(0))); _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & (((1 << _GLF_IDENTITY(int(6), int(6))) >> _GLF_IDENTITY(int(6), int(6))) | 0))); _injected_loop_counter ++)
+    {
+     GLF_merged2_0_2_41_2_2_55GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size.zw = GLF_merged2_0_2_55_2_2_56GLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.xy;
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ uvec4 GLF_merged3_0_2_41_2_1_13_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_sizeworkgroup_base;
+ uvec4 GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_4_1_1_13readsubgroup_base;
+ uvec4 GLF_merged2_0_3_60_3_1_14GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseworkgroup_size;
+ uvec4 GLF_merged2_0_3_60_3_1_11GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_id;
+ uvec4 GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup;
+ uvec4 GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_size;
+ uvec4 GLF_merged3_0_2_56_2_1_4_3_1_17GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basereadsubgroup_local_id;
+ uvec4 GLF_merged2_0_3_94_3_1_17GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_local_id;
+ uvec4 GLF_merged3_0_2_56_2_1_14_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_baseworkgroup_size;
+ uvec4 GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_base;
+ uvec4 GLF_merged2_0_2_41_2_2_56GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base;
+ uvec3 GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_size;
+ GLF_merged2_0_3_61_3_1_17GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizesubgroup_local_id.xyz = GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_size;
+ do
+  {
+   do
+    {
+     GLF_merged2_0_3_61_3_1_12GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizeworkgroup_id.xyz = GLF_merged2_0_3_61_3_1_17GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizesubgroup_local_id.xyz;
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     GLF_merged2_0_3_61_3_1_16GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenext_virtual_gid.xyz = GLF_merged2_0_3_61_3_1_12GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizeworkgroup_id.xyz;
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, ! (! (false)))));
+ for(int _injected_loop_counter = ((1 << _GLF_IDENTITY(int(6), int(6))) >> _GLF_IDENTITY(int(6), _GLF_IDENTITY(int(6), int(ivec3(int(6), ((1 << _GLF_IDENTITY(int(4), int(4))) >> _GLF_IDENTITY(int(4), int(4))), 1))))); _GLF_WRAPPED_LOOP(_injected_loop_counter != (0 & 7461)); _injected_loop_counter --)
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup.xyz = GLF_merged2_0_3_61_3_1_16GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenext_virtual_gid.xyz;
+    }
+   else
+    {
+    }
+  }
+ uvec4 GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id;
+ uvec4 GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_4num_workgroupread;
+ uvec3 GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_size;
+ GLF_merged2_0_3_73_3_1_14GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeworkgroup_base.xyz = GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_size;
+ do
+  {
+   GLF_merged2_0_3_73_3_1_13GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_base.xyz = GLF_merged2_0_3_73_3_1_14GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeworkgroup_base.xyz;
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+        {
+         GLF_merged2_0_3_73_3_1_4GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeread.xyz = GLF_merged2_0_3_73_3_1_13GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_base.xyz;
+        }
+      }
+    }
+  }
+ else
+  {
+  }
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id.xyz = GLF_merged2_0_3_73_3_1_4GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeread.xyz;
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ uvec4 GLF_merged2_0_3_59_3_1_13GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidsubgroup_base;
+ uvec2 GLF_merged2_0_1_4_1_1_13readsubgroup_base;
+ GLF_merged3_0_2_41_2_1_13_3_1_11GLF_merged2_0_1_4_1_1_13readsubgroup_basenum_workgroupsubgroup_id.xy = GLF_merged2_0_1_4_1_1_13readsubgroup_base;
+ GLF_merged2_0_2_52_2_2_41GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_4_1_1_13readsubgroup_base.zw = GLF_merged3_0_2_41_2_1_13_3_1_11GLF_merged2_0_1_4_1_1_13readsubgroup_basenum_workgroupsubgroup_id.xy;
+ GLF_merged2_0_2_41_2_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basesubgroup_base.xy = GLF_merged2_0_2_52_2_2_41GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_4_1_1_13readsubgroup_base.zw;
+ GLF_merged3_0_2_41_2_1_16_3_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basenext_virtual_gidsubgroup_size.xy = GLF_merged2_0_2_41_2_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basesubgroup_base.xy;
+ for(int _injected_loop_counter = (0 | int(_GLF_ZERO(0.0, injectionSwitch.x))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     GLF_merged2_0_2_56_2_2_41GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseGLF_merged2_0_1_4_1_1_13readsubgroup_base.zw = GLF_merged3_0_2_41_2_1_16_3_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basenext_virtual_gidsubgroup_size.xy;
+    }
+   else
+    {
+    }
+  }
+ for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+  {
+   GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_4_1_1_13readsubgroup_base.zw = GLF_merged2_0_2_56_2_2_41GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseGLF_merged2_0_1_4_1_1_13readsubgroup_base.zw;
+  }
+ uvec4 GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base;
+ uvec2 GLF_merged2_0_1_13_1_1_4num_workgroupread;
+ for(int _injected_loop_counter = (int(_GLF_ONE(1.0, injectionSwitch.y)) & 1); _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+  {
+   do
+    {
+     GLF_merged2_0_2_50_2_2_41GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizeGLF_merged2_0_1_13_1_1_4num_workgroupread.zw = GLF_merged2_0_1_13_1_1_4num_workgroupread;
+    }
+   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+  }
+ GLF_merged2_0_2_41_2_2_55GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size.xy = GLF_merged2_0_2_50_2_2_41GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizeGLF_merged2_0_1_13_1_1_4num_workgroupread.zw;
+ do
+  {
+   GLF_merged3_0_2_41_2_1_13_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_sizeworkgroup_base.xy = GLF_merged2_0_2_41_2_2_55GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size.xy;
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     GLF_merged2_0_2_41_2_2_56GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.xy = GLF_merged3_0_2_41_2_1_13_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_sizeworkgroup_base.xy;
+    }
+  }
+ else
+  {
+  }
+ GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_4num_workgroupread.zw = GLF_merged2_0_2_41_2_2_56GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.xy;
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   for(int _injected_loop_counter = ((int(_GLF_ONE(1.0, injectionSwitch.y)) << _GLF_IDENTITY(int(6), int(6))) >> _GLF_IDENTITY(int(6), _GLF_IDENTITY(int(6), max(int(6), int(6))))); _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+    {
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+      {
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         do
+          {
+           if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+            {
+             GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base.xy = GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_4num_workgroupread.zw;
+            }
+           else
+            {
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+       else
+        {
+        }
+      }
+    }
+  }
+ uvec4 GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basenum_workgroup;
+ uvec4 GLF_merged2_0_3_94_3_1_16GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnext_virtual_gid;
+ uvec4 GLF_merged4_0_1_13_1_1_17_2_1_13_3_1_11num_workgroupsubgroup_local_idsubgroup_sizevirtual_gid;
+ uvec4 GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_size;
+ uvec4 GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_base;
+ uvec4 GLF_merged2_0_3_59_3_1_11GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidvirtual_gid;
+ uvec4 GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnum_workgroup;
+ uvec4 GLF_merged3_0_2_56_2_1_16_3_1_4GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidread;
+ uvec4 GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid;
+ uvec4 GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size;
+ uvec4 GLF_merged4_0_1_17_1_1_11_2_1_12_3_1_14subgroup_local_idvirtual_gidworkgroup_idworkgroup_size;
+ uvec3 GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroup;
+ GLF_merged2_0_3_94_3_1_14GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupworkgroup_base.xyz = GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroup;
+ GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_size.xyz = GLF_merged2_0_3_94_3_1_14GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupworkgroup_base.xyz;
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   for(int _injected_loop_counter = ((int(_GLF_ONE(1.0, injectionSwitch.y)) << _GLF_IDENTITY(int(0), int(0))) >> _GLF_IDENTITY(int(0), int(0))); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           do
+            {
+             GLF_merged2_0_3_94_3_1_17GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_local_id.xyz = GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_size.xyz;
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+          }
+         else
+          {
+          }
+        }
+       else
+        {
+        }
+      }
+    }
+  }
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+  }
+ else
+  {
+   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+    {
+     do
+      {
+       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+        {
+         for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+          {
+           do
+            {
+             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+              }
+             else
+              {
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                  {
+                   do
+                    {
+                     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((1 << _GLF_IDENTITY(int(3), int(3))) >> _GLF_IDENTITY(int(3), int(3)))); _injected_loop_counter ++)
+                      {
+                       if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, (true) && true)))
+                        {
+                         if(_GLF_WRAPPED_IF_FALSE(false))
+                          {
+                          }
+                         else
+                          {
+                           for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                            {
+                             if(_GLF_WRAPPED_IF_FALSE(false))
+                              {
+                              }
+                             else
+                              {
+                               GLF_merged2_0_3_94_3_1_16GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnext_virtual_gid.xyz = GLF_merged2_0_3_94_3_1_17GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_local_id.xyz;
+                              }
+                            }
+                          }
+                        }
+                       else
+                        {
+                        }
+                      }
+                    }
+                   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                  }
+                }
+               else
+                {
+                }
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, (false) && true)));
+          }
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   else
+    {
+    }
+  }
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+  }
+ else
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     do
+      {
+       GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_base.xyz = GLF_merged2_0_3_94_3_1_16GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnext_virtual_gid.xyz;
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+  }
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   for(int _injected_loop_counter = (0 ^ 0); _GLF_WRAPPED_LOOP(_injected_loop_counter != (0 | (1 ^ (0 | 0)))); _injected_loop_counter ++)
+    {
+     do
+      {
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, false || (false))))
+          {
+          }
+         else
+          {
+           GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnum_workgroup.xyz = GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_base.xyz;
+          }
+        }
+       else
+        {
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+    }
+  }
+ else
+  {
+  }
+ uvec2 GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size;
+ GLF_merged2_0_2_52_2_2_41GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_4_1_1_13readsubgroup_base.xy = GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size;
+ GLF_merged2_0_2_52_2_2_52GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_sizeGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.zw = GLF_merged2_0_2_52_2_2_41GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_4_1_1_13readsubgroup_base.xy;
+ GLF_merged2_0_2_52_2_2_56GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.xy = GLF_merged2_0_2_52_2_2_52GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_sizeGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.zw;
+ GLF_merged3_0_2_52_2_1_11_3_1_14GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizevirtual_gidworkgroup_size.xy = GLF_merged2_0_2_52_2_2_56GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.xy;
+ GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.zw = GLF_merged3_0_2_52_2_1_11_3_1_14GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizevirtual_gidworkgroup_size.xy;
+ uvec2 GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_id;
+ GLF_merged2_0_2_48_2_2_50GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size.xy = GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_id;
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   do
+    {
+     GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_4_1_1_13readsubgroup_base.xy = GLF_merged2_0_2_48_2_2_50GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size.xy;
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ for(int _injected_loop_counter = (0 >> _GLF_IDENTITY(int(7), int(7))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+    {
+     for(int _injected_loop_counter = ((1 << _GLF_IDENTITY(int(5), int(5))) >> _GLF_IDENTITY(int(5), int(5))); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+      {
+       GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_4num_workgroupread.xy = GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_4_1_1_13readsubgroup_base.xy;
+      }
+    }
+   else
+    {
+    }
+  }
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+  {
+   GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy = GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_4num_workgroupread.xy;
+  }
+ uvec3 GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gid;
+ do
+  {
+   GLF_merged2_0_3_59_3_1_13GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidsubgroup_base.xyz = GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gid;
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ do
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+      {
+       do
+        {
+         do
+          {
+           do
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               do
+                {
+                 do
+                  {
+                   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(true))
+                      {
+                       do
+                        {
+                         do
+                          {
+                           do
+                            {
+                             do
+                              {
+                               if(_GLF_WRAPPED_IF_FALSE(false))
+                                {
+                                }
+                               else
+                                {
+                                 for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                                  {
+                                   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                    {
+                                     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                      {
+                                       if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, bool(bvec3(true, false, true)))))
+                                        {
+                                         GLF_merged2_0_3_59_3_1_11GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidvirtual_gid.xyz = GLF_merged2_0_3_59_3_1_13GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidsubgroup_base.xyz;
+                                        }
+                                       else
+                                        {
+                                        }
+                                      }
+                                     else
+                                      {
+                                      }
+                                    }
+                                   else
+                                    {
+                                    }
+                                  }
+                                }
+                              }
+                             while(_GLF_WRAPPED_LOOP(false));
+                            }
+                           while(_GLF_WRAPPED_LOOP(false));
+                          }
+                         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                        }
+                       while(_GLF_WRAPPED_LOOP(false));
+                      }
+                     else
+                      {
+                      }
+                    }
+                   else
+                    {
+                    }
+                  }
+                 while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                }
+               while(_GLF_WRAPPED_LOOP(false));
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+        }
+       while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+      }
+    }
+   else
+    {
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+  {
+   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid.xyz = GLF_merged2_0_3_59_3_1_11GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidvirtual_gid.xyz;
+    }
+  }
+ uvec4 GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id;
+ uvec3 GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_base;
+ GLF_merged2_0_3_60_3_1_4GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseread.xyz = GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_base;
+ do
+  {
+   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+    {
+     GLF_merged2_0_3_60_3_1_14GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseworkgroup_size.xyz = GLF_merged2_0_3_60_3_1_4GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseread.xyz;
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     GLF_merged2_0_3_60_3_1_11GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_id.xyz = GLF_merged2_0_3_60_3_1_14GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseworkgroup_size.xyz;
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ do
+  {
+   GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_base.xyz = GLF_merged2_0_3_60_3_1_11GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_id.xyz;
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+  }
+ else
+  {
+   GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basenum_workgroup.xyz = GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_base.xyz;
+  }
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       do
+        {
+         GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_size.xyz = GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basenum_workgroup.xyz;
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+    }
+  }
+ else
+  {
+  }
+ do
+  {
+   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+    {
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+      {
+       do
+        {
+         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != (1 & 1)); _injected_loop_counter ++)
+          {
+           do
+            {
+             GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id.xyz = GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_size.xyz;
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+    }
+   else
+    {
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ uvec4 GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id;
+ uvec4 GLF_merged4_0_1_13_1_1_4_2_1_11_3_1_17num_workgroupreadsubgroup_idsubgroup_local_id;
+ uvec4 GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid;
+ uvec4 GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup;
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+  {
+   do
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       if(_GLF_WRAPPED_IF_FALSE(false))
+        {
+        }
+       else
+        {
+         do
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(false))
+                  {
+                  }
+                 else
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(false))
+                    {
+                    }
+                   else
+                    {
+                     for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & 1)); _injected_loop_counter ++)
+                      {
+                       if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, ! (! (false)))))
+                        {
+                        }
+                       else
+                        {
+                         do
+                          {
+                           barrier();
+                          }
+                         while(_GLF_WRAPPED_LOOP(false));
+                        }
+                      }
+                    }
+                  }
+                }
+               else
+                {
+                }
+              }
+             else
+              {
+              }
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+      }
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ uvec2 GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base;
+ GLF_merged2_0_2_55_2_2_56GLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.zw = GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base;
+ GLF_merged3_0_2_56_2_1_17_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basesubgroup_local_idworkgroup_base.xy = GLF_merged2_0_2_55_2_2_56GLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.zw;
+ GLF_merged2_0_2_56_2_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_base.xy = GLF_merged3_0_2_56_2_1_17_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basesubgroup_local_idworkgroup_base.xy;
+ GLF_merged2_0_2_52_2_2_56GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.zw = GLF_merged2_0_2_56_2_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_base.xy;
+ GLF_merged2_0_2_56_2_2_41GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseGLF_merged2_0_1_4_1_1_13readsubgroup_base.xy = GLF_merged2_0_2_52_2_2_56GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizeGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.zw;
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     GLF_merged3_0_2_56_2_1_4_3_1_17GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basereadsubgroup_local_id.xy = GLF_merged2_0_2_56_2_2_41GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseGLF_merged2_0_1_4_1_1_13readsubgroup_base.xy;
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ do
+  {
+   for(int _injected_loop_counter = (0 | 0); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+    {
+     GLF_merged3_0_2_56_2_1_14_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_baseworkgroup_size.xy = GLF_merged3_0_2_56_2_1_4_3_1_17GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basereadsubgroup_local_id.xy;
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       GLF_merged2_0_2_41_2_2_56GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.zw = GLF_merged3_0_2_56_2_1_14_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_baseworkgroup_size.xy;
+      }
+    }
+   else
+    {
+    }
+  }
+ else
+  {
+  }
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+        {
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           do
+            {
+             GLF_merged3_0_2_56_2_1_16_3_1_4GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidread.xy = GLF_merged2_0_2_41_2_2_56GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_base.zw;
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+        }
+      }
+     else
+      {
+      }
+    }
+  }
+ else
+  {
+  }
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+  }
+ else
+  {
+   do
+    {
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+      {
+       if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, (false) && true)))
+        {
+        }
+       else
+        {
+         do
+          {
+           if(_GLF_WRAPPED_IF_FALSE(false))
+            {
+            }
+           else
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                }
+               else
+                {
+                 do
+                  {
+                   for(int _injected_loop_counter = _GLF_IDENTITY(1, ~ (~ (1))); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                    {
+                     for(int _injected_loop_counter = ((0 << _GLF_IDENTITY(int(1), int(1))) | 0); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                      {
+                       if(_GLF_WRAPPED_IF_FALSE(false))
+                        {
+                        }
+                       else
+                        {
+                         for(int _injected_loop_counter = (0 | 0); _GLF_WRAPPED_LOOP(_injected_loop_counter != (1 & 1)); _injected_loop_counter ++)
+                          {
+                           do
+                            {
+                             GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnum_workgroup.xyz.xy = GLF_merged3_0_2_56_2_1_16_3_1_4GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidread.xy;
+                            }
+                           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                          }
+                        }
+                      }
+                    }
+                  }
+                 while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                }
+              }
+             else
+              {
+              }
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+      }
+     else
+      {
+      }
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+    {
+     do
+      {
+       do
+        {
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+            }
+           else
+            {
+             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+              }
+             else
+              {
+               if(_GLF_WRAPPED_IF_FALSE(false))
+                {
+                }
+               else
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, (true) || false)))
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(false))
+                    {
+                    }
+                   else
+                    {
+                     do
+                      {
+                       if(_GLF_WRAPPED_IF_TRUE(true))
+                        {
+                         do
+                          {
+                           do
+                            {
+                             do
+                              {
+                               if(_GLF_WRAPPED_IF_FALSE(false))
+                                {
+                                }
+                               else
+                                {
+                                 GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.xy = GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnum_workgroup.xyz.xy;
+                                }
+                              }
+                             while(_GLF_WRAPPED_LOOP(false));
+                            }
+                           while(_GLF_WRAPPED_LOOP(false));
+                          }
+                         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                        }
+                       else
+                        {
+                        }
+                      }
+                     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                    }
+                  }
+                 else
+                  {
+                  }
+                }
+              }
+            }
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+  }
+ for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 >> _GLF_IDENTITY(int(6), int(6)))); _injected_loop_counter --)
+  {
+   do
+    {
+     do
+      {
+       do
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+            }
+           else
+            {
+             barrier();
+            }
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ uint subgroup_id = gl_SubgroupID;
+ GLF_merged3_0_2_41_2_1_13_3_1_11GLF_merged2_0_1_4_1_1_13readsubgroup_basenum_workgroupsubgroup_id.w = subgroup_id;
+ GLF_merged4_0_1_4_1_1_11_2_1_11_3_1_14readsubgroup_idvirtual_gidworkgroup_size.y = GLF_merged3_0_2_41_2_1_13_3_1_11GLF_merged2_0_1_4_1_1_13readsubgroup_basenum_workgroupsubgroup_id.w;
+ GLF_merged2_0_2_48_2_2_50GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size.zw.x = GLF_merged4_0_1_4_1_1_11_2_1_11_3_1_14readsubgroup_idvirtual_gidworkgroup_size.y;
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+  }
+ else
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     for(int _injected_loop_counter = (890 & (0 << _GLF_IDENTITY(int(0), int(0)))); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+      {
+       do
+        {
+         GLF_merged2_0_3_60_3_1_11GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_id.w = GLF_merged2_0_2_48_2_2_50GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size.zw.x;
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+    }
+   else
+    {
+    }
+  }
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy.x = GLF_merged2_0_3_60_3_1_11GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_id.w;
+    }
+  }
+ do
+  {
+   do
+    {
+     do
+      {
+       for(int _injected_loop_counter = ((1 << _GLF_IDENTITY(int(7), int(7))) >> _GLF_IDENTITY(int(7), int(7))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+        {
+         do
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+              {
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 do
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(false))
+                    {
+                    }
+                   else
+                    {
+                     do
+                      {
+                       GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id.xyz.y = GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy.x;
+                      }
+                     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                    }
+                  }
+                 while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, true && (false))));
+                }
+               else
+                {
+                }
+              }
+            }
+           else
+            {
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+  {
+   do
+    {
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       do
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+            {
+             if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, ! (! (_GLF_IDENTITY(true, bool(bvec4(true, true, false, true))))))))
+              {
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(false))
+                  {
+                  }
+                 else
+                  {
+                   for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                    {
+                     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                      {
+                       do
+                        {
+                         if(_GLF_WRAPPED_IF_TRUE(true))
+                          {
+                           if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                            {
+                             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                              {
+                              }
+                             else
+                              {
+                               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+                                {
+                                 do
+                                  {
+                                   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                    {
+                                     for(int _injected_loop_counter = (0 << _GLF_IDENTITY(int(8), int(8))); _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & 1)); _injected_loop_counter ++)
+                                      {
+                                       if(_GLF_WRAPPED_IF_TRUE(true))
+                                        {
+                                         GLF_merged4_0_1_13_1_1_4_2_1_11_3_1_17num_workgroupreadsubgroup_idsubgroup_local_id.z = GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id.xyz.y;
+                                        }
+                                       else
+                                        {
+                                        }
+                                      }
+                                    }
+                                   else
+                                    {
+                                    }
+                                  }
+                                 while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, (false) && true)));
+                                }
+                              }
+                            }
+                           else
+                            {
+                            }
+                          }
+                         else
+                          {
+                          }
+                        }
+                       while(_GLF_WRAPPED_LOOP(false));
+                      }
+                    }
+                  }
+                }
+               else
+                {
+                }
+              }
+             else
+              {
+              }
+            }
+           else
+            {
+            }
+          }
+         else
+          {
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     else
+      {
+      }
+    }
+   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+  }
+ for(int _injected_loop_counter = ((0 & -6903) >> _GLF_IDENTITY(int(2), _GLF_IDENTITY(int(2), int(int(int(2)))))); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+  {
+   do
+    {
+     do
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+          {
+           if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+            }
+           else
+            {
+             do
+              {
+               if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  {
+                  }
+                 else
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(false))
+                    {
+                    }
+                   else
+                    {
+                     do
+                      {
+                       if(_GLF_WRAPPED_IF_FALSE(false))
+                        {
+                        }
+                       else
+                        {
+                         GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.y = GLF_merged4_0_1_13_1_1_4_2_1_11_3_1_17num_workgroupreadsubgroup_idsubgroup_local_id.z;
+                        }
+                      }
+                     while(_GLF_WRAPPED_LOOP(false));
+                    }
+                  }
+                }
+               else
+                {
+                }
+              }
+             while(_GLF_WRAPPED_LOOP(false));
+            }
+          }
+         else
+          {
+          }
+        }
+       else
+        {
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ uint subgroup_size = gl_SubgroupSize;
+ GLF_merged3_0_2_50_2_1_13_3_1_11GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizesubgroup_sizevirtual_gid.z = subgroup_size;
+ GLF_merged3_0_2_41_2_1_16_3_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basenext_virtual_gidsubgroup_size.w = GLF_merged3_0_2_50_2_1_13_3_1_11GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizesubgroup_sizevirtual_gid.z;
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     GLF_merged3_0_2_41_2_1_13_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_sizeworkgroup_base.z = GLF_merged3_0_2_41_2_1_16_3_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basenext_virtual_gidsubgroup_size.w;
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_size.w = GLF_merged3_0_2_41_2_1_13_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_sizeworkgroup_base.z;
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup.xyz.z = GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_size.w;
+ for(int _injected_loop_counter = (1 & 1); _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 << _GLF_IDENTITY(int(2), int(2)))); _injected_loop_counter --)
+  {
+   GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id.xyz.x = GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup.xyz.z;
+  }
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   for(int _injected_loop_counter = ((1 << _GLF_IDENTITY(int(4), _GLF_IDENTITY(int(4), min(int(4), int(4))))) >> _GLF_IDENTITY(int(4), int(4))); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         do
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             do
+              {
+               do
+                {
+                 for(int _injected_loop_counter = (0 ^ 1); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                  {
+                   for(int _injected_loop_counter = (1 ^ 1); _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(7), int(7))) >> _GLF_IDENTITY(int(7), int(7)))); _injected_loop_counter ++)
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                      {
+                       GLF_merged4_0_1_13_1_1_17_2_1_13_3_1_11num_workgroupsubgroup_local_idsubgroup_sizevirtual_gid.z = GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id.xyz.x;
+                      }
+                     else
+                      {
+                      }
+                    }
+                  }
+                }
+               while(_GLF_WRAPPED_LOOP(false));
+              }
+             while(_GLF_WRAPPED_LOOP(false));
+            }
+           else
+            {
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+       else
+        {
+        }
+      }
+     else
+      {
+      }
+    }
+  }
+ do
+  {
+   do
+    {
+     for(int _injected_loop_counter = (0 >> _GLF_IDENTITY(int(2), _GLF_IDENTITY(int(2), (int(2)) ^ (0 | 0)))); _GLF_WRAPPED_LOOP(_injected_loop_counter != (0 ^ 1)); _injected_loop_counter ++)
+      {
+       for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter != ((1 << _GLF_IDENTITY(int(4), int(4))) >> _GLF_IDENTITY(int(4), _GLF_IDENTITY(int(4), ~ (~ (int(4))))))); _injected_loop_counter ++)
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(_GLF_IDENTITY(false, false || (false)), false || (_GLF_IDENTITY(false, false || (false))))))
+          {
+          }
+         else
+          {
+           for(int _injected_loop_counter = (int(_GLF_ZERO(0.0, injectionSwitch.x)) >> _GLF_IDENTITY(int(7), _GLF_IDENTITY(int(7), (true ? int(7) : _GLF_FUZZED(_injected_loop_counter))))); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_size.w = GLF_merged4_0_1_13_1_1_17_2_1_13_3_1_11num_workgroupsubgroup_local_idsubgroup_sizevirtual_gid.z;
+              }
+            }
+          }
+        }
+      }
+    }
+   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ do
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     do
+      {
+       do
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+          }
+         else
+          {
+           do
+            {
+             for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+              {
+               do
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(false))
+                  {
+                  }
+                 else
+                  {
+                   do
+                    {
+                     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((1 << _GLF_IDENTITY(int(0), int(0))) >> _GLF_IDENTITY(int(0), _GLF_IDENTITY(int(0), int(ivec3(int(0), (1 ^ 1), 0)))))); _injected_loop_counter ++)
+                      {
+                       for(int _injected_loop_counter = ((0 >> _GLF_IDENTITY(int(6), int(6))) >> _GLF_IDENTITY(int(0), int(0))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                        {
+                         GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.zw.x = GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_size.w;
+                        }
+                      }
+                    }
+                   while(_GLF_WRAPPED_LOOP(false));
+                  }
+                }
+               while(_GLF_WRAPPED_LOOP(false));
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+    }
+   else
+    {
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id.z = GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.zw.x;
+  }
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, ! (! (true)))))
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         do
+          {
+           for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & 1)); _injected_loop_counter ++)
+            {
+             do
+              {
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                  {
+                   do
+                    {
+                     do
+                      {
+                       GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.z = GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id.z;
+                      }
+                     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                    }
+                   while(_GLF_WRAPPED_LOOP(false));
+                  }
+                }
+               else
+                {
+                }
+              }
+             while(_GLF_WRAPPED_LOOP(false));
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, (false) || false)));
+        }
+       else
+        {
+        }
+      }
+     else
+      {
+      }
+    }
+  }
+ else
+  {
+  }
+ uint subgroup_local_id = gl_SubgroupInvocationID;
+ GLF_merged2_0_3_61_3_1_17GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizesubgroup_local_id.w = subgroup_local_id;
+ GLF_merged3_0_2_56_2_1_17_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basesubgroup_local_idworkgroup_base.z = GLF_merged2_0_3_61_3_1_17GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizesubgroup_local_id.w;
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   GLF_merged3_0_2_56_2_1_4_3_1_17GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basereadsubgroup_local_id.w = GLF_merged3_0_2_56_2_1_17_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basesubgroup_local_idworkgroup_base.z;
+  }
+ else
+  {
+  }
+ GLF_merged2_0_3_94_3_1_17GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_local_id.w = GLF_merged3_0_2_56_2_1_4_3_1_17GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basereadsubgroup_local_id.w;
+ GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id.w = GLF_merged2_0_3_94_3_1_17GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_local_id.w;
+ do
+  {
+   GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base.z = GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id.w;
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     do
+      {
+       do
+        {
+         for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+          {
+           for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != (0 << _GLF_IDENTITY(int(1), int(1)))); _injected_loop_counter --)
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               do
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(true))
+                  {
+                   for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                    {
+                     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                      {
+                       GLF_merged4_0_1_13_1_1_17_2_1_13_3_1_11num_workgroupsubgroup_local_idsubgroup_sizevirtual_gid.y = GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base.z;
+                      }
+                    }
+                  }
+                 else
+                  {
+                  }
+                }
+               while(_GLF_WRAPPED_LOOP(false));
+              }
+             else
+              {
+              }
+            }
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ GLF_merged4_0_1_17_1_1_11_2_1_12_3_1_14subgroup_local_idvirtual_gidworkgroup_idworkgroup_size.x = GLF_merged4_0_1_13_1_1_17_2_1_13_3_1_11num_workgroupsubgroup_local_idsubgroup_sizevirtual_gid.y;
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, (false) && true)))
+      {
+      }
+     else
+      {
+       GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id.w = GLF_merged4_0_1_17_1_1_11_2_1_12_3_1_14subgroup_local_idvirtual_gidworkgroup_idworkgroup_size.x;
+      }
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   do
+    {
+     do
+      {
+       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+        {
+         do
+          {
+           for(int _injected_loop_counter = ((0 << _GLF_IDENTITY(int(6), int(6))) << _GLF_IDENTITY(int(4), int(4))); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               do
+                {
+                 GLF_merged4_0_1_13_1_1_4_2_1_11_3_1_17num_workgroupreadsubgroup_idsubgroup_local_id.w = GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id.w;
+                }
+               while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+              }
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, ! (! (false)))));
+  }
+ else
+  {
+  }
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+  }
+ else
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+          {
+           if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, (true) || false)))
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               for(int _injected_loop_counter = (0 ^ 0); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                {
+                 for(int _injected_loop_counter = (0 | 0); _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & 1)); _injected_loop_counter ++)
+                  {
+                   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                    {
+                     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                      {
+                       GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.xy.x = GLF_merged4_0_1_13_1_1_4_2_1_11_3_1_17num_workgroupreadsubgroup_idsubgroup_local_id.w;
+                      }
+                    }
+                   else
+                    {
+                    }
+                  }
+                }
+              }
+            }
+           else
+            {
+            }
+          }
+        }
+       else
+        {
+        }
+      }
+    }
+  }
+ uint num_workgroup = gl_NumWorkGroups.x;
+ GLF_merged3_0_2_41_2_1_13_3_1_11GLF_merged2_0_1_4_1_1_13readsubgroup_basenum_workgroupsubgroup_id.z = num_workgroup;
+ GLF_merged2_0_2_52_2_2_52GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_sizeGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy.x = GLF_merged3_0_2_41_2_1_13_3_1_11GLF_merged2_0_1_4_1_1_13readsubgroup_basenum_workgroupsubgroup_id.z;
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, bool(bool(false)))))
+  {
+  }
+ else
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     do
+      {
+       GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup.w = GLF_merged2_0_2_52_2_2_52GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_sizeGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy.x;
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+  }
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 ^ 0)); _injected_loop_counter ++)
+  {
+   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+    {
+     GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup.xyz.x = GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup.w;
+    }
+   else
+    {
+    }
+  }
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), ! (! (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)))))))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, ! (! (_GLF_IDENTITY(true, bool(bvec4(true, false, false, false))))))))
+            {
+             GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base.xy.x = GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup.xyz.x;
+            }
+           else
+            {
+            }
+          }
+         else
+          {
+          }
+        }
+       else
+        {
+        }
+      }
+    }
+  }
+ do
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     do
+      {
+       for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+          }
+         else
+          {
+           for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+            {
+             GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basenum_workgroup.w = GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base.xy.x;
+            }
+          }
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   else
+    {
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ GLF_merged4_0_1_13_1_1_17_2_1_13_3_1_11num_workgroupsubgroup_local_idsubgroup_sizevirtual_gid.x = GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basenum_workgroup.w;
+ for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+  {
+   GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnum_workgroup.w = GLF_merged4_0_1_13_1_1_17_2_1_13_3_1_11num_workgroupsubgroup_local_idsubgroup_sizevirtual_gid.x;
+  }
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(0), int(0))) >> _GLF_IDENTITY(int(0), _GLF_IDENTITY(int(0), (int(0)) | (int(0)))))); _injected_loop_counter ++)
+      {
+       do
+        {
+         for(int _injected_loop_counter = _GLF_IDENTITY(0, (0) | 0); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+              }
+             else
+              {
+               do
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(false))
+                  {
+                  }
+                 else
+                  {
+                   for(int _injected_loop_counter = (0 ^ 0); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(true))
+                      {
+                       if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, (true) && true)))
+                        {
+                         if(_GLF_WRAPPED_IF_TRUE(true))
+                          {
+                           if(_GLF_WRAPPED_IF_FALSE(false))
+                            {
+                            }
+                           else
+                            {
+                             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                              {
+                              }
+                             else
+                              {
+                               if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                {
+                                 for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                                  {
+                                   if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, ! (! (_GLF_IDENTITY(true, true && (true)))))))
+                                    {
+                                     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                      {
+                                       do
+                                        {
+                                         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+                                          {
+                                           do
+                                            {
+                                             for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                                              {
+                                               GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnum_workgroup.xyz.z = GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnum_workgroup.w;
+                                              }
+                                            }
+                                           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                          }
+                                        }
+                                       while(_GLF_WRAPPED_LOOP(false));
+                                      }
+                                     else
+                                      {
+                                      }
+                                    }
+                                   else
+                                    {
+                                    }
+                                  }
+                                }
+                               else
+                                {
+                                }
+                              }
+                            }
+                          }
+                         else
+                          {
+                          }
+                        }
+                       else
+                        {
+                        }
+                      }
+                     else
+                      {
+                      }
+                    }
+                  }
+                }
+               while(_GLF_WRAPPED_LOOP(false));
+              }
+            }
+           else
+            {
+            }
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ do
+  {
+   do
+    {
+     GLF_merged4_0_1_13_1_1_4_2_1_11_3_1_17num_workgroupreadsubgroup_idsubgroup_local_id.x = GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnum_workgroup.xyz.z;
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   do
+    {
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != _GLF_IDENTITY(1, (_GLF_IDENTITY(1, 0 | (1))) | (1))); _injected_loop_counter ++)
+      {
+       GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.w = GLF_merged4_0_1_13_1_1_4_2_1_11_3_1_17num_workgroupreadsubgroup_idsubgroup_local_id.x;
+      }
+    }
+   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+  }
+ uint workgroup_size = gl_WorkGroupSize.x;
+ GLF_merged2_0_2_52_2_2_52GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_sizeGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy.y = workgroup_size;
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   GLF_merged4_0_1_4_1_1_11_2_1_11_3_1_14readsubgroup_idvirtual_gidworkgroup_size.w = GLF_merged2_0_2_52_2_2_52GLF_merged2_0_1_13_1_1_14num_workgroupworkgroup_sizeGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy.y;
+  }
+ else
+  {
+  }
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   GLF_merged2_0_2_48_2_2_50GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size.zw.y = GLF_merged4_0_1_4_1_1_11_2_1_11_3_1_14readsubgroup_idvirtual_gidworkgroup_size.w;
+  }
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   GLF_merged3_0_2_52_2_1_11_3_1_14GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizevirtual_gidworkgroup_size.w = GLF_merged2_0_2_48_2_2_50GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_size.zw.y;
+  }
+ else
+  {
+  }
+ do
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     do
+      {
+       for(int _injected_loop_counter = (1 & 1); _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 >> _GLF_IDENTITY(int(1), int(1)))); _injected_loop_counter --)
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+          }
+         else
+          {
+           for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+            {
+             for(int _injected_loop_counter = _GLF_IDENTITY(1, max(1, 1)); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+              {
+               GLF_merged2_0_2_41_2_2_55GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size.zw.y = GLF_merged3_0_2_52_2_1_11_3_1_14GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizevirtual_gidworkgroup_size.w;
+              }
+            }
+          }
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   else
+    {
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ do
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     GLF_merged2_0_3_60_3_1_14GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseworkgroup_size.w = GLF_merged2_0_2_41_2_2_55GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size.zw.y;
+    }
+   else
+    {
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, ! (! (false)))));
+ GLF_merged3_0_2_56_2_1_14_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_baseworkgroup_size.w = GLF_merged2_0_3_60_3_1_14GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseworkgroup_size.w;
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id.xyz.z = GLF_merged3_0_2_56_2_1_14_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_baseworkgroup_size.w;
+  }
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, (false) && true)))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+      {
+       for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & 1)); _injected_loop_counter ++)
+        {
+         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+              {
+               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(false))
+                  {
+                  }
+                 else
+                  {
+                   GLF_merged4_0_1_17_1_1_11_2_1_12_3_1_14subgroup_local_idvirtual_gidworkgroup_idworkgroup_size.w = GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id.xyz.z;
+                  }
+                }
+              }
+            }
+           else
+            {
+            }
+          }
+        }
+      }
+     else
+      {
+      }
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.zw.y = GLF_merged4_0_1_17_1_1_11_2_1_12_3_1_14subgroup_local_idvirtual_gidworkgroup_idworkgroup_size.w;
+ uint workgroup_id = gl_WorkGroupID.x;
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+  {
+   GLF_merged2_0_3_61_3_1_12GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizeworkgroup_id.w = workgroup_id;
+  }
+ for(int _injected_loop_counter = (1 & ((1 << _GLF_IDENTITY(int(1), _GLF_IDENTITY(int(1), (int(1)) | 0))) >> _GLF_IDENTITY(int(1), int(1)))); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           do
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               do
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(_GLF_IDENTITY(true, ! (! (true))), ! (! (_GLF_IDENTITY(true, ! (! (true))))))))
+                  {
+                   GLF_merged4_0_1_17_1_1_11_2_1_12_3_1_14subgroup_local_idvirtual_gidworkgroup_idworkgroup_size.z = GLF_merged2_0_3_61_3_1_12GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizeworkgroup_id.w;
+                  }
+                 else
+                  {
+                  }
+                }
+               while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+          }
+         else
+          {
+          }
+        }
+       else
+        {
+        }
+      }
+    }
+   else
+    {
+    }
+  }
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+  }
+ else
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     do
+      {
+       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 << _GLF_IDENTITY(int(6), int(6)))); _injected_loop_counter --)
+        {
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           for(int _injected_loop_counter = (0 ^ 1); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+            {
+             for(int _injected_loop_counter = (0 << _GLF_IDENTITY(int(7), _GLF_IDENTITY(int(7), max(int(7), int(7))))); _GLF_WRAPPED_LOOP(_injected_loop_counter != ((_GLF_IDENTITY(1, 0 | (1)) << _GLF_IDENTITY(int(7), int(7))) >> _GLF_IDENTITY(int(7), int(7)))); _injected_loop_counter ++)
+              {
+               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((((1 << _GLF_IDENTITY(int(7), int(7))) >> _GLF_IDENTITY(int(7), int(7))) << _GLF_IDENTITY(int(6), int(6))) >> _GLF_IDENTITY(int(6), _GLF_IDENTITY(int(6), ~ (~ (int(6))))))); _injected_loop_counter ++)
+                {
+                 for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                    }
+                   else
+                    {
+                     do
+                      {
+                       if(_GLF_WRAPPED_IF_FALSE(false))
+                        {
+                        }
+                       else
+                        {
+                         if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                          {
+                           if(_GLF_WRAPPED_IF_TRUE(true))
+                            {
+                             do
+                              {
+                               if(_GLF_WRAPPED_IF_FALSE(false))
+                                {
+                                }
+                               else
+                                {
+                                 if(_GLF_WRAPPED_IF_FALSE(false))
+                                  {
+                                  }
+                                 else
+                                  {
+                                   if(_GLF_WRAPPED_IF_FALSE(false))
+                                    {
+                                    }
+                                   else
+                                    {
+                                     do
+                                      {
+                                       if(_GLF_WRAPPED_IF_TRUE(true))
+                                        {
+                                         do
+                                          {
+                                           GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy.y = GLF_merged4_0_1_17_1_1_11_2_1_12_3_1_14subgroup_local_idvirtual_gidworkgroup_idworkgroup_size.z;
+                                          }
+                                         while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, ! (! (false)))));
+                                        }
+                                       else
+                                        {
+                                        }
+                                      }
+                                     while(_GLF_WRAPPED_LOOP(false));
+                                    }
+                                  }
+                                }
+                              }
+                             while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                            }
+                           else
+                            {
+                            }
+                          }
+                         else
+                          {
+                          }
+                        }
+                      }
+                     while(_GLF_WRAPPED_LOOP(false));
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+  }
+ for(int _injected_loop_counter = (0 >> _GLF_IDENTITY(int(8), int(8))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id.w = GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.xy.y;
+  }
+ uint workgroup_base = GLF_merged2_0_2_48_2_2_52GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size.zw.y * GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id.w;
+ GLF_merged2_0_3_94_3_1_14GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupworkgroup_base.w = workgroup_base;
+ GLF_merged2_0_3_73_3_1_14GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeworkgroup_base.w = GLF_merged2_0_3_94_3_1_14GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupworkgroup_base.w;
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     GLF_merged3_0_2_56_2_1_17_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basesubgroup_local_idworkgroup_base.w = GLF_merged2_0_3_73_3_1_14GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeworkgroup_base.w;
+    }
+  }
+ else
+  {
+  }
+ GLF_merged2_0_2_56_2_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_base.z = GLF_merged3_0_2_56_2_1_17_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basesubgroup_local_idworkgroup_base.w;
+ do
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     do
+      {
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         GLF_merged3_0_2_41_2_1_13_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_sizeworkgroup_base.w = GLF_merged2_0_2_56_2_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_base.z;
+        }
+       else
+        {
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   do
+    {
+     GLF_merged3_0_2_56_2_1_14_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_baseworkgroup_size.z = GLF_merged3_0_2_41_2_1_13_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_sizeworkgroup_base.w;
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ do
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+      {
+       GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id.xyz.y = GLF_merged3_0_2_56_2_1_14_3_1_14GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_baseworkgroup_baseworkgroup_size.z;
+      }
+     else
+      {
+      }
+    }
+   else
+    {
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   do
+    {
+     do
+      {
+       if(_GLF_WRAPPED_IF_FALSE(false))
+        {
+        }
+       else
+        {
+         do
+          {
+           GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base.w = GLF_merged2_0_3_73_3_1_17GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_local_id.xyz.y;
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         do
+          {
+           do
+            {
+             do
+              {
+               if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                {
+                 do
+                  {
+                   if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, true && (true))))
+                    {
+                     GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id.xyz.z = GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base.w;
+                    }
+                   else
+                    {
+                    }
+                  }
+                 while(_GLF_WRAPPED_LOOP(false));
+                }
+               else
+                {
+                }
+              }
+             while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, true && (_GLF_IDENTITY(false, ! (! (false)))))));
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+       else
+        {
+        }
+      }
+     else
+      {
+      }
+    }
+  }
+ else
+  {
+  }
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+  }
+ else
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+      }
+     else
+      {
+       if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+        }
+       else
+        {
+         for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != _GLF_IDENTITY(0, 1 * (0))); _injected_loop_counter --)
+          {
+           do
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(false))
+                  {
+                  }
+                 else
+                  {
+                   do
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(true))
+                      {
+                       if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, ! (_GLF_IDENTITY(! (false), true && (! (false)))))))
+                        {
+                        }
+                       else
+                        {
+                         if(_GLF_WRAPPED_IF_FALSE(false))
+                          {
+                          }
+                         else
+                          {
+                           if(_GLF_WRAPPED_IF_TRUE(true))
+                            {
+                             if(_GLF_WRAPPED_IF_FALSE(false))
+                              {
+                              }
+                             else
+                              {
+                               for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                                {
+                                 for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                                  {
+                                   do
+                                    {
+                                     do
+                                      {
+                                       for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < _GLF_IDENTITY(1, clamp(1, 1, 1))); _injected_loop_counter ++)
+                                        {
+                                         if(_GLF_WRAPPED_IF_TRUE(true))
+                                          {
+                                           do
+                                            {
+                                             if(_GLF_WRAPPED_IF_FALSE(false))
+                                              {
+                                              }
+                                             else
+                                              {
+                                               do
+                                                {
+                                                 if(_GLF_WRAPPED_IF_FALSE(false))
+                                                  {
+                                                  }
+                                                 else
+                                                  {
+                                                   do
+                                                    {
+                                                     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, ! (_GLF_IDENTITY(! (true), bool(bvec2(! (true), false)))))))
+                                                      {
+                                                       do
+                                                        {
+                                                         do
+                                                          {
+                                                           do
+                                                            {
+                                                             for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                                                              {
+                                                               for(int _injected_loop_counter = (0 ^ 1); _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+                                                                {
+                                                                 if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                                                  {
+                                                                  }
+                                                                 else
+                                                                  {
+                                                                   if(_GLF_WRAPPED_IF_FALSE(false))
+                                                                    {
+                                                                    }
+                                                                   else
+                                                                    {
+                                                                     do
+                                                                      {
+                                                                       do
+                                                                        {
+                                                                         for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > (29865 & (0 >> _GLF_IDENTITY(int(3), int(3))))); _injected_loop_counter --)
+                                                                          {
+                                                                           if(_GLF_WRAPPED_IF_TRUE(true))
+                                                                            {
+                                                                             for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(1), int(1))) >> _GLF_IDENTITY(int(1), int(1)))); _injected_loop_counter ++)
+                                                                              {
+                                                                               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                                                                {
+                                                                                 do
+                                                                                  {
+                                                                                   if(_GLF_WRAPPED_IF_FALSE(false))
+                                                                                    {
+                                                                                    }
+                                                                                   else
+                                                                                    {
+                                                                                     do
+                                                                                      {
+                                                                                       for(int _injected_loop_counter = (0 >> _GLF_IDENTITY(int(7), _GLF_IDENTITY(int(7), ~ (~ (int(7)))))); _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(0), int(0))) >> _GLF_IDENTITY(int(0), _GLF_IDENTITY(int(0), (_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)) ? _GLF_IDENTITY(int(0), 0 ^ (int(0))) : _GLF_FUZZED(_injected_loop_counter)))))); _injected_loop_counter ++)
+                                                                                        {
+                                                                                         if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                                                                          {
+                                                                                           do
+                                                                                            {
+                                                                                             barrier();
+                                                                                            }
+                                                                                           while(_GLF_WRAPPED_LOOP(false));
+                                                                                          }
+                                                                                         else
+                                                                                          {
+                                                                                          }
+                                                                                        }
+                                                                                      }
+                                                                                     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                                                                    }
+                                                                                  }
+                                                                                 while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                           else
+                                                                            {
+                                                                            }
+                                                                          }
+                                                                        }
+                                                                       while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                                                      }
+                                                                     while(_GLF_WRAPPED_LOOP(false));
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                            }
+                                                           while(_GLF_WRAPPED_LOOP(false));
+                                                          }
+                                                         while(_GLF_WRAPPED_LOOP(false));
+                                                        }
+                                                       while(_GLF_WRAPPED_LOOP(false));
+                                                      }
+                                                     else
+                                                      {
+                                                      }
+                                                    }
+                                                   while(_GLF_WRAPPED_LOOP(false));
+                                                  }
+                                                }
+                                               while(_GLF_WRAPPED_LOOP(false));
+                                              }
+                                            }
+                                           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                          }
+                                         else
+                                          {
+                                          }
+                                        }
+                                      }
+                                     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                    }
+                                   while(_GLF_WRAPPED_LOOP(false));
+                                  }
+                                }
+                              }
+                             GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.xy.y = GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id.xyz.z;
+                            }
+                           else
+                            {
+                            }
+                          }
+                        }
+                      }
+                     else
+                      {
+                      }
+                    }
+                   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                  }
+                }
+               else
+                {
+                }
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+          }
+        }
+      }
+    }
+  }
+ uint subgroup_base = GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.y * GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.z;
+ GLF_merged2_0_2_41_2_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basesubgroup_base.z = subgroup_base;
+ GLF_merged2_0_3_73_3_1_13GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_base.w = GLF_merged2_0_2_41_2_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basesubgroup_base.z;
+ GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_base.w = GLF_merged2_0_3_73_3_1_13GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizesubgroup_base.w;
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     do
+      {
+       do
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+          }
+         else
+          {
+           GLF_merged2_0_3_59_3_1_13GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidsubgroup_base.w = GLF_merged2_0_3_60_3_1_13GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_base.w;
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+  }
+ else
+  {
+  }
+ GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_4_1_1_13readsubgroup_base.zw.y = GLF_merged2_0_3_59_3_1_13GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidsubgroup_base.w;
+ do
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+      {
+       do
+        {
+         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+          {
+           do
+            {
+             do
+              {
+               if(_GLF_WRAPPED_IF_FALSE(false))
+                {
+                }
+               else
+                {
+                 for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                    }
+                   else
+                    {
+                     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      {
+                      }
+                     else
+                      {
+                       GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_base.w = GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_4_1_1_13readsubgroup_base.zw.y;
+                      }
+                    }
+                  }
+                }
+              }
+             while(_GLF_WRAPPED_LOOP(false));
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     else
+      {
+      }
+    }
+   else
+    {
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+      {
+       do
+        {
+         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((int(_GLF_ONE(1.0, injectionSwitch.y)) << _GLF_IDENTITY(int(5), int(5))) >> _GLF_IDENTITY(int(5), int(5)))); _injected_loop_counter ++)
+          {
+           GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid.xyz.y = GLF_merged2_0_3_94_3_1_13GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupsubgroup_base.w;
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+    }
+  }
+ else
+  {
+  }
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, ! (! (false)))))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       if(_GLF_WRAPPED_IF_FALSE(false))
+        {
+        }
+       else
+        {
+         do
+          {
+           do
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 do
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(false))
+                    {
+                    }
+                   else
+                    {
+                     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+                      {
+                       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+                        {
+                         if(_GLF_WRAPPED_IF_TRUE(true))
+                          {
+                           GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id.y = GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid.xyz.y;
+                          }
+                         else
+                          {
+                          }
+                        }
+                      }
+                    }
+                  }
+                 while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                }
+               else
+                {
+                }
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+      }
+    }
+  }
+ uint virtual_gid = GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.xy.y + GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id.y + GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.xy.x;
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   GLF_merged3_0_2_50_2_1_13_3_1_11GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizesubgroup_sizevirtual_gid.w = virtual_gid;
+  }
+ else
+  {
+  }
+ GLF_merged4_0_1_4_1_1_11_2_1_11_3_1_14readsubgroup_idvirtual_gidworkgroup_size.z = GLF_merged3_0_2_50_2_1_13_3_1_11GLF_merged2_0_1_11_1_1_14subgroup_idworkgroup_sizesubgroup_sizevirtual_gid.w;
+ do
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+        }
+       else
+        {
+         for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+          {
+           GLF_merged3_0_2_52_2_1_11_3_1_14GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizevirtual_gidworkgroup_size.z = GLF_merged4_0_1_4_1_1_11_2_1_11_3_1_14readsubgroup_idvirtual_gidworkgroup_size.z;
+          }
+        }
+      }
+     else
+      {
+      }
+    }
+   else
+    {
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+  {
+   do
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       GLF_merged4_0_1_13_1_1_17_2_1_13_3_1_11num_workgroupsubgroup_local_idsubgroup_sizevirtual_gid.w = GLF_merged3_0_2_52_2_1_11_3_1_14GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizevirtual_gidworkgroup_size.z;
+      }
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+  {
+   do
+    {
+     GLF_merged2_0_3_59_3_1_11GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidvirtual_gid.w = GLF_merged4_0_1_13_1_1_17_2_1_13_3_1_11num_workgroupsubgroup_local_idsubgroup_sizevirtual_gid.w;
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   GLF_merged4_0_1_17_1_1_11_2_1_12_3_1_14subgroup_local_idvirtual_gidworkgroup_idworkgroup_size.y = GLF_merged2_0_3_59_3_1_11GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidvirtual_gid.w;
+  }
+ else
+  {
+  }
+ GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid.xyz.z = GLF_merged4_0_1_17_1_1_11_2_1_12_3_1_14subgroup_local_idvirtual_gidworkgroup_idworkgroup_size.y;
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+      }
+     else
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+          {
+           for(int _injected_loop_counter = (0 << _GLF_IDENTITY(int(3), _GLF_IDENTITY(int(3), int(_GLF_ZERO(0.0, injectionSwitch.x)) ^ (int(3))))); _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                  {
+                   GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.w = GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid.xyz.z;
+                  }
+                 else
+                  {
+                  }
+                }
+               else
+                {
+                }
+              }
+            }
+          }
+        }
+       else
+        {
+        }
+      }
+    }
+   else
+    {
+    }
+  }
+ else
+  {
+  }
+ uint next_virtual_gid = GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.xy.y + GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id.y + ((GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.xy.x + 1) % GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.z);
+ GLF_merged3_0_2_41_2_1_16_3_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basenext_virtual_gidsubgroup_size.z = next_virtual_gid;
+ GLF_merged2_0_3_61_3_1_16GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenext_virtual_gid.w = GLF_merged3_0_2_41_2_1_16_3_1_13GLF_merged2_0_1_4_1_1_13readsubgroup_basenext_virtual_gidsubgroup_size.z;
+ GLF_merged2_0_2_41_2_2_55GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size.zw.x = GLF_merged2_0_3_61_3_1_16GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenext_virtual_gid.w;
+ GLF_merged2_0_3_94_3_1_16GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnext_virtual_gid.w = GLF_merged2_0_2_41_2_2_55GLF_merged2_0_1_13_1_1_4num_workgroupreadGLF_merged2_0_1_16_1_1_14next_virtual_gidworkgroup_size.zw.x;
+ GLF_merged3_0_2_56_2_1_16_3_1_4GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidread.z = GLF_merged2_0_3_94_3_1_16GLF_merged2_0_2_56_2_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenum_workgroupnext_virtual_gid.w;
+ for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+      {
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         for(int _injected_loop_counter = (0 << _GLF_IDENTITY(int(5), int(5))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+          {
+           for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((0 << _GLF_IDENTITY(int(2), int(2))) ^ 1)); _injected_loop_counter ++)
+            {
+             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+              }
+             else
+              {
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 for(int _injected_loop_counter = (0 ^ 0); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                  {
+                   GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid.w = GLF_merged3_0_2_56_2_1_16_3_1_4GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidread.z;
+                  }
+                }
+               else
+                {
+                }
+              }
+            }
+          }
+        }
+       else
+        {
+        }
+      }
+    }
+   else
+    {
+    }
+  }
+ for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+        {
+         if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+          {
+           do
+            {
+             for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+              {
+               for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > ((0 | 0) << _GLF_IDENTITY(int(2), _GLF_IDENTITY(int(2), clamp(int(2), int(2), int(2)))))); _injected_loop_counter --)
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(true))
+                  {
+                   for(int _injected_loop_counter = ((1 | 1) & 1); _GLF_WRAPPED_LOOP(_injected_loop_counter != (0 >> _GLF_IDENTITY(int(6), int(6)))); _injected_loop_counter --)
+                    {
+                     if(_GLF_WRAPPED_IF_FALSE(false))
+                      {
+                      }
+                     else
+                      {
+                       if(_GLF_WRAPPED_IF_TRUE(true))
+                        {
+                         GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.z = GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid.w;
+                        }
+                       else
+                        {
+                        }
+                      }
+                    }
+                  }
+                 else
+                  {
+                  }
+                }
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+         else
+          {
+          }
+        }
+      }
+    }
+  }
+ uint read = atomicLoad(buf[GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.w], 3, 64, 2);
+ GLF_merged2_0_3_60_3_1_4GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseread.w = read;
+ GLF_merged4_0_1_4_1_1_11_2_1_11_3_1_14readsubgroup_idvirtual_gidworkgroup_size.x = GLF_merged2_0_3_60_3_1_4GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_baseread.w;
+ GLF_merged2_0_3_73_3_1_4GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeread.w = GLF_merged4_0_1_4_1_1_11_2_1_11_3_1_14readsubgroup_idvirtual_gidworkgroup_size.x;
+ do
+  {
+   GLF_merged3_0_2_56_2_1_4_3_1_17GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basereadsubgroup_local_id.z = GLF_merged2_0_3_73_3_1_4GLF_merged3_0_1_13_1_1_14_2_1_14subgroup_sizeworkgroup_baseworkgroup_sizeread.w;
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ for(int _injected_loop_counter = ((0 >> _GLF_IDENTITY(int(8), int(8))) | 0); _GLF_WRAPPED_LOOP(_injected_loop_counter != ((1 << _GLF_IDENTITY(int(2), _GLF_IDENTITY(int(2), (int(2)) / (1 ^ 0)))) >> _GLF_IDENTITY(int(2), int(2)))); _injected_loop_counter ++)
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup.xyz.y = GLF_merged3_0_2_56_2_1_4_3_1_17GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basereadsubgroup_local_id.z;
+    }
+   else
+    {
+    }
+  }
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_4_1_1_13readsubgroup_base.zw.x = GLF_merged2_0_3_61_3_1_13GLF_merged3_0_1_13_1_1_4_2_1_13num_workgroupreadsubgroup_sizenum_workgroup.xyz.y;
+    }
+   else
+    {
+    }
+  }
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   do
+    {
+     GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base.xy.y = GLF_merged2_0_2_48_2_2_41GLF_merged2_0_1_11_1_1_12subgroup_idworkgroup_idGLF_merged2_0_1_4_1_1_13readsubgroup_base.zw.x;
+    }
+   while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, bool(bvec3(false, true, false)))));
+  }
+ else
+  {
+  }
+ GLF_merged3_0_2_56_2_1_16_3_1_4GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidread.w = GLF_merged3_0_2_41_2_1_17_3_1_14GLF_merged2_0_1_13_1_1_4num_workgroupreadsubgroup_local_idworkgroup_base.xy.y;
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       do
+        {
+         GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid.xyz.x = GLF_merged3_0_2_56_2_1_16_3_1_4GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidread.w;
+        }
+       while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+      }
+     else
+      {
+      }
+    }
+   else
+    {
+    }
+  }
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+      }
+     else
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(false))
+                  {
+                  }
+                 else
+                  {
+                   for(int _injected_loop_counter = (-83112 & (0 << _GLF_IDENTITY(int(0), int(0)))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(true))
+                      {
+                       if(_GLF_WRAPPED_IF_FALSE(false))
+                        {
+                        }
+                       else
+                        {
+                         for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                          {
+                           for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                            {
+                             if(_GLF_WRAPPED_IF_FALSE(false))
+                              {
+                              }
+                             else
+                              {
+                               do
+                                {
+                                 do
+                                  {
+                                   if(_GLF_WRAPPED_IF_TRUE(true))
+                                    {
+                                     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                      {
+                                      }
+                                     else
+                                      {
+                                       if(_GLF_WRAPPED_IF_TRUE(true))
+                                        {
+                                         GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id.xyz.x = GLF_merged2_0_3_59_3_1_16GLF_merged3_0_1_4_1_1_13_2_1_11readsubgroup_basevirtual_gidnext_virtual_gid.xyz.x;
+                                        }
+                                       else
+                                        {
+                                        }
+                                      }
+                                    }
+                                   else
+                                    {
+                                    }
+                                  }
+                                 while(_GLF_WRAPPED_LOOP(false));
+                                }
+                               while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                              }
+                            }
+                          }
+                        }
+                      }
+                     else
+                      {
+                      }
+                    }
+                  }
+                }
+              }
+             else
+              {
+              }
+            }
+           else
+            {
+            }
+          }
+        }
+       else
+        {
+        }
+      }
+    }
+  }
+ else
+  {
+  }
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id.x = GLF_merged2_0_3_60_3_1_17GLF_merged3_0_1_4_1_1_11_2_1_14readsubgroup_idworkgroup_basesubgroup_local_id.xyz.x;
+    }
+  }
+ else
+  {
+  }
+ for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+  {
+   do
+    {
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != (((1 & 1) << _GLF_IDENTITY(int(2), _GLF_IDENTITY(int(2), (int(2)) | (int(2))))) >> _GLF_IDENTITY(int(2), int(2)))); _injected_loop_counter ++)
+      {
+       do
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           do
+            {
+             do
+              {
+               if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, true && (false))))
+                {
+                }
+               else
+                {
+                 for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(1), int(1))) >> _GLF_IDENTITY(int(1), int(1)))); _injected_loop_counter ++)
+                  {
+                   if(_GLF_WRAPPED_IF_TRUE(true))
+                    {
+                     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                      {
+                       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                        {
+                         GLF_merged4_0_1_13_1_1_4_2_1_11_3_1_17num_workgroupreadsubgroup_idsubgroup_local_id.y = GLF_merged4_0_1_4_1_1_13_2_1_13_3_1_12readsubgroup_basesubgroup_sizeworkgroup_id.x;
+                        }
+                       else
+                        {
+                        }
+                      }
+                    }
+                   else
+                    {
+                    }
+                  }
+                }
+              }
+             while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+         else
+          {
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.x = GLF_merged4_0_1_13_1_1_4_2_1_11_3_1_17num_workgroupreadsubgroup_idsubgroup_local_id.y;
+ for(int _injected_loop_counter = _GLF_IDENTITY(0, max(0, 0)); _GLF_WRAPPED_LOOP(_injected_loop_counter != ((1 << _GLF_IDENTITY(int(3), int(3))) >> _GLF_IDENTITY(int(3), int(3)))); _injected_loop_counter ++)
+  {
+   do
+    {
+     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+      }
+     else
+      {
+       for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           do
+            {
+             for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+              {
+               if(_GLF_WRAPPED_IF_FALSE(false))
+                {
+                }
+               else
+                {
+                 do
+                  {
+                   do
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                      {
+                       if(_GLF_WRAPPED_IF_TRUE(true))
+                        {
+                         if(_GLF_WRAPPED_IF_TRUE(true))
+                          {
+                           if(_GLF_WRAPPED_IF_FALSE(false))
+                            {
+                            }
+                           else
+                            {
+                             if(_GLF_WRAPPED_IF_TRUE(true))
+                              {
+                               if(_GLF_WRAPPED_IF_FALSE(false))
+                                {
+                                }
+                               else
+                                {
+                                 if(_GLF_WRAPPED_IF_TRUE(true))
+                                  {
+                                   if(_GLF_WRAPPED_IF_TRUE(true))
+                                    {
+                                     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, bool(bvec3(_GLF_IDENTITY(true, bool(bool(true))), true, true)))))
+                                      {
+                                       if((GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.xy.x % 2) == 0)
+                                        {
+                                         if(_GLF_WRAPPED_IF_FALSE(false))
+                                          {
+                                          }
+                                         else
+                                          {
+                                           do
+                                            {
+                                             do
+                                              {
+                                               if(_GLF_WRAPPED_IF_FALSE(false))
+                                                {
+                                                }
+                                               else
+                                                {
+                                                 for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                                                  {
+                                                   if(_GLF_WRAPPED_IF_TRUE(true))
+                                                    {
+                                                     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, bool(bvec4(true, false, true, false)))))
+                                                      {
+                                                       if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), false || (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))))
+                                                        {
+                                                        }
+                                                       else
+                                                        {
+                                                         do
+                                                          {
+                                                           if(_GLF_WRAPPED_IF_FALSE(false))
+                                                            {
+                                                            }
+                                                           else
+                                                            {
+                                                             do
+                                                              {
+                                                               if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                                                {
+                                                                }
+                                                               else
+                                                                {
+                                                                 if(_GLF_WRAPPED_IF_FALSE(false))
+                                                                  {
+                                                                  }
+                                                                 else
+                                                                  {
+                                                                   if(_GLF_WRAPPED_IF_FALSE(false))
+                                                                    {
+                                                                    }
+                                                                   else
+                                                                    {
+                                                                     if(_GLF_WRAPPED_IF_FALSE(false))
+                                                                      {
+                                                                      }
+                                                                     else
+                                                                      {
+                                                                       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                                                        {
+                                                                         atomicStore(buf[GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.z], uint(1), 3, 64, 4);
+                                                                        }
+                                                                       else
+                                                                        {
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                  }
+                                                                }
+                                                              }
+                                                             while(_GLF_WRAPPED_LOOP(false));
+                                                            }
+                                                          }
+                                                         while(_GLF_WRAPPED_LOOP(false));
+                                                        }
+                                                      }
+                                                     else
+                                                      {
+                                                      }
+                                                    }
+                                                   else
+                                                    {
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                             while(_GLF_WRAPPED_LOOP(false));
+                                            }
+                                           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                          }
+                                        }
+                                       else
+                                        {
+                                         if(_GLF_WRAPPED_IF_FALSE(false))
+                                          {
+                                          }
+                                         else
+                                          {
+                                           if(_GLF_WRAPPED_IF_FALSE(false))
+                                            {
+                                            }
+                                           else
+                                            {
+                                             if(_GLF_WRAPPED_IF_FALSE(false))
+                                              {
+                                               do
+                                                {
+                                                 for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+                                                  {
+                                                   if(_GLF_DEAD(false))
+                                                    {
+                                                     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & 1)); _injected_loop_counter ++)
+                                                      {
+                                                       if(_GLF_WRAPPED_IF_FALSE(false))
+                                                        {
+                                                        }
+                                                       else
+                                                        {
+                                                         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                                          {
+                                                          }
+                                                         else
+                                                          {
+                                                           if(_GLF_WRAPPED_IF_TRUE(true))
+                                                            {
+                                                             do
+                                                              {
+                                                               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+                                                                {
+                                                                 for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((_GLF_IDENTITY(1, 0 | (1)) << _GLF_IDENTITY(int(4), int(4))) >> _GLF_IDENTITY(int(4), _GLF_IDENTITY(int(4), int(ivec4(int(4), int(_GLF_ONE(1.0, injectionSwitch.y)), 0, 1)))))); _injected_loop_counter ++)
+                                                                  {
+                                                                   barrier();
+                                                                  }
+                                                                }
+                                                              }
+                                                             while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), _GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)) || (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))));
+                                                            }
+                                                           else
+                                                            {
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                               while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, ! (! (false)))));
+                                              }
+                                             else
+                                              {
+                                               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                                                {
+                                                 if(_GLF_WRAPPED_IF_FALSE(false))
+                                                  {
+                                                  }
+                                                 else
+                                                  {
+                                                   do
+                                                    {
+                                                     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                                      {
+                                                      }
+                                                     else
+                                                      {
+                                                       for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                                                        {
+                                                         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & 1)); _injected_loop_counter ++)
+                                                          {
+                                                           for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                                                            {
+                                                             if(_GLF_WRAPPED_IF_FALSE(false))
+                                                              {
+                                                              }
+                                                             else
+                                                              {
+                                                               if(_GLF_WRAPPED_IF_TRUE(true))
+                                                                {
+                                                                 do
+                                                                  {
+                                                                   if(_GLF_WRAPPED_IF_TRUE(true))
+                                                                    {
+                                                                     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                                                                      {
+                                                                       if(_GLF_WRAPPED_IF_FALSE(false))
+                                                                        {
+                                                                        }
+                                                                       else
+                                                                        {
+                                                                         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                                                          {
+                                                                          }
+                                                                         else
+                                                                          {
+                                                                           do
+                                                                            {
+                                                                             if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, (false) || false)))
+                                                                              {
+                                                                              }
+                                                                             else
+                                                                              {
+                                                                               if(_GLF_WRAPPED_IF_FALSE(false))
+                                                                                {
+                                                                                }
+                                                                               else
+                                                                                {
+                                                                                 if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                                                                  {
+                                                                                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                                                                    {
+                                                                                     if(_GLF_WRAPPED_IF_FALSE(false))
+                                                                                      {
+                                                                                      }
+                                                                                     else
+                                                                                      {
+                                                                                       if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                                                                        {
+                                                                                        }
+                                                                                       else
+                                                                                        {
+                                                                                         do
+                                                                                          {
+                                                                                           if(_GLF_WRAPPED_IF_TRUE(true))
+                                                                                            {
+                                                                                             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                                                                              {
+                                                                                              }
+                                                                                             else
+                                                                                              {
+                                                                                               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                                                                                                {
+                                                                                                 if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                                                                                  {
+                                                                                                   for(int _injected_loop_counter = (1 ^ ((1 << _GLF_IDENTITY(int(4), int(4))) >> _GLF_IDENTITY(int(4), int(4)))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                                                                                                    {
+                                                                                                     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                                                                                                      {
+                                                                                                       do
+                                                                                                        {
+                                                                                                         for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 << _GLF_IDENTITY(int(8), int(8)))); _injected_loop_counter --)
+                                                                                                          {
+                                                                                                           do
+                                                                                                            {
+                                                                                                             do
+                                                                                                              {
+                                                                                                               do
+                                                                                                                {
+                                                                                                                 if(_GLF_WRAPPED_IF_TRUE(true))
+                                                                                                                  {
+                                                                                                                   if(_GLF_WRAPPED_IF_TRUE(true))
+                                                                                                                    {
+                                                                                                                     if(_GLF_WRAPPED_IF_FALSE(false))
+                                                                                                                      {
+                                                                                                                      }
+                                                                                                                     else
+                                                                                                                      {
+                                                                                                                       for(int _injected_loop_counter = ((0 >> _GLF_IDENTITY(int(7), int(7))) ^ 0); _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(0), _GLF_IDENTITY(int(0), (int(0)) | 0))) >> _GLF_IDENTITY(int(0), int(0)))); _injected_loop_counter ++)
+                                                                                                                        {
+                                                                                                                         for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                                                                                                                          {
+                                                                                                                           barrier();
+                                                                                                                          }
+                                                                                                                        }
+                                                                                                                      }
+                                                                                                                    }
+                                                                                                                   else
+                                                                                                                    {
+                                                                                                                    }
+                                                                                                                  }
+                                                                                                                 else
+                                                                                                                  {
+                                                                                                                  }
+                                                                                                                }
+                                                                                                               while(_GLF_WRAPPED_LOOP(false));
+                                                                                                              }
+                                                                                                             while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                                                                                            }
+                                                                                                           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                                                                                          }
+                                                                                                        }
+                                                                                                       while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                                                                                      }
+                                                                                                    }
+                                                                                                  }
+                                                                                                 else
+                                                                                                  {
+                                                                                                  }
+                                                                                                }
+                                                                                              }
+                                                                                            }
+                                                                                           else
+                                                                                            {
+                                                                                            }
+                                                                                          }
+                                                                                         while(_GLF_WRAPPED_LOOP(false));
+                                                                                        }
+                                                                                      }
+                                                                                    }
+                                                                                  }
+                                                                                 else
+                                                                                  {
+                                                                                  }
+                                                                                }
+                                                                              }
+                                                                            }
+                                                                           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                                                          }
+                                                                        }
+                                                                      }
+                                                                    }
+                                                                   else
+                                                                    {
+                                                                    }
+                                                                  }
+                                                                 while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, (false) && true)));
+                                                                }
+                                                               else
+                                                                {
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                   while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, ! (! (false)))));
+                                                  }
+                                                }
+                                               do
+                                                {
+                                                 if(_GLF_WRAPPED_IF_FALSE(false))
+                                                  {
+                                                  }
+                                                 else
+                                                  {
+                                                   for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                                                    {
+                                                     if(_GLF_WRAPPED_IF_TRUE(true))
+                                                      {
+                                                       do
+                                                        {
+                                                         if(_GLF_WRAPPED_IF_FALSE(false))
+                                                          {
+                                                          }
+                                                         else
+                                                          {
+                                                           atomicStore(buf[GLF_merged3_0_2_56_2_1_16_3_1_13GLF_merged2_0_1_17_1_1_14subgroup_local_idworkgroup_basenext_virtual_gidnum_workgroup.z], uint(1), 3, 64, 4);
+                                                          }
+                                                        }
+                                                       while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                                                      }
+                                                     else
+                                                      {
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                               while(_GLF_WRAPPED_LOOP(false));
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                     else
+                                      {
+                                      }
+                                    }
+                                   else
+                                    {
+                                    }
+                                  }
+                                 else
+                                  {
+                                  }
+                                }
+                              }
+                             else
+                              {
+                              }
+                            }
+                          }
+                         else
+                          {
+                          }
+                        }
+                       else
+                        {
+                        }
+                      }
+                     else
+                      {
+                      }
+                    }
+                   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                  }
+                 while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                }
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+         else
+          {
+          }
+        }
+      }
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 | 0)); _injected_loop_counter --)
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+        }
+       else
+        {
+         do
+          {
+           if(_GLF_DEAD(false))
+            {
+             for(int _injected_loop_counter = ((1 << _GLF_IDENTITY(int(5), int(5))) >> _GLF_IDENTITY(int(5), int(5))); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+              {
+               for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                  {
+                   if(_GLF_WRAPPED_IF_TRUE(true))
+                    {
+                     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                      {
+                       if(_GLF_WRAPPED_IF_FALSE(false))
+                        {
+                        }
+                       else
+                        {
+                         do
+                          {
+                           for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(3), int(3))) >> _GLF_IDENTITY(int(3), _GLF_IDENTITY(int(3), clamp(_GLF_IDENTITY(int(3), (int(3)) - 0), int(3), int(3)))))); _injected_loop_counter ++)
+                            {
+                             for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((1 << _GLF_IDENTITY(int(2), int(2))) >> _GLF_IDENTITY(int(2), _GLF_IDENTITY(int(2), 0 ^ (int(2)))))); _injected_loop_counter ++)
+                              {
+                               if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                                {
+                                 do
+                                  {
+                                   if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)), ! (! (_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)))))))
+                                    {
+                                     barrier();
+                                    }
+                                   else
+                                    {
+                                    }
+                                  }
+                                 while(_GLF_WRAPPED_LOOP(false));
+                                }
+                               else
+                                {
+                                }
+                              }
+                            }
+                          }
+                         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                        }
+                      }
+                    }
+                   else
+                    {
+                    }
+                  }
+                 else
+                  {
+                  }
+                }
+              }
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(_GLF_IDENTITY(false, false || (false)), (_GLF_IDENTITY(false, false || (false))) || false)));
+        }
+      }
+    }
+  }
+ else
+  {
+  }
+ do
+  {
+   subgroupBarrier();
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   atomicStore(checker[GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.w], GLF_merged4_0_1_4_1_1_11_2_1_13_3_1_11readsubgroup_idsubgroup_sizevirtual_gid.x, 3, 64, 4);
+  }
+}
+
+END
+
+BUFFER tester DATA_TYPE uint32 SIZE 8388096 FILL 0
+BUFFER expected DATA_TYPE uint32 SIZE 8388096 FILL 2
+BUFFER injection DATA_TYPE vec2<float> DATA
+ 0.0 1.0
+END
+BUFFER checker DATA_TYPE uint32 SIZE 8388096 FILL 0
+BUFFER expected_checker DATA_TYPE uint32 SIZE 8388096 FILL 0
+
+PIPELINE compute test_pipe
+  ATTACH test
+  BIND BUFFER tester AS storage DESCRIPTOR_SET 0 BINDING 0 
+  BIND BUFFER injection AS uniform DESCRIPTOR_SET 0 BINDING 1 
+  BIND BUFFER checker AS storage DESCRIPTOR_SET 0 BINDING 2 
+
+  SUBGROUP test
+	  VARYING_SIZE on
+  END
+END
+
+RUN test_pipe 65532 1 1
+EXPECT checker EQ_BUFFER expected_checker

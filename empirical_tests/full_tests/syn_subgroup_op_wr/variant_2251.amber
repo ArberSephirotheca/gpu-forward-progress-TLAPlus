@@ -1,0 +1,6407 @@
+#!amber
+
+DEVICE_FEATURE SubgroupSizeControl.subgroupSizeControl
+
+SET ENGINE_DATA fence_timeout_ms 10000
+
+SHADER compute test GLSL
+#version 460
+
+#ifndef REDUCER
+#define _GLF_ZERO(X, Y)                   (Y)
+#define _GLF_ONE(X, Y)                    (Y)
+#define _GLF_FALSE(X, Y)                  (Y)
+#define _GLF_TRUE(X, Y)                   (Y)
+#define _GLF_IDENTITY(X, Y)               (Y)
+#define _GLF_DEAD(X)                      (X)
+#define _GLF_FUZZED(X)                    (X)
+#define _GLF_WRAPPED_LOOP(X)              X
+#define _GLF_WRAPPED_IF_TRUE(X)           X
+#define _GLF_WRAPPED_IF_FALSE(X)          X
+#define _GLF_SWITCH(X)                    X
+#define _GLF_MAKE_IN_BOUNDS_INT(IDX, SZ)  clamp(IDX, 0, SZ - 1)
+#define _GLF_MAKE_IN_BOUNDS_UINT(IDX, SZ) clamp(IDX, 0u, SZ - 1u)
+#endif
+
+
+struct _GLF_struct_134 {
+ vec4 _f0;
+ bvec2 _f1;
+} ;
+
+struct _GLF_struct_132 {
+ bvec3 _f0;
+ uvec2 _f1;
+ float _f2;
+} ;
+
+struct _GLF_struct_133 {
+ uvec3 _f0;
+ int _f1;
+ float _f2;
+ _GLF_struct_132 _f3;
+} ;
+
+struct _GLF_struct_130 {
+ bvec2 _f0;
+} ;
+
+struct _GLF_struct_131 {
+ bvec4 _f0;
+ _GLF_struct_130 _f1;
+ bvec2 _f2;
+ bvec4 _f3;
+} ;
+
+struct _GLF_struct_128 {
+ bvec4 _f0;
+ ivec2 _f1;
+ vec3 _f2;
+ mat4x3 _f3;
+ mat4 _f4;
+ vec2 _f5;
+ mat4x2 _f6;
+} ;
+
+struct _GLF_struct_127 {
+ int _f0;
+} ;
+
+struct _GLF_struct_126 {
+ bool _f0;
+ mat4x2 _f1;
+ uvec4 _f2;
+ mat3x4 _f3;
+ int _f4;
+ bvec4 _f5;
+} ;
+
+struct _GLF_struct_129 {
+ vec3 _f0;
+ _GLF_struct_126 _f1;
+ mat2 _f2;
+ mat2 _f3;
+ _GLF_struct_127 _f4;
+ _GLF_struct_128 _f5;
+} ;
+
+struct _GLF_struct_125 {
+ mat2x4 _f0;
+} ;
+
+struct _GLF_struct_135 {
+ _GLF_struct_125 _f0;
+ _GLF_struct_129 _f1;
+ _GLF_struct_131 _f2;
+ _GLF_struct_133 _f3;
+ int _injected_loop_counter;
+ _GLF_struct_134 _f4;
+} ;
+
+struct _GLF_struct_122 {
+ int _f0;
+ ivec3 _f1;
+} ;
+
+struct _GLF_struct_121 {
+ mat2x4 _f0;
+ bvec3 _f1;
+ bvec3 _f2;
+ mat4 _f3;
+ bool _f4;
+} ;
+
+struct _GLF_struct_123 {
+ _GLF_struct_121 _f0;
+ mat3x2 _f1;
+ int _f2;
+ mat2x4 _f3;
+ _GLF_struct_122 _f4;
+} ;
+
+struct _GLF_struct_119 {
+ uvec2 _f0;
+ mat2x4 _f1;
+ mat2x3 _f2;
+ mat3 _f3;
+} ;
+
+struct _GLF_struct_120 {
+ _GLF_struct_119 _f0;
+ bvec4 _f1;
+ float _f2;
+ int _f3;
+ mat3x4 _f4;
+} ;
+
+struct _GLF_struct_124 {
+ mat3 _f0;
+ _GLF_struct_120 _f1;
+ int _injected_loop_counter;
+ bool _f2;
+ _GLF_struct_123 _f3;
+ uvec2 _f4;
+} ;
+
+struct _GLF_struct_116 {
+ uint _f0;
+ mat3x4 _f1;
+} ;
+
+struct _GLF_struct_115 {
+ bool _f0;
+ mat4x2 _f1;
+ mat3 _f2;
+ mat3x4 _f3;
+ vec4 _f4;
+ mat3x2 _f5;
+ mat4 _f6;
+} ;
+
+struct _GLF_struct_117 {
+ _GLF_struct_115 _f0;
+ _GLF_struct_116 _f1;
+ uvec4 _f2;
+ mat3x4 _f3;
+ uint _f4;
+} ;
+
+struct _GLF_struct_114 {
+ ivec2 _f0;
+ ivec2 _f1;
+ ivec2 _f2;
+} ;
+
+struct _GLF_struct_112 {
+ mat3 _f0;
+ bvec4 _f1;
+ ivec2 _f2;
+ bvec3 _f3;
+ float _f4;
+} ;
+
+struct _GLF_struct_113 {
+ bvec3 _f0;
+ _GLF_struct_112 _f1;
+ ivec3 _f2;
+} ;
+
+struct _GLF_struct_111 {
+ float _f0;
+} ;
+
+struct _GLF_struct_118 {
+ mat3x4 _f0;
+ _GLF_struct_111 _f1;
+ _GLF_struct_113 _f2;
+ _GLF_struct_114 _f3;
+ int _injected_loop_counter;
+ mat4 _f4;
+ _GLF_struct_117 _f5;
+} ;
+
+struct _GLF_struct_108 {
+ bvec2 _f0;
+ mat2 _f1;
+ mat3x4 _f2;
+} ;
+
+struct _GLF_struct_107 {
+ mat3 _f0;
+ uvec3 _f1;
+} ;
+
+struct _GLF_struct_109 {
+ bvec4 _f0;
+ _GLF_struct_107 _f1;
+ _GLF_struct_108 _f2;
+ ivec2 _f3;
+ uvec2 _f4;
+ ivec2 _f5;
+ bool _f6;
+} ;
+
+struct _GLF_struct_106 {
+ vec2 _f0;
+} ;
+
+struct _GLF_struct_105 {
+ bool _f0;
+ vec3 _f1;
+} ;
+
+struct _GLF_struct_103 {
+ mat3x4 _f0;
+ int _injected_loop_counter;
+ mat4 _f1;
+} ;
+
+struct _GLF_struct_104 {
+ int _f0;
+ mat4 _f1;
+ vec2 _f2;
+ _GLF_struct_103 _f3;
+ mat2 _f4;
+} ;
+
+struct _GLF_struct_110 {
+ _GLF_struct_104 _f0;
+ vec4 _f1;
+ _GLF_struct_105 _f2;
+ _GLF_struct_106 _f3;
+ _GLF_struct_109 _f4;
+} ;
+
+struct _GLF_struct_100 {
+ uint _f0;
+ vec3 _f1;
+ int _f2;
+} ;
+
+struct _GLF_struct_101 {
+ vec3 _f0;
+ mat3x4 _f1;
+ _GLF_struct_100 _f2;
+} ;
+
+struct _GLF_struct_99 {
+ mat3x2 _f0;
+ int _injected_loop_counter;
+} ;
+
+struct _GLF_struct_102 {
+ _GLF_struct_99 _f0;
+ mat2x3 _f1;
+ _GLF_struct_101 _f2;
+ ivec4 _f3;
+ uint _f4;
+ mat3 _f5;
+} ;
+
+struct _GLF_struct_98 {
+ mat3x4 _f0;
+ mat2 _f1;
+ mat3x2 _f2;
+ uint workgroup_size;
+ vec3 _f3;
+ uvec4 _f4;
+} ;
+
+struct _GLF_struct_95 {
+ mat2 _f0;
+ vec4 _f1;
+ vec3 _f2;
+} ;
+
+struct _GLF_struct_94 {
+ vec3 _f0;
+ mat3 _f1;
+ bvec3 _f2;
+ mat3 _f3;
+ uint workgroup_id;
+ mat4x3 _f4;
+ mat2x4 _f5;
+ vec3 _f6;
+} ;
+
+struct _GLF_struct_96 {
+ _GLF_struct_94 _f0;
+ bvec3 _f1;
+ _GLF_struct_95 _f2;
+} ;
+
+struct _GLF_struct_92 {
+ bvec4 _f0;
+} ;
+
+struct _GLF_struct_91 {
+ mat4 _f0;
+} ;
+
+struct _GLF_struct_90 {
+ bool _f0;
+ ivec4 _f1;
+} ;
+
+struct _GLF_struct_89 {
+ mat4x3 _f0;
+ ivec3 _f1;
+ mat3x2 _f2;
+ int _f3;
+ uvec4 _f4;
+ uvec3 _f5;
+} ;
+
+struct _GLF_struct_88 {
+ vec3 _f0;
+ int _f1;
+} ;
+
+struct _GLF_struct_93 {
+ bool _f0;
+ _GLF_struct_88 _f1;
+ _GLF_struct_89 _f2;
+ _GLF_struct_90 _f3;
+ _GLF_struct_91 _f4;
+ _GLF_struct_92 _f5;
+ uvec2 _f6;
+} ;
+
+struct _GLF_struct_86 {
+ mat4 _f0;
+ ivec2 _f1;
+ mat2x4 _f2;
+} ;
+
+struct _GLF_struct_85 {
+ uvec4 _f0;
+ mat3 _f1;
+ mat3 _f2;
+} ;
+
+struct _GLF_struct_84 {
+ uint _f0;
+ bvec3 _f1;
+ vec3 _f2;
+ vec2 _f3;
+} ;
+
+struct _GLF_struct_87 {
+ bvec2 _f0;
+ _GLF_struct_84 _f1;
+ uvec4 _f2;
+ _GLF_struct_85 _f3;
+ _GLF_struct_86 _f4;
+} ;
+
+struct _GLF_struct_82 {
+ int _f0;
+ bvec3 _f1;
+ bvec2 _f2;
+ bool _f3;
+ uvec4 _f4;
+ mat3 _f5;
+} ;
+
+struct _GLF_struct_81 {
+ mat3 _f0;
+ uvec4 _f1;
+ bvec3 _f2;
+ vec4 _f3;
+ mat3x4 _f4;
+ mat2x3 _f5;
+ int _f6;
+} ;
+
+struct _GLF_struct_80 {
+ mat4x2 _f0;
+} ;
+
+struct _GLF_struct_79 {
+ bvec4 _f0;
+ mat3 _f1;
+ mat3x4 _f2;
+ uvec2 _f3;
+ ivec3 _f4;
+} ;
+
+struct _GLF_struct_78 {
+ mat3 _f0;
+ bvec4 _f1;
+} ;
+
+struct _GLF_struct_77 {
+ mat3 _f0;
+ vec2 _f1;
+ bvec2 _f2;
+ mat4 _f3;
+ mat2x3 _f4;
+ mat2 _f5;
+} ;
+
+struct _GLF_struct_83 {
+ _GLF_struct_77 _f0;
+ _GLF_struct_78 _f1;
+ _GLF_struct_79 _f2;
+ _GLF_struct_80 _f3;
+ _GLF_struct_81 _f4;
+ bool _f5;
+ _GLF_struct_82 _f6;
+} ;
+
+struct _GLF_struct_97 {
+ _GLF_struct_83 _f0;
+ uvec3 _f1;
+ _GLF_struct_87 _f2;
+ vec4 _f3;
+ _GLF_struct_93 _f4;
+ ivec2 _f5;
+ _GLF_struct_96 _f6;
+} ;
+
+struct _GLF_struct_74 {
+ uint _f0;
+ uint _f1;
+ ivec2 _f2;
+ uvec2 _f3;
+ mat2x3 _f4;
+ int _f5;
+} ;
+
+struct _GLF_struct_73 {
+ bvec4 _f0;
+ vec2 _f1;
+ mat3x4 _f2;
+ float _f3;
+ uvec2 _f4;
+ mat3x4 _f5;
+} ;
+
+struct _GLF_struct_72 {
+ vec2 _f0;
+ mat3 _f1;
+ int _f2;
+ bvec4 _f3;
+} ;
+
+struct _GLF_struct_71 {
+ ivec4 _f0;
+} ;
+
+struct _GLF_struct_70 {
+ vec2 _f0;
+} ;
+
+struct _GLF_struct_75 {
+ _GLF_struct_70 _f0;
+ _GLF_struct_71 _f1;
+ _GLF_struct_72 _f2;
+ mat4x2 _f3;
+ mat4x2 _f4;
+ _GLF_struct_73 _f5;
+ _GLF_struct_74 _f6;
+} ;
+
+struct _GLF_struct_68 {
+ mat2x3 _f0;
+ uvec2 _f1;
+ mat4 _f2;
+ bvec2 _f3;
+ uvec3 _f4;
+} ;
+
+struct _GLF_struct_67 {
+ vec3 _f0;
+ mat2x3 _f1;
+ mat2 _f2;
+ bvec2 _f3;
+ ivec3 _f4;
+ bool _f5;
+} ;
+
+struct _GLF_struct_66 {
+ mat4x3 _f0;
+ vec4 _f1;
+ vec4 _f2;
+ mat4x3 _f3;
+ mat4x3 _f4;
+ mat3x4 _f5;
+ ivec3 _f6;
+} ;
+
+struct _GLF_struct_65 {
+ vec3 _f0;
+} ;
+
+struct _GLF_struct_69 {
+ _GLF_struct_65 _f0;
+ uint _f1;
+ _GLF_struct_66 _f2;
+ mat3x2 _f3;
+ _GLF_struct_67 _f4;
+ _GLF_struct_68 _f5;
+ mat2x3 _f6;
+ uint num_workgroup;
+} ;
+
+struct _GLF_struct_76 {
+ bvec4 _f0;
+ _GLF_struct_69 _f1;
+ ivec4 _f2;
+ uint _f3;
+ _GLF_struct_75 _f4;
+} ;
+
+struct _GLF_struct_62 {
+ uint _f0;
+ bool _f1;
+ mat4x3 _f2;
+} ;
+
+struct _GLF_struct_61 {
+ mat3x4 _f0;
+ mat4 _f1;
+ mat2 _f2;
+} ;
+
+struct _GLF_struct_60 {
+ ivec3 _f0;
+ bool _f1;
+ vec3 _f2;
+ bvec4 _f3;
+ uvec2 _f4;
+ bvec3 _f5;
+} ;
+
+struct _GLF_struct_59 {
+ mat3x2 _f0;
+ vec2 _f1;
+ mat4x2 _f2;
+ bool _f3;
+ bool _f4;
+ ivec3 _f5;
+} ;
+
+struct _GLF_struct_63 {
+ uvec2 _f0;
+ _GLF_struct_59 _f1;
+ _GLF_struct_60 _f2;
+ _GLF_struct_61 _f3;
+ _GLF_struct_62 _f4;
+} ;
+
+struct _GLF_struct_58 {
+ bvec4 _f0;
+ bvec3 _f1;
+} ;
+
+struct _GLF_struct_56 {
+ mat4x2 _f0;
+} ;
+
+struct _GLF_struct_57 {
+ ivec4 _f0;
+ bvec3 _f1;
+ uint _f2;
+ _GLF_struct_56 _f3;
+} ;
+
+struct _GLF_struct_54 {
+ uvec2 _f0;
+ mat3x4 _f1;
+ ivec4 _f2;
+ uvec4 _f3;
+ mat2x3 _f4;
+ vec4 _f5;
+} ;
+
+struct _GLF_struct_53 {
+ int _f0;
+ uint subgroup_local_id;
+} ;
+
+struct _GLF_struct_52 {
+ bool _f0;
+ uvec2 _f1;
+ vec3 _f2;
+ mat2x3 _f3;
+} ;
+
+struct _GLF_struct_51 {
+ bool _f0;
+ ivec4 _f1;
+ uvec2 _f2;
+} ;
+
+struct _GLF_struct_55 {
+ _GLF_struct_51 _f0;
+ _GLF_struct_52 _f1;
+ _GLF_struct_53 _f2;
+ ivec3 _f3;
+ _GLF_struct_54 _f4;
+ uvec2 _f5;
+} ;
+
+struct _GLF_struct_49 {
+ mat3x4 _f0;
+ mat4x3 _f1;
+ bvec4 _f2;
+ mat2x4 _f3;
+ ivec4 _f4;
+} ;
+
+struct _GLF_struct_48 {
+ uint _f0;
+ mat2 _f1;
+ uvec3 _f2;
+ bvec4 _f3;
+ mat2x3 _f4;
+} ;
+
+struct _GLF_struct_47 {
+ mat4 _f0;
+ mat2 _f1;
+} ;
+
+struct _GLF_struct_50 {
+ _GLF_struct_47 _f0;
+ uvec4 _f1;
+ _GLF_struct_48 _f2;
+ bool _f3;
+ _GLF_struct_49 _f4;
+} ;
+
+struct _GLF_struct_64 {
+ _GLF_struct_50 _f0;
+ _GLF_struct_55 _f1;
+ _GLF_struct_57 _f2;
+ _GLF_struct_58 _f3;
+ _GLF_struct_63 _f4;
+ uvec2 _f5;
+} ;
+
+struct _GLF_struct_45 {
+ vec3 _f0;
+ mat3x2 _f1;
+ vec2 _f2;
+ mat3x2 _f3;
+} ;
+
+struct _GLF_struct_43 {
+ uint _f0;
+ int _f1;
+ mat4x2 _f2;
+} ;
+
+struct _GLF_struct_42 {
+ uvec4 _f0;
+ mat3x4 _f1;
+ mat3x2 _f2;
+ ivec3 _f3;
+ uvec4 _f4;
+ bool _f5;
+} ;
+
+struct _GLF_struct_41 {
+ ivec4 _f0;
+} ;
+
+struct _GLF_struct_40 {
+ bvec3 _f0;
+ mat2 _f1;
+ mat3 _f2;
+} ;
+
+struct _GLF_struct_44 {
+ _GLF_struct_40 _f0;
+ _GLF_struct_41 _f1;
+ _GLF_struct_42 _f2;
+ ivec3 _f3;
+ _GLF_struct_43 _f4;
+} ;
+
+struct _GLF_struct_38 {
+ uint _f0;
+ mat4 _f1;
+ bool _f2;
+ bvec2 _f3;
+ ivec2 _f4;
+ uvec2 _f5;
+ vec4 _f6;
+} ;
+
+struct _GLF_struct_39 {
+ _GLF_struct_38 _f0;
+ mat3 _f1;
+ bool _f2;
+} ;
+
+struct _GLF_struct_46 {
+ _GLF_struct_39 _f0;
+ int _injected_loop_counter;
+ _GLF_struct_44 _f1;
+ mat3x4 _f2;
+ _GLF_struct_45 _f3;
+ mat3 _f4;
+} ;
+
+struct _GLF_struct_37 {
+ int _injected_loop_counter;
+ vec4 _f0;
+} ;
+
+struct _GLF_struct_34 {
+ uvec2 _f0;
+ uint _f1;
+} ;
+
+struct _GLF_struct_33 {
+ ivec2 _f0;
+} ;
+
+struct _GLF_struct_35 {
+ _GLF_struct_33 _f0;
+ _GLF_struct_34 _f1;
+} ;
+
+struct _GLF_struct_31 {
+ int _f0;
+ mat4x2 _f1;
+ ivec3 _f2;
+ vec3 _f3;
+} ;
+
+struct _GLF_struct_30 {
+ float _f0;
+ vec2 _f1;
+ uint subgroup_size;
+} ;
+
+struct _GLF_struct_29 {
+ ivec2 _f0;
+} ;
+
+struct _GLF_struct_32 {
+ _GLF_struct_29 _f0;
+ uint _f1;
+ uvec4 _f2;
+ vec4 _f3;
+ ivec3 _f4;
+ _GLF_struct_30 _f5;
+ _GLF_struct_31 _f6;
+} ;
+
+struct _GLF_struct_27 {
+ float _f0;
+ mat2x4 _f1;
+ int _f2;
+ bvec4 _f3;
+ mat4 _f4;
+ uint _f5;
+ mat2x3 _f6;
+} ;
+
+struct _GLF_struct_26 {
+ mat4 _f0;
+} ;
+
+struct _GLF_struct_28 {
+ _GLF_struct_26 _f0;
+ mat3 _f1;
+ int _f2;
+ _GLF_struct_27 _f3;
+ bvec3 _f4;
+} ;
+
+struct _GLF_struct_24 {
+ mat3x2 _f0;
+} ;
+
+struct _GLF_struct_23 {
+ vec2 _f0;
+ vec3 _f1;
+ int _f2;
+ vec3 _f3;
+ mat4x2 _f4;
+ ivec4 _f5;
+} ;
+
+struct _GLF_struct_22 {
+ int _f0;
+ vec2 _f1;
+ uvec2 _f2;
+ mat3x2 _f3;
+ vec3 _f4;
+ ivec4 _f5;
+ uvec2 _f6;
+} ;
+
+struct _GLF_struct_25 {
+ vec3 _f0;
+ _GLF_struct_22 _f1;
+ _GLF_struct_23 _f2;
+ mat3x4 _f3;
+ float _f4;
+ _GLF_struct_24 _f5;
+ mat4x2 _f6;
+} ;
+
+struct _GLF_struct_36 {
+ ivec2 _f0;
+ _GLF_struct_25 _f1;
+ _GLF_struct_28 _f2;
+ _GLF_struct_32 _f3;
+ mat3x4 _f4;
+ _GLF_struct_35 _f5;
+} ;
+
+struct _GLF_struct_21 {
+ uint virtual_gid;
+ int _f0;
+} ;
+
+struct _GLF_struct_18 {
+ bvec4 _f0;
+ bvec4 _f1;
+ mat4x2 _f2;
+ bvec2 _f3;
+ uint _f4;
+} ;
+
+struct _GLF_struct_19 {
+ _GLF_struct_18 _f0;
+} ;
+
+struct _GLF_struct_16 {
+ uint _f0;
+ float _f1;
+ uint subgroup_base;
+ int _f2;
+ ivec2 _f3;
+ vec3 _f4;
+ vec3 _f5;
+ uvec2 _f6;
+} ;
+
+struct _GLF_struct_17 {
+ _GLF_struct_16 _f0;
+ int _f1;
+ float _f2;
+ ivec4 _f3;
+} ;
+
+struct _GLF_struct_14 {
+ mat4 _f0;
+ ivec3 _f1;
+ mat3 _f2;
+} ;
+
+struct _GLF_struct_13 {
+ bvec3 _f0;
+ mat2 _f1;
+} ;
+
+struct _GLF_struct_15 {
+ bvec4 _f0;
+ _GLF_struct_13 _f1;
+ uvec2 _f2;
+ _GLF_struct_14 _f3;
+ uvec2 _f4;
+} ;
+
+struct _GLF_struct_20 {
+ float _f0;
+ bvec2 _f1;
+ _GLF_struct_15 _f2;
+ _GLF_struct_17 _f3;
+ _GLF_struct_19 _f4;
+} ;
+
+struct _GLF_struct_10 {
+ bvec2 _f0;
+ mat2x3 _f1;
+ mat3x4 _f2;
+ uvec4 _f3;
+ uvec4 _f4;
+ vec2 _f5;
+ uvec2 _f6;
+} ;
+
+struct _GLF_struct_11 {
+ bvec3 _f0;
+ _GLF_struct_10 _f1;
+ bvec4 _f2;
+ bvec4 _f3;
+ uvec4 _f4;
+ mat2x4 _f5;
+} ;
+
+struct _GLF_struct_8 {
+ mat4x3 _f0;
+ ivec2 _f1;
+ mat2x4 _f2;
+} ;
+
+struct _GLF_struct_9 {
+ _GLF_struct_8 _f0;
+} ;
+
+struct _GLF_struct_7 {
+ uint _f0;
+ mat2x4 _f1;
+ mat3x2 _f2;
+ bvec4 _f3;
+ bvec2 _f4;
+} ;
+
+struct _GLF_struct_12 {
+ _GLF_struct_7 _f0;
+ bvec4 _f1;
+ uvec3 _f2;
+ uint _f3;
+ uint workgroup_base;
+ _GLF_struct_9 _f4;
+ _GLF_struct_11 _f5;
+} ;
+
+struct _GLF_struct_4 {
+ bvec2 _f0;
+ vec2 _f1;
+ uvec4 _f2;
+ mat2 _f3;
+ bvec4 _f4;
+} ;
+
+struct _GLF_struct_3 {
+ uvec3 _f0;
+ ivec2 _f1;
+ uvec3 _f2;
+ ivec2 _f3;
+ bvec2 _f4;
+ vec4 _f5;
+} ;
+
+struct _GLF_struct_2 {
+ float _f0;
+} ;
+
+struct _GLF_struct_1 {
+ ivec2 _f0;
+ vec4 _f1;
+} ;
+
+struct _GLF_struct_0 {
+ mat2 _f0;
+ mat3 _f1;
+} ;
+
+struct _GLF_struct_5 {
+ _GLF_struct_0 _f0;
+ _GLF_struct_1 _f1;
+ _GLF_struct_2 _f2;
+ ivec3 _f3;
+ _GLF_struct_3 _f4;
+ uvec4 _f5;
+ _GLF_struct_4 _f6;
+} ;
+
+struct _GLF_struct_6 {
+ mat2x4 _f0;
+ uint read;
+ _GLF_struct_5 _f1;
+} ;
+
+layout(set = 0, binding = 1) uniform buf1 {
+ vec2 injectionSwitch;
+};
+#extension GL_KHR_shader_subgroup_vote : enable
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_EXT_maximal_reconvergence : enable
+layout(set = 0, binding = 0) buffer Buf {
+ uint buf[];
+};
+layout(set = 0, binding = 2) buffer Checker {
+ uint checker[];
+};
+layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+ if(_GLF_DEAD(false))
+  {
+   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     return;
+    }
+  }
+ uint subgroup_id = gl_SubgroupID;
+ do
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+      }
+     else
+      {
+       return;
+      }
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+ _GLF_struct_36 _GLF_struct_replacement_36 = _GLF_struct_36(ivec2(1), _GLF_struct_25(vec3(1.0), _GLF_struct_22(1, vec2(1.0), uvec2(1u), mat3x2(1.0), vec3(1.0), ivec4(1), uvec2(1u)), _GLF_struct_23(vec2(1.0), vec3(1.0), 1, vec3(1.0), mat4x2(1.0), ivec4(1)), mat3x4(1.0), 1.0, _GLF_struct_24(mat3x2(1.0)), mat4x2(1.0)), _GLF_struct_28(_GLF_struct_26(mat4(1.0)), mat3(1.0), 1, _GLF_struct_27(1.0, mat2x4(1.0), 1, bvec4(true), mat4(1.0), 1u, mat2x3(1.0)), bvec3(true)), _GLF_struct_32(_GLF_struct_29(ivec2(1)), 1u, uvec4(1u), vec4(1.0), ivec3(1), _GLF_struct_30(1.0, vec2(1.0), gl_SubgroupSize), _GLF_struct_31(1, mat4x2(1.0), ivec3(1), vec3(1.0))), mat3x4(1.0), _GLF_struct_35(_GLF_struct_33(ivec2(1)), _GLF_struct_34(uvec2(1u), 1u)));
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  barrier();
+ _GLF_struct_64 _GLF_struct_replacement_64 = _GLF_struct_64(_GLF_struct_50(_GLF_struct_47(mat4(1.0), mat2(1.0)), uvec4(1u), _GLF_struct_48(1u, mat2(1.0), uvec3(1u), bvec4(true), mat2x3(1.0)), true, _GLF_struct_49(mat3x4(1.0), mat4x3(1.0), bvec4(true), mat2x4(1.0), ivec4(1))), _GLF_struct_55(_GLF_struct_51(true, ivec4(1), uvec2(1u)), _GLF_struct_52(true, uvec2(1u), vec3(1.0), mat2x3(1.0)), _GLF_struct_53(1, gl_SubgroupInvocationID), ivec3(1), _GLF_struct_54(uvec2(1u), mat3x4(1.0), ivec4(1), uvec4(1u), mat2x3(1.0), vec4(1.0)), uvec2(1u)), _GLF_struct_57(ivec4(1), bvec3(true), 1u, _GLF_struct_56(mat4x2(1.0))), _GLF_struct_58(bvec4(true), bvec3(true)), _GLF_struct_63(uvec2(1u), _GLF_struct_59(mat3x2(1.0), vec2(1.0), mat4x2(1.0), true, true, ivec3(1)), _GLF_struct_60(ivec3(1), true, vec3(1.0), bvec4(true), uvec2(1u), bvec3(true)), _GLF_struct_61(mat3x4(1.0), mat4(1.0), mat2(1.0)), _GLF_struct_62(1u, true, mat4x3(1.0))), uvec2(1u));
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+     do
+      {
+       if(_GLF_DEAD(false))
+        return;
+       for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+        {
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           break;
+          }
+         if(_GLF_DEAD(_GLF_IDENTITY(false, (false) && true)))
+          barrier();
+         if(_GLF_DEAD(false))
+          return;
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          continue;
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           continue;
+          }
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           return;
+          }
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, bool(bvec4(_GLF_IDENTITY(false, ! (! (false))), false, false, false)))));
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(false))
+        return;
+       return;
+      }
+    }
+   else
+    {
+    }
+   if(_GLF_DEAD(false))
+    barrier();
+  }
+ else
+  {
+  }
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_DEAD(_GLF_IDENTITY(false, false || (false))))
+    return;
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           return;
+          }
+        }
+       if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bool(false)))))
+        barrier();
+      }
+     return;
+    }
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(false))
+      return;
+     barrier();
+    }
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      return;
+    }
+   else
+    {
+     barrier();
+    }
+  }
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    return;
+   if(_GLF_DEAD(false))
+    return;
+   return;
+   if(_GLF_DEAD(false))
+    return;
+  }
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     else
+      {
+       barrier();
+      }
+    }
+  }
+ else
+  {
+  }
+ if(_GLF_DEAD(false))
+  barrier();
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  return;
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, bool(bool(false)))))
+  {
+  }
+ else
+  {
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      return;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       return;
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      return;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        return;
+       barrier();
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+          {
+           barrier();
+          }
+        }
+       barrier();
+      }
+     do
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          return;
+         barrier();
+         if(_GLF_DEAD(false))
+          break;
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(_GLF_IDENTITY(false, true && (_GLF_IDENTITY(false, (false) || false)))))
+            barrier();
+           if(_GLF_DEAD(false))
+            return;
+           if(_GLF_WRAPPED_IF_FALSE(false))
+            {
+            }
+           else
+            {
+             if(_GLF_DEAD(false))
+              return;
+            }
+           barrier();
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(_GLF_IDENTITY(false, (false) && true)))
+            break;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             break;
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           if(_GLF_WRAPPED_IF_FALSE(false))
+            {
+            }
+           else
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             do
+              {
+               barrier();
+               if(_GLF_DEAD(false))
+                barrier();
+              }
+             while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (_GLF_IDENTITY(false, (false) || false))))))
+          barrier();
+         break;
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+     return;
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+      {
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           do
+            {
+             barrier();
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+        }
+       else
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+        }
+      }
+     else
+      {
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), ! (_GLF_IDENTITY(! (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))), (! (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)))) && true)))))
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         return;
+        }
+       if(_GLF_DEAD(false))
+        barrier();
+       barrier();
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           return;
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+        }
+      }
+     else
+      {
+      }
+    }
+   if(_GLF_DEAD(false))
+    barrier();
+  }
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  return;
+ if(_GLF_DEAD(false))
+  return;
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   return;
+  }
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    return;
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    barrier();
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     if(_GLF_DEAD(false))
+      return;
+     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > _GLF_IDENTITY(0, ~ (~ (0)))); _injected_loop_counter --)
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        return;
+      }
+     do
+      {
+       return;
+       if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec2(_GLF_IDENTITY(false, true && (false)), false)))))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         return;
+        }
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   if(_GLF_DEAD(false))
+    barrier();
+   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       break;
+      }
+     barrier();
+    }
+   if(_GLF_DEAD(false))
+    barrier();
+  }
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+   do
+    {
+     if(_GLF_DEAD(false))
+      return;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+    }
+   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+   barrier();
+  }
+ _GLF_struct_76 _GLF_struct_replacement_76 = _GLF_struct_76(bvec4(true), _GLF_struct_69(_GLF_struct_65(vec3(1.0)), 1u, _GLF_struct_66(mat4x3(1.0), vec4(1.0), vec4(1.0), mat4x3(1.0), mat4x3(1.0), mat3x4(1.0), ivec3(1)), mat3x2(1.0), _GLF_struct_67(vec3(1.0), mat2x3(1.0), mat2(1.0), bvec2(true), ivec3(1), true), _GLF_struct_68(mat2x3(1.0), uvec2(1u), mat4(1.0), bvec2(true), uvec3(1u)), mat2x3(1.0), gl_NumWorkGroups.x), ivec4(1), 1u, _GLF_struct_75(_GLF_struct_70(vec2(1.0)), _GLF_struct_71(ivec4(1)), _GLF_struct_72(vec2(1.0), mat3(1.0), 1, bvec4(true)), mat4x2(1.0), mat4x2(1.0), _GLF_struct_73(bvec4(true), vec2(1.0), mat3x4(1.0), 1.0, uvec2(1u), mat3x4(1.0)), _GLF_struct_74(1u, 1u, ivec2(1), uvec2(1u), mat2x3(1.0), 1)));
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    return;
+   if(_GLF_DEAD(false))
+    barrier();
+   return;
+  }
+ if(_GLF_DEAD(false))
+  return;
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  barrier();
+ _GLF_struct_98 _GLF_struct_replacement_98 = _GLF_struct_98(mat3x4(1.0), mat2(1.0), mat3x2(1.0), gl_WorkGroupSize.x, vec3(1.0), uvec4(1u));
+ _GLF_struct_97 _GLF_struct_replacement_97 = _GLF_struct_97(_GLF_struct_83(_GLF_struct_77(mat3(1.0), vec2(1.0), bvec2(true), mat4(1.0), mat2x3(1.0), mat2(1.0)), _GLF_struct_78(mat3(1.0), bvec4(true)), _GLF_struct_79(bvec4(true), mat3(1.0), mat3x4(1.0), uvec2(1u), ivec3(1)), _GLF_struct_80(mat4x2(1.0)), _GLF_struct_81(mat3(1.0), uvec4(1u), bvec3(true), vec4(1.0), mat3x4(1.0), mat2x3(1.0), 1), true, _GLF_struct_82(1, bvec3(true), bvec2(true), true, uvec4(1u), mat3(1.0))), uvec3(1u), _GLF_struct_87(bvec2(true), _GLF_struct_84(1u, bvec3(true), vec3(1.0), vec2(1.0)), uvec4(1u), _GLF_struct_85(uvec4(1u), mat3(1.0), mat3(1.0)), _GLF_struct_86(mat4(1.0), ivec2(1), mat2x4(1.0))), vec4(1.0), _GLF_struct_93(true, _GLF_struct_88(vec3(1.0), 1), _GLF_struct_89(mat4x3(1.0), ivec3(1), mat3x2(1.0), 1, uvec4(1u), uvec3(1u)), _GLF_struct_90(true, ivec4(1)), _GLF_struct_91(mat4(1.0)), _GLF_struct_92(bvec4(true)), uvec2(1u)), ivec2(1), _GLF_struct_96(_GLF_struct_94(vec3(1.0), mat3(1.0), bvec3(true), mat3(1.0), gl_WorkGroupID.x, mat4x3(1.0), mat2x4(1.0), vec3(1.0)), bvec3(true), _GLF_struct_95(mat2(1.0), vec4(1.0), vec3(1.0))));
+ do
+  {
+   if(_GLF_DEAD(false))
+    break;
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      return;
+    }
+   else
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec3(_GLF_IDENTITY(false, ! (! (false))), false, false)))))
+        continue;
+       break;
+      }
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         break;
+        }
+       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+      }
+     else
+      {
+       if(_GLF_DEAD(false))
+        continue;
+      }
+     if(_GLF_DEAD(false))
+      break;
+     if(_GLF_DEAD(false))
+      break;
+     for(int _injected_loop_counter = (0 ^ ((1 << _GLF_IDENTITY(int(7), int(7))) >> _GLF_IDENTITY(int(7), _GLF_IDENTITY(int(7), (false ? _GLF_FUZZED(-55538) : int(7)))))); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), ! (! (_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))) || false))))))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         return;
+        }
+      }
+     if(_GLF_DEAD(false))
+      continue;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      continue;
+     if(_GLF_DEAD(false))
+      barrier();
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ for(int _injected_loop_counter = ((0 << _GLF_IDENTITY(int(1), int(1))) & 5977); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(false))
+      continue;
+     barrier();
+    }
+  }
+ _GLF_struct_12 _GLF_struct_replacement_12 = _GLF_struct_12(_GLF_struct_7(1u, mat2x4(1.0), mat3x2(1.0), bvec4(true), bvec2(true)), bvec4(true), uvec3(1u), 1u, _GLF_struct_replacement_98.workgroup_size * _GLF_struct_replacement_97._f6._f0.workgroup_id, _GLF_struct_9(_GLF_struct_8(mat4x3(1.0), ivec2(1), mat2x4(1.0))), _GLF_struct_11(bvec3(true), _GLF_struct_10(bvec2(true), mat2x3(1.0), mat3x4(1.0), uvec4(1u), uvec4(1u), vec2(1.0), uvec2(1u)), bvec4(true), bvec4(true), uvec4(1u), mat2x4(1.0)));
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    barrier();
+  }
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  barrier();
+ _GLF_struct_20 _GLF_struct_replacement_20 = _GLF_struct_20(1.0, bvec2(true), _GLF_struct_15(bvec4(true), _GLF_struct_13(bvec3(true), mat2(1.0)), uvec2(1u), _GLF_struct_14(mat4(1.0), ivec3(1), mat3(1.0)), uvec2(1u)), _GLF_struct_17(_GLF_struct_16(1u, 1.0, subgroup_id * _GLF_struct_replacement_36._f3._f5.subgroup_size, 1, ivec2(1), vec3(1.0), vec3(1.0), uvec2(1u)), 1, 1.0, ivec4(1)), _GLF_struct_19(_GLF_struct_18(bvec4(true), bvec4(true), mat4x2(1.0), bvec2(true), 1u)));
+ for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+       else
+        {
+        }
+       return;
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+    }
+   else
+    {
+    }
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+     continue;
+    }
+  }
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+      {
+       if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+        barrier();
+       barrier();
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         return;
+        }
+       barrier();
+      }
+    }
+   return;
+   if(_GLF_DEAD(false))
+    barrier();
+  }
+ if(_GLF_DEAD(false))
+  return;
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    return;
+   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+          }
+         else
+          {
+           return;
+          }
+        }
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           barrier();
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+        }
+       else
+        {
+        }
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+    }
+   else
+    {
+    }
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     do
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec3(_GLF_IDENTITY(false, (false) || false), false, false)))))
+          barrier();
+         return;
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+     barrier();
+     if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (_GLF_IDENTITY(false, bool(bvec2(false, true))))))))
+      return;
+    }
+   if(_GLF_DEAD(_GLF_IDENTITY(false, false || (false))))
+    {
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         barrier();
+        }
+       else
+        {
+        }
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+     barrier();
+     if(_GLF_DEAD(false))
+      {
+       do
+        {
+         if(_GLF_DEAD(false))
+          break;
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             continue;
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+           barrier();
+          }
+         if(_GLF_DEAD(false))
+          return;
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, false || (true))))
+            {
+             barrier();
+            }
+           else
+            {
+            }
+          }
+         if(_GLF_DEAD(_GLF_IDENTITY(false, (false) && true)))
+          barrier();
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           barrier();
+          }
+        }
+       return;
+      }
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)), bool(bool(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)))))))
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_DEAD(false))
+          {
+           for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+            {
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(true))
+                  {
+                   return;
+                  }
+                 else
+                  {
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    barrier();
+                  }
+                }
+               return;
+              }
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+            }
+           barrier();
+          }
+        }
+       else
+        {
+        }
+      }
+     else
+      {
+      }
+    }
+   return;
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       return;
+      }
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       barrier();
+      }
+     if(_GLF_DEAD(false))
+      return;
+     if(_GLF_DEAD(false))
+      barrier();
+    }
+  }
+ if(_GLF_DEAD(false))
+  {
+   for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+    {
+     barrier();
+    }
+  }
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+   for(int _injected_loop_counter = (1 & 1); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     barrier();
+    }
+   if(_GLF_DEAD(false))
+    barrier();
+  }
+ if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+  }
+ else
+  {
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     return;
+    }
+  }
+ _GLF_struct_21 _GLF_struct_replacement_21 = _GLF_struct_21(_GLF_struct_replacement_12.workgroup_base + _GLF_struct_replacement_20._f3._f0.subgroup_base + _GLF_struct_replacement_64._f1._f2.subgroup_local_id, 1);
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  barrier();
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  return;
+ if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec3(false, true, _GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)))))))
+  {
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, false || (true))))
+      {
+       return;
+      }
+     else
+      {
+      }
+    }
+   if(_GLF_DEAD(false))
+    {
+     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != (22228 & 0)); _injected_loop_counter --)
+      {
+       return;
+      }
+    }
+   if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     barrier();
+    }
+   if(_GLF_DEAD(false))
+    return;
+   do
+    {
+     if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+      barrier();
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+   if(_GLF_DEAD(false))
+    return;
+   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     return;
+    }
+   if(_GLF_DEAD(false))
+    return;
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       return;
+      }
+     else
+      {
+      }
+    }
+  }
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    return;
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         barrier();
+         if(_GLF_DEAD(false))
+          return;
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+      }
+    }
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     do
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       do
+        {
+         return;
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        return;
+       if(_GLF_DEAD(false))
+        return;
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+  }
+ uint next_virtual_gid = _GLF_struct_replacement_12.workgroup_base + _GLF_struct_replacement_20._f3._f0.subgroup_base + ((_GLF_struct_replacement_64._f1._f2.subgroup_local_id + 1) % _GLF_struct_replacement_36._f3._f5.subgroup_size);
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  return;
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  barrier();
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          return;
+         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+          {
+           barrier();
+          }
+        }
+       return;
+      }
+    }
+   barrier();
+   if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec4(false, false, true, true)))))
+    barrier();
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    barrier();
+  }
+ if(_GLF_DEAD(false))
+  {
+   for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+    {
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+    }
+  }
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     return;
+    }
+  }
+ _GLF_struct_6 _GLF_struct_replacement_6 = _GLF_struct_6(mat2x4(1.0), 0, _GLF_struct_5(_GLF_struct_0(mat2(1.0), mat3(1.0)), _GLF_struct_1(ivec2(1), vec4(1.0)), _GLF_struct_2(1.0), ivec3(1), _GLF_struct_3(uvec3(1u), ivec2(1), uvec3(1u), ivec2(1), bvec2(true), vec4(1.0)), uvec4(1u), _GLF_struct_4(bvec2(true), vec2(1.0), uvec4(1u), mat2(1.0), bvec4(true))));
+ if(_GLF_DEAD(false))
+  barrier();
+ atomicStore(buf[next_virtual_gid], uint(1), 3, 64, 4);
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)), bool(bvec3(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)), false, false)))))
+        {
+         if(_GLF_DEAD(_GLF_IDENTITY(false, (false) && true)))
+          return;
+         return;
+         if(_GLF_DEAD(false))
+          return;
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+      }
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((((1 << _GLF_IDENTITY(int(2), int(2))) >> _GLF_IDENTITY(int(2), _GLF_IDENTITY(int(2), int(int(int(2)))))) << _GLF_IDENTITY(int(7), _GLF_IDENTITY(int(7), 0 | (int(7))))) >> _GLF_IDENTITY(int(7), _GLF_IDENTITY(int(7), int(ivec2(int(7), 1)))))); _injected_loop_counter ++)
+      {
+       do
+        {
+         barrier();
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+       if(_GLF_DEAD(false))
+        break;
+      }
+    }
+  }
+ else
+  {
+  }
+ if(_GLF_DEAD(false))
+  {
+   do
+    {
+     if(_GLF_DEAD(false))
+      return;
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      barrier();
+    }
+   else
+    {
+     if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+      barrier();
+    }
+   return;
+   if(_GLF_DEAD(false))
+    return;
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     do
+      {
+       do
+        {
+         return;
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           return;
+          }
+         else
+          {
+          }
+        }
+       return;
+      }
+     return;
+    }
+  }
+ do
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        break;
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+          {
+           for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             barrier();
+            }
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           break;
+          }
+        }
+      }
+     barrier();
+    }
+   if(_GLF_DEAD(false))
+    {
+     do
+      {
+       barrier();
+      }
+     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+    }
+   if((_GLF_struct_replacement_64._f1._f2.subgroup_local_id % 2) == 0)
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      continue;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      continue;
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+        continue;
+       break;
+      }
+     for(int _injected_loop_counter = ((1 & 1) | 1); _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          barrier();
+         return;
+        }
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+      }
+     if(_GLF_DEAD(false))
+      return;
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     else
+      {
+       if(_GLF_DEAD(false))
+        {
+         for(int _injected_loop_counter = (1 & 1); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+          {
+           for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(4), _GLF_IDENTITY(int(4), (false ? _GLF_FUZZED(-43091) : int(4))))) >> _GLF_IDENTITY(int(4), int(4)))); _injected_loop_counter ++)
+            {
+             for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+              {
+               for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                {
+                 do
+                  {
+                   if(_GLF_DEAD(false))
+                    return;
+                   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      break;
+                     if(_GLF_DEAD(false))
+                      break;
+                    }
+                   else
+                    {
+                     if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                       for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter > ((0 | 0) & 28583)); _injected_loop_counter --)
+                        {
+                         if(_GLF_DEAD(false))
+                          break;
+                         barrier();
+                         if(_GLF_DEAD(false))
+                          continue;
+                        }
+                      }
+                    }
+                   if(_GLF_DEAD(false))
+                    continue;
+                   if(_GLF_WRAPPED_IF_TRUE(true))
+                    {
+                     if(_GLF_DEAD(false))
+                      {
+                       if(_GLF_DEAD(false))
+                        barrier();
+                       break;
+                      }
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     return;
+                    }
+                   else
+                    {
+                     if(_GLF_DEAD(false))
+                      return;
+                     if(_GLF_DEAD(false))
+                      {
+                       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 >> _GLF_IDENTITY(int(5), int(5)))); _injected_loop_counter --)
+                        {
+                         barrier();
+                        }
+                      }
+                     if(_GLF_DEAD(false))
+                      return;
+                    }
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     do
+                      {
+                       if(_GLF_DEAD(false))
+                        barrier();
+                      }
+                     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                     return;
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     if(_GLF_DEAD(false))
+                      return;
+                    }
+                  }
+                 while(_GLF_WRAPPED_LOOP(false));
+                }
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+              }
+             if(_GLF_DEAD(false))
+              barrier();
+            }
+          }
+         if(_GLF_DEAD(false))
+          break;
+        }
+      }
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(false))
+        break;
+       return;
+      }
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((1 << _GLF_IDENTITY(int(0), int(0))) >> _GLF_IDENTITY(int(0), int(0)))); _injected_loop_counter ++)
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        continue;
+       for(int _injected_loop_counter = ((1 << _GLF_IDENTITY(int(1), int(1))) >> _GLF_IDENTITY(int(1), int(1))); _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+        {
+         if(_GLF_DEAD(_GLF_IDENTITY(false, _GLF_IDENTITY(bool(bvec3(false, true, true)), ! (! (bool(bvec3(false, true, true))))))))
+          barrier();
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          break;
+         return;
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(false))
+        break;
+       for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & 1)); _injected_loop_counter ++)
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         if(_GLF_DEAD(false))
+          break;
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           if(_GLF_DEAD(false))
+            return;
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            continue;
+          }
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              continue;
+             return;
+             if(_GLF_DEAD(false))
+              return;
+            }
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                break;
+               continue;
+              }
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               barrier();
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+              }
+             else
+              {
+              }
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 break;
+                }
+               continue;
+              }
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               barrier();
+              }
+             else
+              {
+              }
+            }
+           do
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec2(false, true)))))
+                barrier();
+               break;
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+           do
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 do
+                  {
+                   for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 | 0)); _injected_loop_counter --)
+                    {
+                     do
+                      {
+                       if(_GLF_DEAD(false))
+                        continue;
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        {
+                         if(_GLF_WRAPPED_IF_FALSE(false))
+                          {
+                          }
+                         else
+                          {
+                           if(_GLF_DEAD(false))
+                            {
+                             if(_GLF_DEAD(false))
+                              return;
+                             for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                              {
+                               if(_GLF_DEAD(false))
+                                {
+                                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                                  barrier();
+                                 break;
+                                }
+                               barrier();
+                              }
+                            }
+                          }
+                         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                          continue;
+                         barrier();
+                        }
+                       if(_GLF_DEAD(false))
+                        barrier();
+                       barrier();
+                      }
+                     while(_GLF_WRAPPED_LOOP(false));
+                    }
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    barrier();
+                  }
+                 while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                }
+               if(_GLF_DEAD(false))
+                barrier();
+              }
+             else
+              {
+              }
+             if(_GLF_DEAD(false))
+              break;
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(_GLF_IDENTITY(false, true && (_GLF_IDENTITY(false, bool(bvec3(false, false, false)))))))
+            return;
+           subgroupAll(false);
+          }
+        }
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         continue;
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          break;
+         continue;
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           return;
+          }
+        }
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+       else
+        {
+        }
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       break;
+      }
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+            {
+             return;
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+            }
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             if(_GLF_DEAD(false))
+              return;
+            }
+           else
+            {
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+        }
+      }
+     else
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        continue;
+       continue;
+      }
+     do
+      {
+       if(_GLF_DEAD(false))
+        continue;
+       _GLF_struct_replacement_6.read = atomicLoad(buf[_GLF_struct_replacement_21.virtual_gid], 3, 64, 2);
+      }
+     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+    }
+   else
+    {
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(false))
+        continue;
+       return;
+      }
+     do
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+          }
+         else
+          {
+           barrier();
+           if(_GLF_DEAD(false))
+            continue;
+          }
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         do
+          {
+           if(_GLF_DEAD(false))
+            {
+             for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+              {
+               barrier();
+               if(_GLF_DEAD(false))
+                barrier();
+              }
+             if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+              break;
+            }
+           if(_GLF_DEAD(false))
+            continue;
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                continue;
+               barrier();
+              }
+             return;
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            continue;
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               return;
+              }
+             else
+              {
+              }
+            }
+           barrier();
+          }
+         if(_GLF_DEAD(false))
+          break;
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          break;
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(false))
+            break;
+           break;
+          }
+         if(_GLF_DEAD(_GLF_IDENTITY(false, false || (false))))
+          continue;
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_WRAPPED_IF_FALSE(false))
+            {
+            }
+           else
+            {
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               do
+                {
+                 if(_GLF_DEAD(false))
+                  break;
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   barrier();
+                  }
+                 barrier();
+                }
+               while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  return;
+                 barrier();
+                }
+              }
+             if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec4(false, true, true, false)))))
+              barrier();
+            }
+           if(_GLF_DEAD(false))
+            break;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+              }
+             else
+              {
+               do
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  barrier();
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    break;
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   barrier();
+                   if(_GLF_DEAD(false))
+                    barrier();
+                  }
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  continue;
+                }
+               while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+              }
+             continue;
+             if(_GLF_DEAD(false))
+              barrier();
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            break;
+           barrier();
+           if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+            break;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         if(_GLF_DEAD(_GLF_IDENTITY(false, bool(_GLF_IDENTITY(bvec2(_GLF_IDENTITY(false, false || (false)), true), bvec2(bvec3(bvec2(_GLF_IDENTITY(false, false || (false)), true), true)))))))
+          return;
+         continue;
+         if(_GLF_DEAD(false))
+          return;
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          break;
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           barrier();
+          }
+         else
+          {
+          }
+        }
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               return;
+              }
+            }
+           return;
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         if(_GLF_DEAD(false))
+          barrier();
+         continue;
+         if(_GLF_DEAD(false))
+          continue;
+        }
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           barrier();
+          }
+        }
+       else
+        {
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       for(int _injected_loop_counter = ((1 << _GLF_IDENTITY(int(4), int(4))) >> _GLF_IDENTITY(int(4), int(4))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           do
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               if(_GLF_DEAD(_GLF_IDENTITY(false, (_GLF_IDENTITY(false, true && (false))) && true)))
+                {
+                 for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                  {
+                   return;
+                  }
+                }
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+                  {
+                   barrier();
+                  }
+                }
+              }
+             if(_GLF_DEAD(false))
+              barrier();
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               break;
+              }
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+             barrier();
+             if(_GLF_DEAD(false))
+              barrier();
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec2(false, false)))))
+                barrier();
+               if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), bool(bvec4(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), false, false, true)))))
+                {
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, bool(bvec4(true, true, true, false)))))
+                    {
+                     if(_GLF_DEAD(false))
+                      break;
+                     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != (0 & -28929)); _injected_loop_counter --)
+                      {
+                       barrier();
+                      }
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      barrier();
+                    }
+                   else
+                    {
+                    }
+                  }
+                 if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))) || false)))
+                  {
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(true))
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        return;
+                      }
+                     else
+                      {
+                      }
+                     barrier();
+                     if(_GLF_DEAD(false))
+                      barrier();
+                    }
+                   return;
+                  }
+                 continue;
+                }
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                break;
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(false))
+                continue;
+               if(_GLF_WRAPPED_IF_FALSE(false))
+                {
+                }
+               else
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 if(_GLF_DEAD(false))
+                  break;
+                 barrier();
+                }
+              }
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  break;
+                 do
+                  {
+                   return;
+                  }
+                 while(_GLF_WRAPPED_LOOP(false));
+                }
+               barrier();
+              }
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              return;
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                break;
+               if(_GLF_DEAD(false))
+                break;
+               barrier();
+              }
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 break;
+                }
+               continue;
+              }
+             if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 barrier();
+                }
+               if(_GLF_DEAD(_GLF_IDENTITY(false, (false) && true)))
+                {
+                 for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > (1 ^ 1)); _injected_loop_counter --)
+                  {
+                   if(_GLF_DEAD(false))
+                    break;
+                   return;
+                  }
+                }
+               if(_GLF_DEAD(false))
+                continue;
+              }
+             else
+              {
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 if(_GLF_DEAD(false))
+                  break;
+                 return;
+                }
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  barrier();
+                 continue;
+                }
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            break;
+           if(_GLF_DEAD(false))
+            barrier();
+           break;
+          }
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), false || (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))))
+          barrier();
+         continue;
+        }
+       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          return;
+         if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), ! (! (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)))))))
+          {
+           if(_GLF_DEAD(false))
+            {
+             for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > _GLF_IDENTITY(0, 1 * (_GLF_IDENTITY(0, ~ (~ (0)))))); _injected_loop_counter --)
+              {
+               return;
+              }
+            }
+           break;
+          }
+         subgroupAll(false);
+         do
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(false))
+            return;
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), bool(bvec3(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), true, false)))))
+      {
+       if(_GLF_DEAD(false))
+        break;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+      }
+     else
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       _GLF_struct_replacement_6.read = atomicLoad(buf[_GLF_struct_replacement_21.virtual_gid], 3, 64, 2);
+      }
+     if(_GLF_DEAD(false))
+      break;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        continue;
+       if(_GLF_DEAD(false))
+        return;
+       continue;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        continue;
+      }
+     if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+      {
+       do
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          return;
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+       barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+      }
+     if(_GLF_DEAD(false))
+      {
+       do
+        {
+         do
+          {
+           if(_GLF_DEAD(false))
+            return;
+           if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+            barrier();
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+             continue;
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           if(_GLF_DEAD(false))
+            continue;
+           barrier();
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            return;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            break;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+          }
+         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, true && (true))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          continue;
+         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+            {
+             barrier();
+            }
+          }
+        }
+       if(_GLF_DEAD(false))
+        break;
+      }
+     else
+      {
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+     if(_GLF_DEAD(false))
+      continue;
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          return;
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+           if(_GLF_DEAD(false))
+            return;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             do
+              {
+               for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                {
+                 barrier();
+                }
+              }
+             while(_GLF_WRAPPED_LOOP(false));
+            }
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              return;
+             break;
+            }
+           if(_GLF_DEAD(false))
+            {
+             do
+              {
+               if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bool(false)))))
+                barrier();
+              }
+             while(_GLF_WRAPPED_LOOP(false));
+             if(_GLF_DEAD(false))
+              break;
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              return;
+             break;
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               return;
+              }
+             else
+              {
+              }
+            }
+           return;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               barrier();
+              }
+             else
+              {
+              }
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           barrier();
+          }
+         if(_GLF_DEAD(false))
+          {
+           do
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 if(_GLF_DEAD(false))
+                  break;
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  barrier();
+                 continue;
+                }
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    barrier();
+                   barrier();
+                  }
+                }
+               else
+                {
+                }
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(false))
+                return;
+              }
+             else
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec2(false, false)))))
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  return;
+                 return;
+                 if(_GLF_DEAD(false))
+                  barrier();
+                }
+              }
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+           if(_GLF_DEAD(false))
+            break;
+           barrier();
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          break;
+         if(_GLF_DEAD(false))
+          break;
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          return;
+         if(_GLF_DEAD(false))
+          break;
+        }
+       do
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              continue;
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               if(_GLF_WRAPPED_IF_FALSE(false))
+                {
+                }
+               else
+                {
+                 return;
+                 if(_GLF_DEAD(false))
+                  {
+                   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                    {
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     barrier();
+                    }
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+                      {
+                       return;
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                      }
+                    }
+                  }
+                }
+              }
+            }
+           barrier();
+          }
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        continue;
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(false))
+        return;
+       barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        continue;
+       if(_GLF_DEAD(false))
+        break;
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      continue;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        break;
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec3(false, false, true)))))
+            barrier();
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(false))
+                return;
+               barrier();
+              }
+             else
+              {
+              }
+            }
+           barrier();
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            return;
+          }
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           continue;
+          }
+        }
+       if(_GLF_WRAPPED_IF_FALSE(false))
+        {
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         return;
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         do
+          {
+           if(_GLF_DEAD(false))
+            break;
+           do
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+         if(_GLF_DEAD(false))
+          barrier();
+         continue;
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_DEAD(false))
+          barrier();
+         return;
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           continue;
+          }
+         if(_GLF_DEAD(false))
+          break;
+         barrier();
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         for(int _injected_loop_counter = (1 | 0); _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+          {
+           if(_GLF_DEAD(false))
+            {
+             do
+              {
+               barrier();
+              }
+             while(_GLF_WRAPPED_LOOP(false));
+            }
+          }
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+          }
+         else
+          {
+           return;
+          }
+         if(_GLF_DEAD(false))
+          continue;
+        }
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+       else
+        {
+        }
+      }
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+      }
+     else
+      {
+       if(_GLF_DEAD(false))
+        {
+         do
+          {
+           barrier();
+           if(_GLF_DEAD(false))
+            {
+             do
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               return;
+              }
+             while(_GLF_WRAPPED_LOOP(false));
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+         if(_GLF_DEAD(_GLF_IDENTITY(false, false || (false))))
+          return;
+        }
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       do
+        {
+         barrier();
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      break;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      continue;
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(_GLF_IDENTITY(false, _GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)) || (false))))
+        barrier();
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(false))
+            break;
+           barrier();
+          }
+         barrier();
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+       break;
+       if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))) && true)))
+        continue;
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec2(false, false)))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(false))
+        return;
+       for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+        {
+         do
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             continue;
+            }
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             if(_GLF_DEAD(false))
+              break;
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 if(_GLF_DEAD(false))
+                  continue;
+                 barrier();
+                }
+               if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                {
+                 for(_GLF_struct_118 _GLF_struct_replacement_118 = _GLF_struct_118(mat3x4(1.0), _GLF_struct_111(1.0), _GLF_struct_113(bvec3(true), _GLF_struct_112(mat3(1.0), bvec4(true), ivec2(1), bvec3(true), 1.0), ivec3(1)), _GLF_struct_114(ivec2(1), ivec2(1), ivec2(1)), 1, mat4(1.0), _GLF_struct_117(_GLF_struct_115(true, mat4x2(1.0), mat3(1.0), mat3x4(1.0), vec4(1.0), mat3x2(1.0), mat4(1.0)), _GLF_struct_116(1u, mat3x4(1.0)), uvec4(1u), mat3x4(1.0), 1u)); _GLF_WRAPPED_LOOP(_GLF_struct_replacement_118._injected_loop_counter > (-62822 & 0)); _GLF_struct_replacement_118._injected_loop_counter --)
+                  {
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, bool(bvec3(true, false, true)))))
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        break;
+                       barrier();
+                      }
+                     else
+                      {
+                       if(_GLF_DEAD(false))
+                        barrier();
+                      }
+                     if(_GLF_DEAD(false))
+                      {
+                       for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                        {
+                         return;
+                        }
+                      }
+                    }
+                   if(_GLF_WRAPPED_IF_TRUE(true))
+                    {
+                     return;
+                    }
+                   else
+                    {
+                    }
+                   if(_GLF_DEAD(false))
+                    continue;
+                   if(_GLF_DEAD(false))
+                    barrier();
+                  }
+                }
+               else
+                {
+                }
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  {
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    barrier();
+                  }
+                 else
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(false))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      return;
+                     if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), true && (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))))
+                      barrier();
+                    }
+                   else
+                    {
+                     return;
+                    }
+                  }
+                }
+               if(_GLF_DEAD(false))
+                continue;
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  break;
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 barrier();
+                }
+              }
+             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(false))
+                break;
+               if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                {
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(false))
+                    {
+                    }
+                   else
+                    {
+                     barrier();
+                    }
+                  }
+                 if(_GLF_DEAD(false))
+                  barrier();
+                }
+               else
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  continue;
+                }
+               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 if(_GLF_DEAD(false))
+                  barrier();
+                }
+               if(_GLF_DEAD(false))
+                continue;
+               if(_GLF_DEAD(false))
+                break;
+              }
+             else
+              {
+               for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                {
+                 if(_GLF_DEAD(false))
+                  break;
+                 return;
+                }
+               if(_GLF_DEAD(false))
+                break;
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(false))
+                  {
+                  }
+                 else
+                  {
+                   return;
+                  }
+                }
+               if(_GLF_DEAD(false))
+                break;
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                break;
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(false))
+                break;
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                  {
+                   if(_GLF_DEAD(false))
+                    barrier();
+                  }
+                 else
+                  {
+                  }
+                 if(_GLF_DEAD(false))
+                  continue;
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  barrier();
+                }
+               else
+                {
+                }
+              }
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+             if(_GLF_DEAD(_GLF_IDENTITY(false, ! (_GLF_IDENTITY(! (false), false || (! (false)))))))
+              return;
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                return;
+               continue;
+              }
+            }
+           else
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+               if(_GLF_WRAPPED_IF_TRUE(true))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                }
+               else
+                {
+                }
+              }
+             else
+              {
+               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+                {
+                 for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > _GLF_IDENTITY(0, clamp(0, 0, _GLF_IDENTITY(0, (0) << 0)))); _injected_loop_counter --)
+                  {
+                   do
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      {
+                       if(_GLF_DEAD(false))
+                        barrier();
+                       if(_GLF_WRAPPED_IF_TRUE(true))
+                        {
+                         barrier();
+                        }
+                       else
+                        {
+                        }
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                      }
+                    }
+                   while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, bool(bvec4(false, _GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), _GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), false)))));
+                   if(_GLF_DEAD(false))
+                    continue;
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                     if(_GLF_DEAD(false))
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                       break;
+                      }
+                     if(_GLF_WRAPPED_IF_TRUE(true))
+                      {
+                       for(int _injected_loop_counter = int(_GLF_ONE(1.0, injectionSwitch.y)); _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+                        {
+                         if(_GLF_DEAD(false))
+                          continue;
+                         if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+                          continue;
+                         barrier();
+                         if(_GLF_DEAD(false))
+                          return;
+                        }
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        continue;
+                      }
+                     else
+                      {
+                      }
+                    }
+                  }
+                 if(_GLF_DEAD(false))
+                  barrier();
+                }
+              }
+            }
+           if(_GLF_DEAD(false))
+            return;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            return;
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            continue;
+           return;
+          }
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         for(int _injected_loop_counter = ((-59801 & 0) << _GLF_IDENTITY(int(2), int(2))); _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 | 1)); _injected_loop_counter ++)
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           barrier();
+           do
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  barrier();
+                 if(_GLF_DEAD(false))
+                  return;
+                 barrier();
+                }
+              }
+             else
+              {
+              }
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              continue;
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          return;
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         break;
+        }
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(false))
+        break;
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       for(int _injected_loop_counter = ((0 >> _GLF_IDENTITY(int(6), int(6))) << _GLF_IDENTITY(int(7), int(7))); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+        {
+         return;
+        }
+      }
+     if(_GLF_DEAD(false))
+      continue;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bool(_GLF_IDENTITY(false, bool(bvec4(false, true, true, false))))))))
+          {
+           if(_GLF_DEAD(false))
+            continue;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+             continue;
+            }
+           for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+            {
+             if(_GLF_DEAD(false))
+              continue;
+             barrier();
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               continue;
+              }
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             for(int _injected_loop_counter = (1 ^ 0); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+              {
+               return;
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+              }
+             if(_GLF_DEAD(false))
+              barrier();
+            }
+           else
+            {
+            }
+          }
+         break;
+        }
+       if(_GLF_DEAD(_GLF_IDENTITY(false, false || (false))))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       continue;
+      }
+     if(_GLF_DEAD(false))
+      break;
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        break;
+       break;
+      }
+    }
+   if(_GLF_DEAD(false))
+    continue;
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+     do
+      {
+       barrier();
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+  }
+ while(_GLF_WRAPPED_LOOP(false));
+ if(_GLF_DEAD(false))
+  return;
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+  {
+   do
+    {
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(false))
+        return;
+      }
+     else
+      {
+      }
+    }
+   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+  }
+ else
+  {
+  }
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+    {
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)), (_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))) || false)))
+      {
+       barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+      }
+     else
+      {
+      }
+    }
+   else
+    {
+    }
+  }
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    barrier();
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       return;
+      }
+    }
+   else
+    {
+    }
+   barrier();
+  }
+ if(_GLF_DEAD(false))
+  return;
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  barrier();
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   barrier();
+  }
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   for(_GLF_struct_102 _GLF_struct_replacement_102 = _GLF_struct_102(_GLF_struct_99(mat3x2(1.0), ((int(_GLF_ONE(1.0, injectionSwitch.y)) << _GLF_IDENTITY(int(5), _GLF_IDENTITY(int(5), min(int(5), int(5))))) >> _GLF_IDENTITY(int(5), _GLF_IDENTITY(int(5), (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)) ? _GLF_FUZZED(-3514) : int(5)))))), mat2x3(1.0), _GLF_struct_101(vec3(1.0), mat3x4(1.0), _GLF_struct_100(1u, vec3(1.0), 1)), ivec4(1), 1u, mat3(1.0)); _GLF_WRAPPED_LOOP(_GLF_struct_replacement_102._f0._injected_loop_counter != 0); _GLF_struct_replacement_102._f0._injected_loop_counter --)
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      continue;
+     if(_GLF_DEAD(false))
+      continue;
+     if(_GLF_DEAD(false))
+      barrier();
+     do
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          continue;
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          return;
+         barrier();
+        }
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+          {
+           return;
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+        }
+       if(_GLF_DEAD(false))
+        break;
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+          }
+         else
+          {
+           return;
+          }
+        }
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+     if(_GLF_DEAD(false))
+      barrier();
+    }
+  }
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(false))
+      return;
+     return;
+    }
+   if(_GLF_DEAD(false))
+    {
+     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+      {
+       barrier();
+      }
+    }
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     for(int _injected_loop_counter = _GLF_IDENTITY(1, ~ (_GLF_IDENTITY(~ (1), (false ? _GLF_FUZZED(-99925) : ~ (1))))); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+      {
+       return;
+      }
+     if(_GLF_DEAD(_GLF_IDENTITY(false, (_GLF_IDENTITY(false, ! (! (false)))) && true)))
+      barrier();
+    }
+   barrier();
+  }
+ if(_GLF_DEAD(false))
+  barrier();
+ if(_GLF_DEAD(false))
+  return;
+ for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+  {
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    barrier();
+  }
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), bool(bvec2(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), false)))))
+    return;
+   return;
+  }
+ if(_GLF_WRAPPED_IF_TRUE(true))
+  {
+   if(_GLF_DEAD(false))
+    return;
+   if(_GLF_DEAD(false))
+    return;
+   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(false))
+        break;
+       do
+        {
+         barrier();
+        }
+       while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+      }
+     do
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       do
+        {
+         if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           return;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            continue;
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           if(_GLF_DEAD(false))
+            break;
+           if(_GLF_WRAPPED_IF_FALSE(false))
+            {
+            }
+           else
+            {
+             barrier();
+            }
+          }
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           for(int _injected_loop_counter = (0 ^ 1); _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 << _GLF_IDENTITY(int(5), _GLF_IDENTITY(int(5), (int(5)) | (int(5)))))); _injected_loop_counter --)
+            {
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                }
+               else
+                {
+                 if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+                  {
+                   if(_GLF_WRAPPED_IF_TRUE(true))
+                    {
+                     barrier();
+                     if(_GLF_DEAD(false))
+                      barrier();
+                    }
+                   else
+                    {
+                    }
+                  }
+                }
+               if(_GLF_DEAD(false))
+                continue;
+               barrier();
+              }
+            }
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             if(_GLF_DEAD(false))
+              continue;
+             barrier();
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(false))
+            {
+             for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+              {
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+               do
+                {
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(true))
+                      {
+                       barrier();
+                      }
+                     else
+                      {
+                      }
+                     if(_GLF_DEAD(false))
+                      continue;
+                     if(_GLF_DEAD(false))
+                      barrier();
+                    }
+                   else
+                    {
+                     if(_GLF_DEAD(false))
+                      break;
+                    }
+                  }
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 do
+                  {
+                   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                    {
+                     if(_GLF_DEAD(false))
+                      {
+                       if(_GLF_DEAD(false))
+                        {
+                         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                          continue;
+                         for(int _injected_loop_counter = (1 ^ 0); _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 << _GLF_IDENTITY(int(5), int(5)))); _injected_loop_counter --)
+                          {
+                           barrier();
+                          }
+                        }
+                       barrier();
+                      }
+                     if(_GLF_DEAD(false))
+                      break;
+                    }
+                  }
+                 while(_GLF_WRAPPED_LOOP(_GLF_IDENTITY(false, (false) && _GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y)))));
+                }
+               while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+              }
+             if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec2(false, true)))))
+              {
+               if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                }
+               else
+                {
+                 barrier();
+                }
+               if(_GLF_DEAD(_GLF_IDENTITY(false, (false) && true)))
+                continue;
+              }
+             if(_GLF_DEAD(false))
+              break;
+             if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+              {
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+               break;
+              }
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               if(_GLF_DEAD(false))
+                return;
+              }
+             else
+              {
+              }
+             if(_GLF_DEAD(false))
+              barrier();
+             return;
+             if(_GLF_DEAD(false))
+              barrier();
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            continue;
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+                {
+                 if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, bool(bvec3(false, true, true)))))
+                  {
+                  }
+                 else
+                  {
+                   return;
+                  }
+                }
+               for(_GLF_struct_124 _GLF_struct_replacement_124 = _GLF_struct_124(mat3(1.0), _GLF_struct_120(_GLF_struct_119(uvec2(1u), mat2x4(1.0), mat2x3(1.0), mat3(1.0)), bvec4(true), 1.0, 1, mat3x4(1.0)), 1, true, _GLF_struct_123(_GLF_struct_121(mat2x4(1.0), bvec3(true), bvec3(true), mat4(1.0), true), mat3x2(1.0), 1, mat2x4(1.0), _GLF_struct_122(1, ivec3(1))), uvec2(1u)); _GLF_WRAPPED_LOOP(_GLF_struct_replacement_124._injected_loop_counter != 0); _GLF_struct_replacement_124._injected_loop_counter --)
+                {
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    continue;
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   for(int _injected_loop_counter = (0 << _GLF_IDENTITY(int(0), int(0))); _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ONE(1.0, injectionSwitch.y))); _injected_loop_counter ++)
+                    {
+                     barrier();
+                    }
+                  }
+                 if(_GLF_DEAD(_GLF_IDENTITY(false, false || (false))))
+                  {
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                     if(_GLF_DEAD(false))
+                      {
+                       for(int _injected_loop_counter = ((1 << _GLF_IDENTITY(int(6), int(6))) >> _GLF_IDENTITY(int(6), _GLF_IDENTITY(int(6), ~ (~ (int(6)))))); _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+                        {
+                         if(_GLF_DEAD(false))
+                          return;
+                         barrier();
+                         if(_GLF_DEAD(false))
+                          continue;
+                        }
+                      }
+                     if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec4(false, false, false, false)))))
+                      continue;
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                       return;
+                      }
+                     barrier();
+                     if(_GLF_DEAD(false))
+                      break;
+                     if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))) && true)))
+                      barrier();
+                    }
+                   if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+                    barrier();
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    barrier();
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                       return;
+                      }
+                    }
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                     if(_GLF_DEAD(_GLF_IDENTITY(false, false || (false))))
+                      barrier();
+                     if(_GLF_DEAD(false))
+                      {
+                       if(_GLF_DEAD(false))
+                        barrier();
+                       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                        {
+                         barrier();
+                        }
+                       else
+                        {
+                        }
+                       if(_GLF_DEAD(false))
+                        break;
+                      }
+                     break;
+                    }
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_DEAD(false))
+                      continue;
+                     return;
+                    }
+                   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                    }
+                   else
+                    {
+                     do
+                      {
+                       if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))) || false)))
+                        break;
+                       do
+                        {
+                         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                          continue;
+                         do
+                          {
+                           if(_GLF_WRAPPED_IF_FALSE(false))
+                            {
+                            }
+                           else
+                            {
+                             if(_GLF_WRAPPED_IF_FALSE(false))
+                              {
+                              }
+                             else
+                              {
+                               do
+                                {
+                                 return;
+                                }
+                               while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                              }
+                            }
+                          }
+                         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                          return;
+                        }
+                       while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                       if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+                        break;
+                       if(_GLF_DEAD(false))
+                        break;
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        {
+                         if(_GLF_DEAD(false))
+                          return;
+                         return;
+                        }
+                       if(_GLF_DEAD(false))
+                        return;
+                       if(_GLF_DEAD(false))
+                        barrier();
+                      }
+                     while(_GLF_WRAPPED_LOOP(false));
+                    }
+                  }
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    return;
+                   continue;
+                  }
+                 if(_GLF_DEAD(false))
+                  break;
+                 for(_GLF_struct_135 _GLF_struct_replacement_135 = _GLF_struct_135(_GLF_struct_125(mat2x4(1.0)), _GLF_struct_129(vec3(1.0), _GLF_struct_126(true, mat4x2(1.0), uvec4(1u), mat3x4(1.0), 1, bvec4(true)), mat2(1.0), mat2(1.0), _GLF_struct_127(1), _GLF_struct_128(bvec4(true), ivec2(1), vec3(1.0), mat4x3(1.0), mat4(1.0), vec2(1.0), mat4x2(1.0))), _GLF_struct_131(bvec4(true), _GLF_struct_130(bvec2(true)), bvec2(true), bvec4(true)), _GLF_struct_133(uvec3(1u), 1, 1.0, _GLF_struct_132(bvec3(true), uvec2(1u), 1.0)), ((1 << _GLF_IDENTITY(int(2), _GLF_IDENTITY(int(2), int(ivec3(_GLF_IDENTITY(int(2), 0 ^ (int(2))), 1, 0))))) >> _GLF_IDENTITY(int(2), int(2))), _GLF_struct_134(vec4(1.0), bvec2(true))); _GLF_WRAPPED_LOOP(_GLF_struct_replacement_135._injected_loop_counter > 0); _GLF_struct_replacement_135._injected_loop_counter --)
+                  {
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                       if(_GLF_DEAD(false))
+                        {
+                         if(_GLF_DEAD(false))
+                          break;
+                         if(_GLF_DEAD(false))
+                          barrier();
+                         break;
+                        }
+                       barrier();
+                      }
+                     if(_GLF_DEAD(false))
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                       break;
+                      }
+                     if(_GLF_DEAD(false))
+                      return;
+                     barrier();
+                     if(_GLF_DEAD(false))
+                      break;
+                    }
+                   if(_GLF_DEAD(false))
+                    return;
+                  }
+                 if(_GLF_WRAPPED_IF_TRUE(true))
+                  {
+                   if(_GLF_DEAD(false))
+                    break;
+                   barrier();
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      barrier();
+                     do
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                      }
+                     while(_GLF_WRAPPED_LOOP(false));
+                     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      {
+                      }
+                     else
+                      {
+                       barrier();
+                       do
+                        {
+                         if(_GLF_DEAD(false))
+                          barrier();
+                         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                          barrier();
+                        }
+                       while(_GLF_WRAPPED_LOOP(false));
+                       if(_GLF_DEAD(false))
+                        barrier();
+                      }
+                    }
+                  }
+                 else
+                  {
+                  }
+                }
+              }
+             else
+              {
+              }
+             if(_GLF_DEAD(false))
+              continue;
+            }
+           else
+            {
+            }
+           if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec3(false, true, true)))))
+            {
+             if(_GLF_DEAD(false))
+              break;
+             break;
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+            }
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              return;
+             if(_GLF_DEAD(false))
+              barrier();
+             barrier();
+            }
+           if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+            {
+             if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+              break;
+             barrier();
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            break;
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              break;
+             if(_GLF_DEAD(false))
+              barrier();
+             continue;
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            return;
+           if(_GLF_WRAPPED_IF_FALSE(false))
+            {
+             if(_GLF_DEAD(false))
+              continue;
+             if(_GLF_DEAD(false))
+              continue;
+            }
+           else
+            {
+             if(_GLF_DEAD(_GLF_IDENTITY(false, true && (false))))
+              barrier();
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         if(_GLF_DEAD(false))
+          break;
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           break;
+          }
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           for(int _injected_loop_counter = (1 ^ 0); _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 ^ 0)); _injected_loop_counter --)
+            {
+             do
+              {
+               for(int _injected_loop_counter = _GLF_IDENTITY(0, (_GLF_IDENTITY(0, 0 | (0))) | (0)); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+                {
+                 barrier();
+                }
+              }
+             while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+            }
+          }
+         else
+          {
+          }
+        }
+       if(_GLF_DEAD(false))
+        break;
+       if(_GLF_DEAD(_GLF_IDENTITY(false, false || (false))))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(false))
+            continue;
+          }
+         else
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 | 0)); _injected_loop_counter --)
+              {
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 barrier();
+                }
+              }
+            }
+           else
+            {
+            }
+          }
+         break;
+        }
+       continue;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         do
+          {
+           barrier();
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         continue;
+        }
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      break;
+     if(_GLF_DEAD(false))
+      break;
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter != _GLF_IDENTITY(1, (1) + 0)); _injected_loop_counter ++)
+          {
+           barrier();
+          }
+         if(_GLF_DEAD(false))
+          return;
+        }
+      }
+     if(_GLF_WRAPPED_IF_FALSE(false))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         do
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               return;
+              }
+            }
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+         if(_GLF_DEAD(false))
+          break;
+         break;
+         if(_GLF_DEAD(false))
+          continue;
+        }
+      }
+     else
+      {
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), bool(bvec4(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), bool(bvec4(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), false, true, true))), false, true, false)))))
+        barrier();
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          continue;
+         break;
+        }
+       if(_GLF_WRAPPED_IF_FALSE(false))
+        {
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(false))
+            continue;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             continue;
+            }
+           if(_GLF_DEAD(false))
+            return;
+           barrier();
+          }
+         if(_GLF_DEAD(false))
+          break;
+         if(_GLF_DEAD(false))
+          continue;
+        }
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+            {
+             barrier();
+             do
+              {
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                  {
+                   barrier();
+                  }
+                 else
+                  {
+                  }
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    break;
+                   continue;
+                  }
+                }
+              }
+             while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+            }
+           else
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              return;
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(_GLF_IDENTITY(false, (_GLF_IDENTITY(false, false || (false))) && true)))
+            barrier();
+          }
+        }
+       else
+        {
+        }
+       if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec3(false, false, true)))))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             break;
+            }
+           if(_GLF_DEAD(false))
+            continue;
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         break;
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        continue;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(false))
+            return;
+          }
+         else
+          {
+           barrier();
+          }
+        }
+      }
+     if(_GLF_DEAD(false))
+      continue;
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        continue;
+       if(_GLF_DEAD(false))
+        return;
+       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != (int(_GLF_ZERO(0.0, injectionSwitch.x)) << _GLF_IDENTITY(int(4), _GLF_IDENTITY(int(4), 0 ^ (int(4)))))); _injected_loop_counter --)
+        {
+         if(_GLF_DEAD(false))
+          {
+           do
+            {
+             barrier();
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+          }
+        }
+       continue;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+          }
+         else
+          {
+           return;
+          }
+        }
+       if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+        barrier();
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          break;
+        }
+       else
+        {
+        }
+      }
+     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != (0 << _GLF_IDENTITY(int(4), int(4)))); _injected_loop_counter --)
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          continue;
+         barrier();
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+              }
+             else
+              {
+               if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), bool(bvec4(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))) && true), false, false, false)))))
+                return;
+              }
+             return;
+            }
+          }
+         if(_GLF_DEAD(false))
+          {
+           do
+            {
+             barrier();
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+          }
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_DEAD(false))
+              {
+               do
+                {
+                 return;
+                }
+               while(_GLF_WRAPPED_LOOP(false));
+              }
+             barrier();
+            }
+          }
+         return;
+         if(_GLF_DEAD(false))
+          return;
+        }
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          break;
+         if(_GLF_DEAD(false))
+          break;
+         do
+          {
+           if(_GLF_DEAD(false))
+            return;
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+         subgroupBarrier();
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          break;
+        }
+      }
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bvec4(false, true, true, true)))))
+        {
+         do
+          {
+           if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+            {
+             if(_GLF_DEAD(false))
+              {
+               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != ((1 << _GLF_IDENTITY(int(2), int(2))) >> _GLF_IDENTITY(int(2), int(2)))); _injected_loop_counter ++)
+                {
+                 return;
+                }
+              }
+            }
+           else
+            {
+            }
+           do
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             barrier();
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+         while(_GLF_WRAPPED_LOOP(false));
+        }
+      }
+     else
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            continue;
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             return;
+            }
+           else
+            {
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           if(_GLF_DEAD(false))
+            return;
+          }
+         barrier();
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         break;
+        }
+      }
+     if(_GLF_DEAD(false))
+      {
+       for(int _injected_loop_counter = (0 << _GLF_IDENTITY(int(5), int(5))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           barrier();
+          }
+        }
+       continue;
+      }
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       break;
+      }
+     if(_GLF_DEAD(false))
+      return;
+     if(_GLF_DEAD(false))
+      barrier();
+     for(int _injected_loop_counter = (int(_GLF_ZERO(0.0, injectionSwitch.x)) ^ (0 << _GLF_IDENTITY(int(8), int(8)))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+      {
+       if(_GLF_DEAD(false))
+        continue;
+       if(_GLF_DEAD(false))
+        {
+         for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             barrier();
+            }
+           else
+            {
+            }
+          }
+        }
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(false))
+      continue;
+    }
+  }
+ else
+  {
+  }
+ if(_GLF_DEAD(false))
+  barrier();
+ for(int _injected_loop_counter = (0 >> _GLF_IDENTITY(int(2), int(2))); _GLF_WRAPPED_LOOP(_injected_loop_counter < _GLF_IDENTITY(1, int(ivec2(1, 1)))); _injected_loop_counter ++)
+  {
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    barrier();
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+     if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       return;
+      }
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         return;
+        }
+       return;
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       do
+        {
+         return;
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+     do
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        barrier();
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_WRAPPED_IF_TRUE(true))
+                  {
+                   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > (0 << _GLF_IDENTITY(int(1), int(1)))); _injected_loop_counter --)
+                    {
+                     barrier();
+                    }
+                  }
+                 else
+                  {
+                  }
+                }
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                break;
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  return;
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  barrier();
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+                    continue;
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   if(_GLF_DEAD(false))
+                    return;
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(true))
+                      {
+                       return;
+                      }
+                     else
+                      {
+                      }
+                    }
+                   do
+                    {
+                     if(_GLF_DEAD(false))
+                      barrier();
+                    }
+                   while(_GLF_WRAPPED_LOOP(false));
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    barrier();
+                   if(_GLF_DEAD(false))
+                    return;
+                   return;
+                  }
+                 if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                  {
+                   if(_GLF_DEAD(false))
+                    return;
+                  }
+                 else
+                  {
+                  }
+                 for(_GLF_struct_46 _GLF_struct_replacement_46 = _GLF_struct_46(_GLF_struct_39(_GLF_struct_38(1u, mat4(1.0), true, bvec2(true), ivec2(1), uvec2(1u), vec4(1.0)), mat3(1.0), true), 1, _GLF_struct_44(_GLF_struct_40(bvec3(true), mat2(1.0), mat3(1.0)), _GLF_struct_41(ivec4(1)), _GLF_struct_42(uvec4(1u), mat3x4(1.0), mat3x2(1.0), ivec3(1), uvec4(1u), true), ivec3(1), _GLF_struct_43(1u, 1, mat4x2(1.0))), mat3x4(1.0), _GLF_struct_45(vec3(1.0), mat3x2(1.0), vec2(1.0), mat3x2(1.0)), mat3(1.0)); _GLF_WRAPPED_LOOP(_GLF_struct_replacement_46._injected_loop_counter != 0); _GLF_struct_replacement_46._injected_loop_counter --)
+                  {
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                     do
+                      {
+                       if(_GLF_DEAD(false))
+                        barrier();
+                       if(_GLF_DEAD(false))
+                        {
+                         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                          return;
+                         barrier();
+                        }
+                      }
+                     while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                     if(_GLF_DEAD(false))
+                      continue;
+                     if(_GLF_DEAD(false))
+                      return;
+                     barrier();
+                     if(_GLF_DEAD(false))
+                      barrier();
+                    }
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   if(_GLF_DEAD(false))
+                    return;
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    break;
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      continue;
+                     return;
+                    }
+                   barrier();
+                   for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                    {
+                     if(_GLF_DEAD(false))
+                      barrier();
+                    }
+                   if(_GLF_DEAD(false))
+                    continue;
+                   do
+                    {
+                     if(_GLF_DEAD(false))
+                      break;
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      barrier();
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      {
+                       if(_GLF_DEAD(false))
+                        break;
+                       continue;
+                      }
+                    }
+                   while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                  }
+                }
+               if(_GLF_DEAD(false))
+                return;
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+               return;
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                return;
+               if(_GLF_WRAPPED_IF_FALSE(false))
+                {
+                }
+               else
+                {
+                 do
+                  {
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      continue;
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      {
+                       for(int _injected_loop_counter = (1 ^ 0); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                        {
+                         return;
+                         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                          break;
+                        }
+                      }
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     if(_GLF_DEAD(false))
+                      continue;
+                     return;
+                     if(_GLF_DEAD(false))
+                      barrier();
+                    }
+                  }
+                 while(_GLF_WRAPPED_LOOP(false));
+                }
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  break;
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    continue;
+                   barrier();
+                  }
+                 return;
+                }
+               if(_GLF_DEAD(false))
+                return;
+               if(_GLF_WRAPPED_IF_FALSE(false))
+                {
+                }
+               else
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  barrier();
+                 if(_GLF_DEAD(false))
+                  barrier();
+                }
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                break;
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   break;
+                  }
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  barrier();
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   barrier();
+                  }
+                 return;
+                }
+              }
+             if(_GLF_DEAD(false))
+              return;
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               continue;
+              }
+             return;
+             if(_GLF_DEAD(false))
+              return;
+             if(_GLF_DEAD(false))
+              return;
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               break;
+              }
+             if(_GLF_WRAPPED_IF_FALSE(false))
+              {
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 break;
+                }
+              }
+             else
+              {
+               do
+                {
+                 do
+                  {
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      {
+                       if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+                        barrier();
+                       return;
+                      }
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      barrier();
+                     barrier();
+                    }
+                  }
+                 while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    barrier();
+                   if(_GLF_DEAD(false))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      break;
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      barrier();
+                     if(_GLF_DEAD(false))
+                      return;
+                     barrier();
+                     if(_GLF_WRAPPED_IF_FALSE(false))
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                      }
+                     else
+                      {
+                       if(_GLF_DEAD(false))
+                        {
+                         if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(false, false || (false))))
+                          {
+                           if(_GLF_DEAD(false))
+                            barrier();
+                          }
+                         else
+                          {
+                           return;
+                          }
+                        }
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        barrier();
+                      }
+                     if(_GLF_DEAD(false))
+                      continue;
+                     if(_GLF_DEAD(false))
+                      barrier();
+                    }
+                   if(_GLF_WRAPPED_IF_TRUE(true))
+                    {
+                     barrier();
+                    }
+                   else
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      barrier();
+                    }
+                  }
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      barrier();
+                     return;
+                    }
+                   break;
+                  }
+                 if(_GLF_DEAD(false))
+                  continue;
+                 if(_GLF_DEAD(false))
+                  break;
+                 if(_GLF_DEAD(false))
+                  barrier();
+                }
+               while(_GLF_WRAPPED_LOOP(false));
+              }
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+              }
+             else
+              {
+               return;
+              }
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+        }
+       else
+        {
+        }
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   else
+    {
+    }
+  }
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   barrier();
+  }
+ if(_GLF_DEAD(false))
+  barrier();
+ for(_GLF_struct_37 _GLF_struct_replacement_37 = _GLF_struct_37(int(_GLF_ONE(1.0, injectionSwitch.y)), vec4(1.0)); _GLF_WRAPPED_LOOP(_GLF_struct_replacement_37._injected_loop_counter != 0); _GLF_struct_replacement_37._injected_loop_counter --)
+  {
+   if(_GLF_DEAD(false))
+    {
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             continue;
+            }
+           if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+            {
+             barrier();
+            }
+           else
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+            }
+          }
+         if(_GLF_DEAD(false))
+          barrier();
+         break;
+        }
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          break;
+         if(_GLF_DEAD(false))
+          break;
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+          }
+         else
+          {
+           return;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            continue;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          continue;
+        }
+      }
+     for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+      {
+       do
+        {
+         if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+          {
+           return;
+          }
+         else
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             if(_GLF_DEAD(false))
+              return;
+            }
+           else
+            {
+            }
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          continue;
+        }
+       while(_GLF_WRAPPED_LOOP(false));
+      }
+    }
+   if(_GLF_DEAD(false))
+    continue;
+   if(_GLF_DEAD(false))
+    barrier();
+   for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+    }
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          return;
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+       else
+        {
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          return;
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+          }
+         else
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+          }
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           return;
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          return;
+         do
+          {
+           do
+            {
+             do
+              {
+               if(_GLF_DEAD(false))
+                {
+                 do
+                  {
+                   barrier();
+                  }
+                 while(_GLF_WRAPPED_LOOP(false));
+                }
+              }
+             while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                continue;
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  break;
+                 return;
+                }
+              }
+             else
+              {
+               return;
+              }
+             if(_GLF_DEAD(false))
+              barrier();
+             if(_GLF_DEAD(false))
+              continue;
+            }
+           while(_GLF_WRAPPED_LOOP(false));
+          }
+         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           break;
+          }
+         if(_GLF_DEAD(false))
+          continue;
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+       if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+        {
+         do
+          {
+           barrier();
+          }
+         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         for(_GLF_struct_110 _GLF_struct_replacement_110 = _GLF_struct_110(_GLF_struct_104(1, mat4(1.0), vec2(1.0), _GLF_struct_103(mat3x4(1.0), 1, mat4(1.0)), mat2(1.0)), vec4(1.0), _GLF_struct_105(true, vec3(1.0)), _GLF_struct_106(vec2(1.0)), _GLF_struct_109(bvec4(true), _GLF_struct_107(mat3(1.0), uvec3(1u)), _GLF_struct_108(bvec2(true), mat2(1.0), mat3x4(1.0)), ivec2(1), uvec2(1u), ivec2(1), true)); _GLF_WRAPPED_LOOP(_GLF_struct_replacement_110._f0._f3._injected_loop_counter != 0); _GLF_struct_replacement_110._f0._f3._injected_loop_counter --)
+          {
+           if(_GLF_DEAD(false))
+            break;
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             barrier();
+            }
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             return;
+            }
+           else
+            {
+            }
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              break;
+             barrier();
+            }
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             continue;
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            break;
+           break;
+          }
+        }
+       for(int _injected_loop_counter = (0 << _GLF_IDENTITY(int(2), int(2))); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+        {
+         if(_GLF_DEAD(false))
+          {
+           do
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             barrier();
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+          }
+        }
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             continue;
+            }
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(false))
+            barrier();
+           continue;
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+            {
+             do
+              {
+               barrier();
+               if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+                return;
+              }
+             while(_GLF_WRAPPED_LOOP(false));
+            }
+           continue;
+           if(_GLF_DEAD(_GLF_IDENTITY(false, bool(_GLF_IDENTITY(bvec2(_GLF_IDENTITY(false, true && (false)), true), bvec2(bvec3(bvec2(_GLF_IDENTITY(false, true && (false)), true), false)))))))
+            barrier();
+          }
+         do
+          {
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+           if(_GLF_DEAD(false))
+            continue;
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_DEAD(false))
+              continue;
+             barrier();
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+            }
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            {
+             if(_GLF_DEAD(false))
+              {
+               if(_GLF_DEAD(false))
+                barrier();
+               barrier();
+              }
+             barrier();
+             if(_GLF_DEAD(false))
+              {
+               for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+                {
+                 return;
+                }
+              }
+            }
+           if(_GLF_DEAD(false))
+            break;
+           barrier();
+          }
+         while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              break;
+             barrier();
+            }
+           break;
+          }
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+               if(_GLF_DEAD(false))
+                continue;
+               break;
+              }
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+               for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+                {
+                 if(_GLF_DEAD(false))
+                  {
+                   if(_GLF_DEAD(false))
+                    barrier();
+                   return;
+                  }
+                }
+               barrier();
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 return;
+                }
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                barrier();
+              }
+             return;
+            }
+           else
+            {
+            }
+          }
+        }
+       if(_GLF_DEAD(false))
+        return;
+      }
+     else
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          return;
+         break;
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         for(int _injected_loop_counter = int(_GLF_ZERO(0.0, injectionSwitch.x)); _GLF_WRAPPED_LOOP(_injected_loop_counter < ((1 << _GLF_IDENTITY(int(3), int(3))) >> _GLF_IDENTITY(int(3), int(3)))); _injected_loop_counter ++)
+          {
+           barrier();
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+            barrier();
+          }
+        }
+       if(_GLF_DEAD(false))
+        break;
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+          {
+           barrier();
+          }
+        }
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        break;
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(false))
+          continue;
+         break;
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(false))
+          break;
+        }
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      barrier();
+     if(_GLF_DEAD(false))
+      return;
+     if(_GLF_DEAD(_GLF_IDENTITY(false, _GLF_IDENTITY(bool(_GLF_IDENTITY(bvec3(false, true, false), bvec3(bvec3(bvec3(false, true, false))))), true && (bool(_GLF_IDENTITY(bvec3(false, true, false), bvec3(bvec3(bvec3(false, true, false))))))))))
+      barrier();
+     if(_GLF_DEAD(false))
+      {
+       if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+        }
+       else
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           if(_GLF_WRAPPED_IF_TRUE(true))
+            {
+             if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              barrier();
+             barrier();
+            }
+           else
+            {
+            }
+          }
+         else
+          {
+          }
+        }
+       if(_GLF_DEAD(false))
+        barrier();
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          break;
+         break;
+        }
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          barrier();
+         break;
+        }
+      }
+    }
+  }
+ if(_GLF_DEAD(false))
+  barrier();
+ if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, (true) && true)))
+  {
+   for(int _injected_loop_counter = (0 >> _GLF_IDENTITY(int(1), int(1))); _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+    {
+     for(int _injected_loop_counter = (1 | int(_GLF_ONE(1.0, injectionSwitch.y))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 0); _injected_loop_counter --)
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           return;
+          }
+         else
+          {
+          }
+        }
+       atomicStore(checker[_GLF_struct_replacement_21.virtual_gid], _GLF_struct_replacement_6.read, 3, 64, 4);
+      }
+    }
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     if(_GLF_DEAD(false))
+      return;
+    }
+  }
+ else
+  {
+  }
+ if(_GLF_DEAD(false))
+  {
+   do
+    {
+     if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        return;
+      }
+     else
+      {
+       for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+        {
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           do
+            {
+             return;
+            }
+           while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+          }
+        }
+       barrier();
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     if(_GLF_DEAD(false))
+      barrier();
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ if(_GLF_DEAD(false))
+  return;
+ if(_GLF_DEAD(false))
+  return;
+ if(_GLF_DEAD(false))
+  {
+   do
+    {
+     barrier();
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+  }
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(false))
+    barrier();
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+     if(_GLF_DEAD(false))
+      {
+       do
+        {
+         return;
+        }
+       while(_GLF_WRAPPED_LOOP(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))));
+      }
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+        {
+         if(_GLF_DEAD(false))
+          return;
+         return;
+        }
+      }
+     else
+      {
+      }
+    }
+   else
+    {
+     if(_GLF_DEAD(false))
+      return;
+     if(_GLF_DEAD(false))
+      barrier();
+     for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < 1); _injected_loop_counter ++)
+      {
+       if(_GLF_WRAPPED_IF_TRUE(true))
+        {
+         if(_GLF_WRAPPED_IF_TRUE(true))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           if(_GLF_DEAD(false))
+            {
+             if(_GLF_DEAD(false))
+              barrier();
+             if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+              {
+              }
+             else
+              {
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                return;
+              }
+             return;
+            }
+          }
+         else
+          {
+          }
+         return;
+         if(_GLF_DEAD(_GLF_IDENTITY(false, _GLF_IDENTITY(bool(bvec4(false, true, false, true)), bool(bvec4(bool(bvec4(false, true, false, true)), false, false, true))))))
+          {
+           if(_GLF_WRAPPED_IF_FALSE(false))
+            {
+            }
+           else
+            {
+             return;
+            }
+          }
+         if(_GLF_DEAD(false))
+          barrier();
+         if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+          {
+           if(_GLF_DEAD(false))
+            return;
+           for(int _injected_loop_counter = 1; _GLF_WRAPPED_LOOP(_injected_loop_counter != int(_GLF_ZERO(0.0, injectionSwitch.x))); _injected_loop_counter --)
+            {
+             if(_GLF_WRAPPED_IF_TRUE(true))
+              {
+               if(_GLF_WRAPPED_IF_FALSE(false))
+                {
+                }
+               else
+                {
+                 barrier();
+                }
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  barrier();
+                 break;
+                }
+               if(_GLF_WRAPPED_IF_TRUE(_GLF_TRUE(true, (injectionSwitch.x < injectionSwitch.y))))
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  {
+                   if(_GLF_WRAPPED_IF_TRUE(true))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      barrier();
+                     return;
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      {
+                       if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                        continue;
+                       break;
+                      }
+                    }
+                   else
+                    {
+                     if(_GLF_DEAD(false))
+                      barrier();
+                     if(_GLF_DEAD(false))
+                      break;
+                     if(_GLF_DEAD(_GLF_IDENTITY(false, ! (! (false)))))
+                      return;
+                    }
+                  }
+                }
+               else
+                {
+                }
+               if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+                barrier();
+               if(_GLF_DEAD(false))
+                {
+                 if(_GLF_DEAD(false))
+                  barrier();
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  break;
+                 continue;
+                }
+               if(_GLF_DEAD(false))
+                continue;
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                {
+                 if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                  {
+                   if(_GLF_WRAPPED_IF_FALSE(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), ! (_GLF_IDENTITY(! (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))), ! (! (! (_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))))))))
+                    {
+                     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                      continue;
+                     if(_GLF_DEAD(_GLF_IDENTITY(false, bool(bool(_GLF_IDENTITY(false, true && (false)))))))
+                      {
+                       if(_GLF_DEAD(false))
+                        break;
+                       if(_GLF_WRAPPED_IF_FALSE(false))
+                        {
+                        }
+                       else
+                        {
+                         for(int _injected_loop_counter = 0; _GLF_WRAPPED_LOOP(_injected_loop_counter < (1 & 1)); _injected_loop_counter ++)
+                          {
+                           if(_GLF_WRAPPED_IF_TRUE(true))
+                            {
+                             barrier();
+                            }
+                           else
+                            {
+                            }
+                          }
+                        }
+                       if(_GLF_DEAD(false))
+                        return;
+                      }
+                    }
+                   else
+                    {
+                     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, ! (! (true)))))
+                      {
+                       return;
+                      }
+                     else
+                      {
+                       if(_GLF_DEAD(false))
+                        barrier();
+                      }
+                    }
+                   if(_GLF_DEAD(false))
+                    barrier();
+                  }
+                 barrier();
+                }
+              }
+             else
+              {
+               if(_GLF_DEAD(false))
+                break;
+               if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+                continue;
+              }
+            }
+          }
+        }
+       else
+        {
+         if(_GLF_DEAD(false))
+          return;
+         if(_GLF_DEAD(false))
+          barrier();
+        }
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     if(_GLF_WRAPPED_IF_TRUE(_GLF_IDENTITY(true, bool(_GLF_IDENTITY(bvec2(_GLF_IDENTITY(true, (true) && true), false), bvec2(bvec4(bvec2(_GLF_IDENTITY(true, (true) && true), false), true, false)))))))
+      {
+       if(_GLF_DEAD(false))
+        {
+         if(_GLF_WRAPPED_IF_FALSE(false))
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+          }
+         else
+          {
+           if(_GLF_DEAD(false))
+            barrier();
+           return;
+          }
+        }
+      }
+     else
+      {
+      }
+     if(_GLF_WRAPPED_IF_TRUE(true))
+      {
+       if(_GLF_DEAD(false))
+        return;
+       if(_GLF_DEAD(false))
+        barrier();
+      }
+     else
+      {
+      }
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      return;
+    }
+  }
+ if(_GLF_DEAD(false))
+  {
+   do
+    {
+     return;
+    }
+   while(_GLF_WRAPPED_LOOP(false));
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    return;
+  }
+ if(_GLF_DEAD(false))
+  barrier();
+ if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+  {
+   for(int _injected_loop_counter = ((1 << _GLF_IDENTITY(int(0), int(0))) >> _GLF_IDENTITY(int(0), _GLF_IDENTITY(int(0), min(int(0), int(0))))); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     return;
+    }
+  }
+ if(_GLF_DEAD(_GLF_IDENTITY(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), bool(bvec2(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y)), true)))))
+  {
+   if(_GLF_WRAPPED_IF_TRUE(true))
+    {
+     do
+      {
+       return;
+       if(_GLF_DEAD(false))
+        continue;
+      }
+     while(_GLF_WRAPPED_LOOP(false));
+    }
+   else
+    {
+    }
+  }
+ if(_GLF_DEAD(false))
+  {
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    barrier();
+   for(int _injected_loop_counter = ((0 >> _GLF_IDENTITY(int(4), int(4))) ^ 1); _GLF_WRAPPED_LOOP(_injected_loop_counter > 0); _injected_loop_counter --)
+    {
+     return;
+    }
+   if(_GLF_DEAD(false))
+    barrier();
+  }
+ if(_GLF_DEAD(false))
+  return;
+ if(_GLF_DEAD(_GLF_IDENTITY(false, (false) || false)))
+  return;
+ for(int _injected_loop_counter = ((1 ^ 1) << _GLF_IDENTITY(int(8), _GLF_IDENTITY(int(8), (false ? _GLF_FUZZED(-40975) : _GLF_IDENTITY(int(8), (int(8)) + 0))))); _GLF_WRAPPED_LOOP(_injected_loop_counter != 1); _injected_loop_counter ++)
+  {
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+     if(_GLF_DEAD(false))
+      barrier();
+     if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+      {
+       if(_GLF_DEAD(false))
+        barrier();
+       continue;
+      }
+     return;
+    }
+   if(_GLF_DEAD(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    continue;
+  }
+}
+
+END
+
+BUFFER tester DATA_TYPE uint32 SIZE 8388096 FILL 0
+BUFFER expected DATA_TYPE uint32 SIZE 8388096 FILL 2
+BUFFER injection DATA_TYPE vec2<float> DATA
+ 0.0 1.0
+END
+BUFFER checker DATA_TYPE uint32 SIZE 8388096 FILL 0
+BUFFER expected_checker DATA_TYPE uint32 SIZE 8388096 FILL 1
+
+PIPELINE compute test_pipe
+  ATTACH test
+  BIND BUFFER tester AS storage DESCRIPTOR_SET 0 BINDING 0 
+  BIND BUFFER injection AS uniform DESCRIPTOR_SET 0 BINDING 1 
+  BIND BUFFER checker AS storage DESCRIPTOR_SET 0 BINDING 2 
+
+  SUBGROUP test
+	  VARYING_SIZE on
+  END
+END
+
+RUN test_pipe 65532 1 1
+EXPECT checker EQ_BUFFER expected_checker

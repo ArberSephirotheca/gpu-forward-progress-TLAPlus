@@ -1,0 +1,120 @@
+#!amber
+
+DEVICE_FEATURE SubgroupSizeControl.subgroupSizeControl
+
+SET ENGINE_DATA fence_timeout_ms 10000
+
+SHADER compute test GLSL
+#version 460
+
+#ifndef REDUCER
+#define _GLF_ZERO(X, Y)                   (Y)
+#define _GLF_ONE(X, Y)                    (Y)
+#define _GLF_FALSE(X, Y)                  (Y)
+#define _GLF_TRUE(X, Y)                   (Y)
+#define _GLF_IDENTITY(X, Y)               (Y)
+#define _GLF_DEAD(X)                      (X)
+#define _GLF_FUZZED(X)                    (X)
+#define _GLF_WRAPPED_LOOP(X)              X
+#define _GLF_WRAPPED_IF_TRUE(X)           X
+#define _GLF_WRAPPED_IF_FALSE(X)          X
+#define _GLF_SWITCH(X)                    X
+#define _GLF_MAKE_IN_BOUNDS_INT(IDX, SZ)  clamp(IDX, 0, SZ - 1)
+#define _GLF_MAKE_IN_BOUNDS_UINT(IDX, SZ) clamp(IDX, 0u, SZ - 1u)
+#endif
+
+
+layout(set = 0, binding = 1) uniform buf1 {
+ vec2 injectionSwitch;
+};
+#extension GL_KHR_shader_subgroup_vote : enable
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_EXT_maximal_reconvergence : enable
+layout(set = 0, binding = 0) buffer Buf {
+ uint buf[];
+};
+layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+ uvec4 GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid;
+ uvec3 GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_size;
+ GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.xyz = GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_size;
+ uvec4 GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup;
+ uvec2 GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size;
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.xy = GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_size;
+  }
+ uint subgroup_id = gl_SubgroupID;
+ uint subgroup_size = gl_SubgroupSize;
+ GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.xyz.y = subgroup_size;
+ GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.xy.x = GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.xyz.y;
+ uint subgroup_local_id = gl_SubgroupInvocationID;
+ uint num_workgroup = gl_NumWorkGroups.x;
+ GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.w = num_workgroup;
+ uint workgroup_size = gl_WorkGroupSize.x;
+ GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.xyz.z = workgroup_size;
+ if(_GLF_WRAPPED_IF_FALSE(false))
+  {
+  }
+ else
+  {
+   GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.xy.y = GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.xyz.z;
+  }
+ uint workgroup_id = gl_WorkGroupID.x;
+ uint workgroup_base = GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.xy.y * workgroup_id;
+ uint subgroup_base = subgroup_id * GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.xy.x;
+ GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.xyz.x = subgroup_base;
+ uint virtual_gid = workgroup_base + GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.xyz.x + subgroup_local_id;
+ uint next_virtual_gid = workgroup_base + GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.xyz.x + ((subgroup_local_id + 1) % GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.xy.x);
+ GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.w = next_virtual_gid;
+ GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.z = GLF_merged2_0_3_72_3_1_16GLF_merged3_0_1_13_1_1_13_2_1_14subgroup_basesubgroup_sizeworkgroup_sizenext_virtual_gid.w;
+ atomicStore(buf[virtual_gid], uint(1), 3, 64, 4);
+ if((subgroup_local_id % 2) == 0)
+  {
+   if(_GLF_WRAPPED_IF_FALSE(false))
+    {
+    }
+   else
+    {
+     subgroupAll(true);
+    }
+   if(_GLF_WRAPPED_IF_FALSE(_GLF_FALSE(false, (injectionSwitch.x > injectionSwitch.y))))
+    {
+    }
+   else
+    {
+     atomicStore(buf[GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.z], uint(2), 3, 64, 4);
+    }
+  }
+ else
+  {
+   subgroupAll(false);
+   atomicStore(buf[GLF_merged3_0_2_52_2_1_16_3_1_13GLF_merged2_0_1_13_1_1_14subgroup_sizeworkgroup_sizenext_virtual_gidnum_workgroup.z], uint(2), 3, 64, 4);
+  }
+}
+
+END
+
+BUFFER tester DATA_TYPE uint32 SIZE 8388096 FILL 0
+BUFFER expected DATA_TYPE uint32 SIZE 8388096 FILL 2
+BUFFER injection DATA_TYPE vec2<float> DATA
+ 0.0 1.0
+END
+
+PIPELINE compute test_pipe
+  ATTACH test
+  BIND BUFFER tester AS storage DESCRIPTOR_SET 0 BINDING 0 
+  BIND BUFFER injection AS uniform DESCRIPTOR_SET 0 BINDING 1 
+
+  SUBGROUP test
+	  VARYING_SIZE on
+  END
+END
+
+RUN test_pipe 65532 1 1
+EXPECT tester EQ_BUFFER expected
