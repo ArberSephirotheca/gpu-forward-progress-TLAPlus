@@ -54,6 +54,44 @@ If your environment blocks Docker bridge networking, use host networking:
 scripts/docker-run.sh --network host --input <glsl compute file> --out <format>
 ```
 
+## Empirical Amber Suites
+The paper-aligned empirical test suites live under [empirical_tests/amber_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests/amber_tests). These are the 10 base Amber suites discussed in Sec. 5.2 and evaluated in Sec. 6.2 of the paper.
+
+Each suite contains one `reference.amber` plus `variant_000.amber` through `variant_099.amber`.
+
+Suffix meanings:
+- `ww`: write-write race pattern
+- `rw`: read-write race pattern
+- `wr`: write-read race pattern
+
+| Suite | Paper mapping | Purpose |
+|------|---------------|---------|
+| `cm_wr` | CM, Fig. 3 | Tests whether memory operations behave collectively across the subgroup. This is the only collective-memory base test. |
+| `sm_ww`, `sm_rw`, `sm_wr` | SM, Fig. 2 without the subgroup operation | Tests whether plain memory operations remain synchronous inside a converged basic block. |
+| `scf_ww`, `scf_rw`, `scf_wr` | SCF, Fig. 9 without subgroup operations | Tests whether branch/merge structure enforces synchronous control-flow progress. |
+| `sso_ww`, `sso_rw`, `sso_wr` | SSO, Fig. 9 with subgroup operations included | Tests whether subgroup operations synchronize with the associated control-flow dependencies. |
+
+## Intel Iris Xe Amber Artifact Subset
+The repo also includes a reviewer-sized Amber subset under [artifact/amber_tests/intel_iris_xe_first100](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/artifact/amber_tests/intel_iris_xe_first100).
+
+Run all subset tests with one command:
+```bash
+scripts/docker-run-artifact-amber.sh
+```
+
+This script builds `Dockerfile.artifact-tests`, runs every `reference.amber` plus `variant_000.amber` through `variant_099.amber` for all ten suites, and writes results to `build/artifact_amber_results/`.
+
+Key outputs:
+- `build/artifact_amber_results/summary.md`
+- `build/artifact_amber_results/summary.csv`
+- `build/artifact_amber_results/all_results.csv`
+- `build/artifact_amber_results/<suite>/*.log`
+
+Maintainer-only regeneration command:
+```bash
+scripts/extract_artifact_amber_subset.sh
+```
+
 ## GLSL
 In our version of GLSL, we add additional syntax to take in TLA+ launch configuration
 such as **Scheduler**, **subgroup size**, and **number of workgroup**.
@@ -97,7 +135,7 @@ layout(tla_synchronization_id = <id>) in;
 `scripts/docker-run.sh --input example_shader_program/synchronization/cm.comp --out text`
 
 ## Command Line Option
-- *format*: text, dot, all
+- *format*: text, dot, all, fuzz
 
 
 ## List of supported SPIR-V Instructions

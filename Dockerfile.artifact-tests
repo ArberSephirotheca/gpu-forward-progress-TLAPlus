@@ -1,0 +1,43 @@
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG AMBER_REF=main
+ARG CMAKE_VERSION=4.0.0-rc4
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        build-essential \
+        ca-certificates \
+        git \
+        libvulkan1 \
+        libssl-dev \
+        mesa-vulkan-drivers \
+        ninja-build \
+        python3 \
+        wget \
+        vulkan-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN wget -q "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz" \
+    && tar -xzf "cmake-${CMAKE_VERSION}.tar.gz" \
+    && cd "cmake-${CMAKE_VERSION}" \
+    && ./bootstrap \
+    && make -j"$(nproc)" \
+    && make install \
+    && cd / \
+    && rm -rf "cmake-${CMAKE_VERSION}" "cmake-${CMAKE_VERSION}.tar.gz"
+
+RUN git clone --depth=1 --branch "${AMBER_REF}" https://github.com/google/amber.git /opt/amber-src \
+    && cd /opt/amber-src \
+    && ./tools/git-sync-deps \
+    && cmake -S . -B out/Debug -GNinja \
+    && cmake --build out/Debug -j"$(nproc)" \
+    && install -m 0755 /opt/amber-src/out/Debug/amber /usr/local/bin/amber
+
+COPY scripts/run_artifact_amber_subset_in_container.sh /usr/local/bin/run_artifact_amber_subset_in_container.sh
+
+RUN chmod +x /usr/local/bin/run_artifact_amber_subset_in_container.sh
+
+WORKDIR /workdir
+ENTRYPOINT ["/usr/local/bin/run_artifact_amber_subset_in_container.sh"]
