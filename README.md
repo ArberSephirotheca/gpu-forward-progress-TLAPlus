@@ -1,8 +1,23 @@
 # gpu-subgroup-semantics-TLAPlus
 
-## Guide for Reviewers
+## Guide for Evaluators
 
-This artifact accompanies *SIMT-Step Execution: A Flexible Operational Semantics for GPU Subgroup Behavior* and is meant to let PLDI reviewers inspect the executable TLA+ model that realises the paper’s operational rules.
+This artifact accompanies *SIMT-Step Execution: A Flexible Operational Semantics for GPU Subgroup Behavior* and is meant to let PLDI evaluators inspect the executable TLA+ model that realises the paper’s operational rules.
+
+### Suggested Evaluator Workflow
+
+1. Run one end-to-end semantics example:
+```bash
+scripts/docker-run.sh --input example_shader_program/synchronization/cm.comp --out text
+```
+2. Run the evaluation subset:
+```bash
+scripts/docker-run-empirical-tests.sh
+```
+3. If you want the larger experiment, run the full empirical campaign. This may **take days**, depending on the GPU:
+```bash
+scripts/docker-run-empirical-tests.sh --full
+```
 
 - **Dynamic blocks (Sec. 3).** `DynamicBlock` in `forward-progress/validation/MCProgram.tla:307` stores the SIS, thread sets (`currentThreadSet`, `notExecuteSet`, `unknownSet`), block label (`labelIdx`), identifier (`id`), merge stack, and child blocks. The merge target is recovered on branching via `BranchUpdate` (`forward-progress/validation/MCProgram.tla:558`).
 - **Instruction classes (Sec. 4/Tab.1).** The CM/SM/SCF/SSO partitions are encoded via `IsCollectiveInstruction` / `IsSynchronousInstruction` in `forward-progress/validation/MCProgram.tla:264-303`.
@@ -25,7 +40,7 @@ Consider the T–Label / G–Collective-UBranch rules for CM/SM/SCF:
 1. `OpLabelCollective` (`MCThreads.tla:1866`) waits until all threads in the dynamic block are aligned, then bumps their PCs together—mirroring Step–Label.
 2. `OpBranchCollective` (`MCThreads.tla:1545`) calls `BranchConditionalUpdateSubgroup` (`MCProgram.tla:798`) which (a) update the thread set in the child dynamic block, (b) pushes merge targets onto the merge stack, and (c) reuses existing children when reconverging at a merge block.
 
-Reviewers who want to follow the execution end-to-end can run `scripts/docker-run.sh --input example_shader_program/synchronization/cm.comp --out text`, open the generated `build/MCProgram.tla`, and observe how the CFG emitted for that shader instantiates these operators.
+Evaluators who want to follow the execution end-to-end can run `scripts/docker-run.sh --input example_shader_program/synchronization/cm.comp --out text`, open the generated `build/MCProgram.tla`, and observe how the CFG emitted for that shader instantiates these operators.
 
 ## Pre-requisites
 - [Docker](https://docs.docker.com/install/) or [Podman](https://github.com/containers/podman/blob/main/docs/tutorials/podman_tutorial.md)
@@ -55,9 +70,10 @@ scripts/docker-run.sh --network host --input <glsl compute file> --out <format>
 ```
 
 ## Empirical Amber Suites
-The paper-aligned empirical test suites live under [empirical_tests/amber_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests/amber_tests). These are the 10 base Amber suites discussed in Sec. 5.2 and evaluated in Sec. 6.2 of the paper.
+The paper-aligned empirical tests live under [empirical_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests).
 
-Each suite contains one `reference.amber` plus `variant_000.amber` through `variant_099.amber`.
+- Evaluation subset: [empirical_tests/evaluation_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests/evaluation_tests). This contains the 10 base suites, each with `reference.amber` plus `variant_000.amber` through `variant_099.amber`, so evaluators can run the suite in a few minutes.
+- Full empirical suites: [empirical_tests/full_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests/full_tests). This contains the full 10-suite collection, with `10001` Amber files per suite, for evaluators who want the larger campaign.
 
 Suffix meanings:
 - `ww`: write-write race pattern
@@ -71,26 +87,28 @@ Suffix meanings:
 | `scf_ww`, `scf_rw`, `scf_wr` | SCF, Fig. 9 without subgroup operations | Tests whether branch/merge structure enforces synchronous control-flow progress. |
 | `sso_ww`, `sso_rw`, `sso_wr` | SSO, Fig. 9 with subgroup operations included | Tests whether subgroup operations synchronize with the associated control-flow dependencies. |
 
-## Intel Iris Xe Amber Artifact Subset
-The repo also includes a reviewer-sized Amber subset under [artifact/amber_tests/intel_iris_xe_first100](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/artifact/amber_tests/intel_iris_xe_first100).
+## Dockerized Empirical Runs
+The Docker runner builds [Dockerfile.empirical-tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/Dockerfile.empirical-tests) and executes Amber across either the evaluation subset or the full empirical suites.
 
-Run all subset tests with one command:
+Run the evaluation subset:
 ```bash
-scripts/docker-run-artifact-amber.sh
+scripts/docker-run-empirical-tests.sh
 ```
 
-This script builds `Dockerfile.artifact-tests`, runs every `reference.amber` plus `variant_000.amber` through `variant_099.amber` for all ten suites, and writes results to `build/artifact_amber_results/`.
-
-Key outputs:
-- `build/artifact_amber_results/summary.md`
-- `build/artifact_amber_results/summary.csv`
-- `build/artifact_amber_results/all_results.csv`
-- `build/artifact_amber_results/<suite>/*.log`
-
-Maintainer-only regeneration command:
+Run the full empirical suites:
 ```bash
-scripts/extract_artifact_amber_subset.sh
+scripts/docker-run-empirical-tests.sh --full
 ```
+
+Outputs:
+- Evaluation subset: `build/empirical_evaluation_results/`
+- Full run: `build/empirical_full_results/`
+
+Key files in either output directory:
+- `summary.md`
+- `summary.csv`
+- `all_results.csv`
+- `<suite>/*.log`
 
 ## GLSL
 In our version of GLSL, we add additional syntax to take in TLA+ launch configuration
@@ -206,6 +224,6 @@ This runs `glslang` to generate SPIR-V, passes it to `Homunculus/src/main.rs` to
 - `forward-progress/validation/MCProgram.tla` – Overwritten by the pipeline with the program-specific instruction partitions, CFG, and dynamic-block metadata derived from the shader.
 
 **Frontend pipeline**
-- `example_shader_program/` – Annotated GLSL compute shaders used as reviewer-friendly fixtures; pragmas encode scheduler/subgroup/synchronization settings.
+- `example_shader_program/` – Annotated GLSL compute shaders used as evaluator-friendly fixtures; pragmas encode scheduler/subgroup/synchronization settings.
 - `Homunculus/src/main.rs` & `compiler/src/codegen/*` – SPIR-V → TLA+ translation: parses `glslang` output, builds CFG/dynamic blocks, and emits the generated `MCProgram.tla` specialised to the shader while relying on the hand-authored `ProgramConf.tla` constant interface.
 - `build/output.txt` – Sample TLC output from the Docker pipeline (helpful for confirming end-to-end execution).

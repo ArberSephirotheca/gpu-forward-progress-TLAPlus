@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SUITE_ROOT="${SUITE_ROOT:-/workdir/artifact/amber_tests/intel_iris_xe_first100}"
-OUTPUT_DIR="${OUTPUT_DIR:-/output/artifact_amber_results}"
+SUITE_ROOT="${SUITE_ROOT:-/workdir/empirical_tests/evaluation_tests}"
+OUTPUT_DIR="${OUTPUT_DIR:-/output/empirical_evaluation_results}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-30}"
 AMBER_BIN="${AMBER_BIN:-/usr/local/bin/amber}"
 
@@ -89,7 +89,7 @@ main() {
     done < <(find "${SUITE_ROOT}" -mindepth 1 -maxdepth 1 -type d | sort)
 
     {
-        echo "# Amber Artifact Summary"
+        echo "# Empirical Test Summary"
         echo
         echo "| Suite | Passed | Failed | Timed out |"
         echo "|---|---:|---:|---:|"
