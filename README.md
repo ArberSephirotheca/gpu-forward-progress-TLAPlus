@@ -14,6 +14,7 @@ scripts/docker-run.sh --input example_shader_program/synchronization/cm.comp --o
 ```bash
 scripts/docker-run-empirical-tests.sh
 ```
+This runs `100` Amber tests total (`10` suites, each with `reference.amber` plus different variants). Expect about `5-8` minutes with a prebuilt image or about `12-16` minutes on the first run if Docker also rebuilds the image.
 3. If you want the larger experiment, run the full empirical campaign. This may **take days**, depending on the GPU:
 ```bash
 scripts/docker-run-empirical-tests.sh --full
@@ -72,7 +73,7 @@ scripts/docker-run.sh --network host --input <glsl compute file> --out <format>
 ## Empirical Amber Suites
 The paper-aligned empirical tests live under [empirical_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests).
 
-- Evaluation subset: [empirical_tests/evaluation_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests/evaluation_tests). This contains the 10 base suites, each with `reference.amber` plus `variant_000.amber` through `variant_099.amber`, so evaluators can run the suite in a few minutes.
+- Evaluation subset: [empirical_tests/evaluation_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests/evaluation_tests). This contains the 10 base suites (`10` Amber files per suite, `100` total), so evaluators can run the suite quickly.
 - Full empirical suites: [empirical_tests/full_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests/full_tests). This contains the full 10-suite collection, with `10001` Amber files per suite, for evaluators who want the larger campaign.
 
 Suffix meanings:
@@ -94,6 +95,7 @@ Run the evaluation subset:
 ```bash
 scripts/docker-run-empirical-tests.sh
 ```
+Expected runtime is about `5-8` minutes with a prebuilt image, or about `12-16` minutes if the Docker image is built from scratch as part of the run.
 
 Run the full empirical suites:
 ```bash

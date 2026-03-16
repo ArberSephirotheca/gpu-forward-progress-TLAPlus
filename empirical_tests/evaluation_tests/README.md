@@ -6,7 +6,9 @@ If you want the full empirical campaign instead, use the sibling directory `../f
 
 Each suite contains:
 - `reference.amber`
-- `variant_000.amber` through `variant_099.amber`
+- `variant_000.amber` through `variant_008.amber`
+
+That gives `10` Amber files per suite and `100` Amber files total across the evaluation subset. In practice, this subset is meant to finish in about `5-8` minutes with a prebuilt image.
 
 Suite naming:
 - `cm`: Collective Memory

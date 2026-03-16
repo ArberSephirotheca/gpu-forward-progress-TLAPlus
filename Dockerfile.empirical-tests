@@ -10,6 +10,7 @@ RUN apt-get update \
         build-essential \
         ca-certificates \
         git \
+        libvulkan-dev \
         libvulkan1 \
         libssl-dev \
         mesa-vulkan-drivers \
@@ -17,6 +18,7 @@ RUN apt-get update \
         python3 \
         wget \
         vulkan-tools \
+        vulkan-validationlayers \
     && rm -rf /var/lib/apt/lists/*
 
 RUN wget -q "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz" \
@@ -31,7 +33,12 @@ RUN wget -q "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION
 RUN git clone --depth=1 --branch "${AMBER_REF}" https://github.com/google/amber.git /opt/amber-src \
     && cd /opt/amber-src \
     && ./tools/git-sync-deps \
+    && rm -rf /usr/local/include/vulkan \
+    && rm -rf /usr/local/include/vk_video \
+    && cp -r /opt/amber-src/third_party/vulkan-headers/include/. /usr/local/include/ \
     && cmake -S . -B out/Debug -GNinja \
+        -DAMBER_ENABLE_TESTS=OFF \
+        -DAMBER_ENABLE_SAMPLES=OFF \
     && cmake --build out/Debug -j"$(nproc)" \
     && install -m 0755 /opt/amber-src/out/Debug/amber /usr/local/bin/amber
 

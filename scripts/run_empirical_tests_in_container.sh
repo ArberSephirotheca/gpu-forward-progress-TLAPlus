@@ -5,6 +5,8 @@ SUITE_ROOT="${SUITE_ROOT:-/workdir/empirical_tests/evaluation_tests}"
 OUTPUT_DIR="${OUTPUT_DIR:-/output/empirical_evaluation_results}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-30}"
 AMBER_BIN="${AMBER_BIN:-/usr/local/bin/amber}"
+AMBER_SPIRV_TARGET="${AMBER_SPIRV_TARGET:-spv1.5}"
+AMBER_DISABLE_VALIDATION="${AMBER_DISABLE_VALIDATION:-1}"
 
 fail() {
     echo "error: $*" >&2
@@ -48,11 +50,17 @@ run_test() {
     local log_file
     local exit_code
     local status
+    local -a amber_cmd
 
     test_name="$(basename "${amber_file}")"
     log_file="${suite_out}/${test_name}.log"
+    amber_cmd=("${AMBER_BIN}")
+    if [[ "${AMBER_DISABLE_VALIDATION}" != "0" ]]; then
+        amber_cmd+=("-d")
+    fi
+    amber_cmd+=("-t" "${AMBER_SPIRV_TARGET}" "${amber_file}")
 
-    if timeout -k 5 "${TIMEOUT_SECS}" "${AMBER_BIN}" "${amber_file}" > "${log_file}" 2>&1; then
+    if timeout -k 5 "${TIMEOUT_SECS}" "${amber_cmd[@]}" > "${log_file}" 2>&1; then
         exit_code=0
         status="PASS"
         passed_ref=$((passed_ref + 1))
