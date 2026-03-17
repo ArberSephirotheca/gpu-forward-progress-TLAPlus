@@ -71,9 +71,9 @@ RUN if [ "${BUILD_AMBER}" = "1" ]; then \
     fi
 
 COPY . /workdir
-COPY scripts/run_pipeline.sh /usr/local/bin/run_pipeline.sh
+COPY scripts/docker-run-tlaplus.sh /usr/local/bin/docker-run-tlaplus.sh
 
-RUN chmod +x /usr/local/bin/run_pipeline.sh \
+RUN chmod +x /usr/local/bin/docker-run-tlaplus.sh \
     && CARGO_TARGET_DIR=Homunculus/target cargo build --release --manifest-path=Homunculus/Cargo.toml
 
-ENTRYPOINT ["/usr/local/bin/run_pipeline.sh"]
+ENTRYPOINT ["/usr/local/bin/docker-run-tlaplus.sh", "--container-run"]

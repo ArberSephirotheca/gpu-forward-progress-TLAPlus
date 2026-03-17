@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+IMAGE_NAME="${IMAGE_NAME:-gpu-subgroup-semantics-tlaplus:latest}"
+DOCKER_NETWORK="${DOCKER_NETWORK:-host}"
 OUT="${OUT:-text}"
 INPUT="${INPUT:-}"
 LITMUS_TESTS="${LITMUS_TESTS:-FALSE}"
+SKIP_BUILD="FALSE"
+CONTAINER_MODE="FALSE"
+
 WORKDIR="${WORKDIR:-/workdir}"
 OUTPUT_DIR="${OUTPUT_DIR:-/output}"
 
@@ -14,9 +22,46 @@ readonly HOMUNCULUS_BIN="Homunculus/target/release/homunculus"
 readonly MC_PROGRAM_PATH="forward-progress/validation/MCProgram.tla"
 readonly MC_MODEL_PATH="forward-progress/validation/MCProgressModel"
 
+usage() {
+    cat <<'EOF'
+Usage:
+  scripts/docker-run-tlaplus.sh --input <shader.comp> --out <text|dot|all|fuzz>
+  scripts/docker-run-tlaplus.sh --litmus-tests
+
+Options:
+  --input <path>      Input shader path relative to repository root.
+  --out <format>      Output mode: text, dot, all, fuzz. Default: text.
+  --litmus-tests      Run litmus test mode (requires ./litmus_tests).
+  --skip-build        Skip docker image rebuild and reuse existing image.
+  --image <name>      Override image name/tag.
+  --network <name>    Docker network mode/name (default: host).
+EOF
+}
+
 fail() {
     echo "error: $*" >&2
     exit 1
+}
+
+require_docker_access() {
+    command -v docker >/dev/null 2>&1 || fail "docker CLI not found; install Docker Engine first"
+
+    local err
+    if err="$(docker version 2>&1 >/dev/null)"; then
+        return
+    fi
+
+    if grep -qi "permission denied while trying to connect to the Docker daemon socket" <<<"${err}"; then
+        local socket="/var/run/docker.sock"
+        local socket_meta="unknown ownership"
+        if [[ -S "${socket}" ]]; then
+            socket_meta="$(stat -c '%U:%G %a' "${socket}" 2>/dev/null || printf 'unknown ownership')"
+        fi
+        fail "docker is installed but the daemon socket is not accessible to your user. ${socket} is ${socket_meta}. If 'sudo docker version' works, either rerun with sudo or configure Docker for non-root use (typically create/use the 'docker' group, add your user, then log out/in) before retrying"
+    fi
+
+    err="${err//$'\n'/ }"
+    fail "docker is installed but the daemon is not reachable. Run 'docker version' and 'docker run hello-world' manually to confirm the host setup. Details: ${err}"
 }
 
 copy_file_to_output() {
@@ -128,12 +173,12 @@ run_main_pipeline() {
             copy_file_to_output "fuzz.comp" "fuzz.comp"
             ;;
         *)
-            echo "Invalid output format: ${OUT}"
+            fail "invalid output format: ${OUT}"
             ;;
     esac
 }
 
-main() {
+run_in_container() {
     mkdir -p "${OUTPUT_DIR}"
     cd "${WORKDIR}"
 
@@ -141,14 +186,94 @@ main() {
         run_litmus_tests
     elif [[ "${OUT}" == "test" ]]; then
         run_out_test
-    elif [[ -z "${INPUT}" ]]; then
-        echo "No input file provided"
     else
         run_main_pipeline
     fi
 
     if [[ -f "${MC_PROGRAM_PATH}" ]]; then
         copy_file_to_output "${MC_PROGRAM_PATH}" "MCProgram.tla"
+    fi
+}
+
+run_on_host() {
+    if [[ "${LITMUS_TESTS}" != "TRUE" && -z "${INPUT}" ]]; then
+        fail "provide --input for standard modes, or use --litmus-tests"
+    fi
+
+    case "${OUT}" in
+        text|dot|all|fuzz|test) ;;
+        *) fail "unsupported --out value: ${OUT}" ;;
+    esac
+
+    if [[ -n "${INPUT}" && ! -f "${PROJECT_ROOT}/${INPUT}" ]]; then
+        fail "input file not found: ${INPUT}"
+    fi
+
+    require_docker_access
+    mkdir -p "${PROJECT_ROOT}/build"
+
+    if [[ "${SKIP_BUILD}" != "TRUE" ]]; then
+        docker build --network "${DOCKER_NETWORK}" -t "${IMAGE_NAME}" "${PROJECT_ROOT}"
+    fi
+
+    docker run --rm \
+        --network "${DOCKER_NETWORK}" \
+        -e OUT="${OUT}" \
+        -e INPUT="${INPUT}" \
+        -e LITMUS_TESTS="${LITMUS_TESTS}" \
+        -v "${PROJECT_ROOT}/build:/output" \
+        "${IMAGE_NAME}"
+}
+
+main() {
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --container-run)
+                CONTAINER_MODE="TRUE"
+                shift
+                ;;
+            --input)
+                [[ $# -ge 2 ]] || fail "--input requires a value"
+                INPUT="$2"
+                shift 2
+                ;;
+            --out)
+                [[ $# -ge 2 ]] || fail "--out requires a value"
+                OUT="$2"
+                shift 2
+                ;;
+            --litmus-tests)
+                LITMUS_TESTS="TRUE"
+                shift
+                ;;
+            --skip-build)
+                SKIP_BUILD="TRUE"
+                shift
+                ;;
+            --image)
+                [[ $# -ge 2 ]] || fail "--image requires a value"
+                IMAGE_NAME="$2"
+                shift 2
+                ;;
+            --network)
+                [[ $# -ge 2 ]] || fail "--network requires a value"
+                DOCKER_NETWORK="$2"
+                shift 2
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                fail "unknown option: $1"
+                ;;
+        esac
+    done
+
+    if [[ "${CONTAINER_MODE}" == "TRUE" ]]; then
+        run_in_container
+    else
+        run_on_host
     fi
 }
 

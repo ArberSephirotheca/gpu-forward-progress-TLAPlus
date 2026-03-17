@@ -1,174 +1,243 @@
 # gpu-subgroup-semantics-TLAPlus
 
-## Guide for Evaluators
+This artifact accompanies *SIMT-Step Execution: A Flexible Operational Semantics for GPU Subgroup Behavior*.
+It packages:
 
-This artifact accompanies *SIMT-Step Execution: A Flexible Operational Semantics for GPU Subgroup Behavior* and is meant to let PLDI evaluators inspect the executable TLA+ model that realises the paper’s operational rules.
+- an executable TLA+ model under [`forward-progress/validation/`](forward-progress/validation)
+- a SPIR-V-to-TLA+ compiler under [`Homunculus/`](Homunculus)
+- example shaders under [`example_shader_program/`](example_shader_program)
+- empirical Amber suites under [`empirical_tests/`](empirical_tests)
 
-### Suggested Evaluator Workflow
+This README is organized in the two parts expected by artifact evaluation:
 
-1. Run one end-to-end semantics example:
-```bash
-scripts/docker-run.sh --input example_shader_program/synchronization/cm.comp --out text
-```
-2. Run the evaluation subset:
-```bash
-scripts/docker-run-empirical-tests.sh
-```
-This runs `100` Amber tests total (`10` suites, each with `reference.amber` plus different variants). Expect about `5-8` minutes with a prebuilt image or about `12-16` minutes on the first run if Docker also rebuilds the image.
-3. If you want the larger experiment, run the full empirical campaign. This may **take days**, depending on the GPU:
-```bash
-scripts/docker-run-empirical-tests.sh --full
-```
+1. Part I. Getting Started Guide
+2. Part II. Step-by-Step Instructions
 
-- **Dynamic blocks (Sec. 3).** `DynamicBlock` in `forward-progress/validation/MCProgram.tla:307` stores the SIS, thread sets (`currentThreadSet`, `notExecuteSet`, `unknownSet`), block label (`labelIdx`), identifier (`id`), merge stack, and child blocks. The merge target is recovered on branching via `BranchUpdate` (`forward-progress/validation/MCProgram.tla:558`).
-- **Instruction classes (Sec. 4/Tab.1).** The CM/SM/SCF/SSO partitions are encoded via `IsCollectiveInstruction` / `IsSynchronousInstruction` in `forward-progress/validation/MCProgram.tla:264-303`.
-- **Dynamic-block evolution (Sec. 4).** Independent branching: `BranchUpdate` (`MCProgram.tla:554`), `OpBranch` (`MCThreads.tla:1590`), `OpBranchConditional` (`MCThreads.tla:1671`). Collective branching/labels: `BranchConditionalUpdateSubgroup` (`MCProgram.tla:798`), `OpBranchCollective` (`MCThreads.tla:1545`), `OpBranchConditionalCollective` (`MCThreads.tla:1619`), `OpLabelCollective` (`MCThreads.tla:1866`).
-- **Thread-level semantics (Sec. 4).** `MCThreads.tla:1918-2047` contains `ExecuteInstruction`, which dispatches to memory, collective control flow, and subgroup operations.
-- **System-level spec (Sec. 4).** `forward-progress/validation/MCProgressModel.tla` assembles the program, threads, and scheduler, defining `Init` and `Next` so TLC checks the same fairness/liveness properties discussed in the paper.
-- **Initial state (`Init` in `MCProgressModel.tla`)**
-  - `InitProgram` (`MCProgram.tla`) = `InitDB` ∧ `InitGPU`.
-  - `InitThreads` (`MCThreads.tla`) set up per-thread PCs/states.
-  - `InitScheduler`, `InitState` (`MCProgressModel.tla`) choose the scheduler (HSA/OBE) and initialize scheduler state.
-- **Transition relation**
-  - `Step` / `Next` (`MCProgressModel.tla`) call `ExecuteInstruction` (`MCThreads.tla`) and `UpdateFairExecutionSet` to advance one ready thread while enforcing fairness.
-  - Instruction handlers in `MCThreads.tla` perform the primed assignments; when control flow branches they invoke `BranchUpdate`/`BranchConditionalUpdateSubgroup` from `MCProgram.tla` to evolve the dynamic blocks.
+Generated outputs are written under `build/`. The `build/` directory is not checked into git, so the files described below are generated on demand rather than shipped as precomputed logs.
 
+## Part I. Getting Started Guide
 
-### Worked Example — Collective Control Flow
+A reviewer who follows it should be able to confirm that the artifact can:
 
-Consider the T–Label / G–Collective-UBranch rules for CM/SM/SCF:
+- translate a shader into a program-specific TLA+ model
+- run TLC on the generated model
+- expose the main files that correspond to the paper's operational semantics
 
-1. `OpLabelCollective` (`MCThreads.tla:1866`) waits until all threads in the dynamic block are aligned, then bumps their PCs together—mirroring Step–Label.
-2. `OpBranchCollective` (`MCThreads.tla:1545`) calls `BranchConditionalUpdateSubgroup` (`MCProgram.tla:798`) which (a) update the thread set in the child dynamic block, (b) pushes merge targets onto the merge stack, and (c) reuses existing children when reconverging at a merge block.
+### 1. Environment and Setup
+Required for the basic semantics pipeline:
 
-Evaluators who want to follow the execution end-to-end can run `scripts/docker-run.sh --input example_shader_program/synchronization/cm.comp --out text`, open the generated `build/MCProgram.tla`, and observe how the CFG emitted for that shader instantiates these operators.
-
-## Pre-requisites
-- [Docker](https://docs.docker.com/engine/install/)
+- [Docker Engine](https://docs.docker.com/engine/install/)
 - [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 - Bash shell
 
-The helper scripts in this repository call the `docker` CLI directly. Podman may be adaptable by translating the raw container commands manually, but it is not the documented or validated path for this artifact.
+Additional requirements for the empirical GPU experiments in Part II:
 
-## Get Started
-Run the end-to-end pipeline and collect outputs in `build/` (the helper script builds the image automatically unless `--skip-build` is set):
+- `x86_64` Linux
+- either:
+  - Intel/AMD with `/dev/dri/renderD*`
+  - or NVIDIA with `nvidia-smi` and NVIDIA Container Toolkit configured for Docker
+
+Support boundary:
+
+- The main TLA+ pipeline in [`scripts/docker-run-tlaplus.sh`](scripts/docker-run-tlaplus.sh) only requires Docker.
+- The empirical Amber pipeline in [`scripts/docker-run-empirical-tests.sh`](scripts/docker-run-empirical-tests.sh) is documented only for Linux GPU hosts.
+- macOS, Windows, and WSL are not documented for the empirical GPU runs.
+- Podman is not the documented or validated path for this artifact.
+
+Before continuing, unpack the artifact or clone the repository, then enter the repository root.
+
+### 2. Verify Docker
+
+Run:
+
 ```bash
-scripts/docker-run.sh --input <glsl compute file> --out <format>
+docker version
+docker run hello-world
 ```
 
-Equivalent raw Docker command (without helper script):
+If Docker reports `permission denied while trying to connect to the Docker daemon socket`, either:
+
+- rerun the helper scripts with `sudo`, or
+- configure Docker for non-root use and then re-login before retrying
+
+The helper scripts now fail early with a clearer message when Docker is installed but the daemon socket is not accessible to the current user.
+
+### 3. Test
+
+Run one end-to-end semantics example:
+
 ```bash
-docker build -t gpu-subgroup-semantics-tlaplus .
-docker run --rm \
-  --network host \
-  -e INPUT=<glsl compute file> \
-  -e OUT=<format> \
-  -v "$(pwd)/build:/output" \
-  gpu-subgroup-semantics-tlaplus
+scripts/docker-run-tlaplus.sh --input example_shader_program/synchronization/cm.comp --out text
 ```
 
-If your environment blocks Docker bridge networking, use host networking:
+What this command does:
+
+- builds the main Docker image if needed
+- compiles the example shader to SPIR-V
+- translates the SPIR-V program into a program-specific TLA+ module
+- runs TLC on the generated model
+
+Expected generated outputs under `build/`:
+
+- `MCProgram.tla`
+- `output.txt`
+- `spirv-asm.txt`
+- `example_shader_program/synchronization/cm.comp.spv`
+
+Success criteria:
+
+- the command finishes without a Docker error
+- `build/MCProgram.tla` exists
+- `build/output.txt` exists and contains TLC output
+
+Notes:
+
+- The first run may take a while because it builds the Docker image.
+- `build/MCProgram.tla` is overwritten on each new pipeline run.
+
+### 4. What to Inspect After the Test
+
+The quickest files to inspect are:
+
+- `build/MCProgram.tla`
+  - the generated, program-specific TLA+ module for the shader you just ran
+- [`forward-progress/validation/MCThreads.tla`](forward-progress/validation/MCThreads.tla)
+  - the hand-written instruction semantics
+- [`forward-progress/validation/MCProgressModel.tla`](forward-progress/validation/MCProgressModel.tla)
+  - the model-checking harness that defines `Init` and `Next`
+- `build/output.txt`
+  - the TLC run log for the generated model
+
+At this point, a reviewer has completed the basic artifact validation path.
+
+### 5. Optional GPU Test
+
+If you have a supported Linux GPU environment and want a quick artifact-level experiment after the basic  test, run the evaluator-sized empirical subset:
+
 ```bash
-scripts/docker-run.sh --network host --input <glsl compute file> --out <format>
+scripts/docker-run-empirical-tests.sh
 ```
 
-## Empirical Amber Suites
-The paper-aligned empirical tests live under [empirical_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests).
+Expected runtime:
 
-- Evaluation subset: [empirical_tests/evaluation_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests/evaluation_tests). This contains the 10 base suites (`10` Amber files per suite, `100` total), so evaluators can run the suite quickly.
-- Full empirical suites: [empirical_tests/full_tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/empirical_tests/full_tests). This contains the full 10-suite collection, with `10001` Amber files per suite, for evaluators who want the larger campaign.
+- about `5-8` minutes with a prebuilt image
+- about `12-16` minutes on the first run if the empirical Docker image must be built
 
-Suffix meanings:
-- `ww`: write-write race pattern
-- `rw`: read-write race pattern
-- `wr`: write-read race pattern
+Expected generated outputs under `build/empirical_evaluation_results/`:
 
-| Suite | Paper mapping | Purpose |
-|------|---------------|---------|
-| `cm_wr` | CM, Fig. 3 | Tests whether memory operations behave collectively across the subgroup. This is the only collective-memory base test. |
-| `sm_ww`, `sm_rw`, `sm_wr` | SM, Fig. 2 without the subgroup operation | Tests whether plain memory operations remain synchronous inside a converged basic block. |
-| `scf_ww`, `scf_rw`, `scf_wr` | SCF, Fig. 9 without subgroup operations | Tests whether branch/merge structure enforces synchronous control-flow progress. |
-| `sso_ww`, `sso_rw`, `sso_wr` | SSO, Fig. 9 with subgroup operations included | Tests whether subgroup operations synchronize with the associated control-flow dependencies. |
+- `summary.md`
+- `summary.csv`
+- `all_results.csv`
+- `vulkaninfo_summary.txt`
+- `<suite>/*.log`
 
-## Dockerized Empirical Runs
-The Docker runner builds [Dockerfile.empirical-tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/Dockerfile.empirical-tests) and executes Amber across either the evaluation subset or the full empirical suites.
+Warnings that are usually safe to ignore in this headless/containerized setting:
 
-Supported Linux host modes for the empirical Amber runs:
-- `drm`: Intel and most AMD Linux setups where the GPU is exposed through `/dev/dri/renderD*`
-- `nvidia`: NVIDIA Linux setups using Docker `--gpus all` plus NVIDIA Container Toolkit
+- `'DISPLAY' environment variable not set... skipping surface info`
+- `error: XDG_RUNTIME_DIR not set in the environment.`
+- `terminator_CreateInstance: Failed to CreateInstance in ICD 0. Skipping ICD.`
+- `llvmpipe` appearing in `vulkaninfo --summary` alongside a real hardware GPU
 
-Documented evaluator environment:
-- `x86_64` Linux host
-- Ubuntu `22.04 LTS` or `24.04 LTS`
-- Docker Engine
-- for Intel/AMD: `/dev/dri/renderD*` available
-- for NVIDIA: `nvidia-smi` works on the host and Docker GPU support is configured
+These warnings are not fatal by themselves. What matters is that:
 
-Concrete support boundary:
-- The empirical campaign bundled with the repository was curated from Intel Iris Xe runs.
-- The launcher [docker-run-empirical-tests.sh](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/scripts/docker-run-empirical-tests.sh) now supports both Linux DRM GPUs and NVIDIA GPUs on Linux.
-- macOS, Windows, and WSL are not supported for the empirical Docker runs.
-- The TLA+ pipeline in [docker-run.sh](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/scripts/docker-run.sh) does not have this GPU/Vulkan requirement; this restriction applies only to [docker-run-empirical-tests.sh](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/scripts/docker-run-empirical-tests.sh).
+- the run produces the output files above
+- `vulkaninfo_summary.txt` lists a real hardware GPU
+- suite logs are written under `build/empirical_evaluation_results/`
 
-What "Vulkan-capable GPU driver" means in this artifact:
-- The host can expose at least one Vulkan physical device to user space.
-- On Intel/AMD, this normally means `/dev/dri/renderD*` exists and `vulkaninfo --summary` succeeds.
-- On NVIDIA, this normally means `nvidia-smi` succeeds on the host, NVIDIA Container Toolkit is configured for Docker, and the container can start with `--gpus all`.
-- The host does **not** need the Vulkan SDK. It does need working GPU driver packages and Vulkan runtime support.
+## Part II. Step-by-Step Instructions
 
-How the launcher chooses the GPU path:
-- `scripts/docker-run-empirical-tests.sh` defaults to `--gpu-platform auto`.
-- In `auto` mode, it prefers `nvidia` when `nvidia-smi` works on the host; otherwise it falls back to `drm` when `/dev/dri/renderD*` is available.
-- You can override this explicitly with:
+This part is for evaluators and researchers who want to reproduce the artifact's experiments, connect them back to the paper, and inspect the implementation in more depth.
+
+### 1. Claims Supported by This Artifact
+
+The artifact supports the following paper claims by providing executable models, included tests, and reproduction scripts.
+
+| Claim supported by the artifact | Paper connection | How to evaluate it |
+|---|---|---|
+| The four direct SIMT-Step models implemented in the artifact can be executed as TLA+ semantics and checked with TLC. | Sec. 4, Sec. 5, and Table 1 | Run [`scripts/docker-run-tlaplus.sh`](scripts/docker-run-tlaplus.sh) on one of the shaders in [`example_shader_program/synchronization/`](example_shader_program/synchronization), then inspect `build/MCProgram.tla` and `build/output.txt`. |
+| Dynamic blocks, branching, merge handling, and reconvergence are represented explicitly in the artifact. | Sec. 3 and Sec. 4 | Inspect [`forward-progress/validation/MCProgram.tla`](forward-progress/validation/MCProgram.tla) and [`forward-progress/validation/MCThreads.tla`](forward-progress/validation/MCThreads.tla), then compare the generated `build/MCProgram.tla` after running `cm.comp` or `scf.comp`. |
+| The direct models CM, SM, SCF, and SSO from Table 1 are encoded in the executable model and exercised by included example shaders. | Sec. 4, Sec. 5, and Table 1 | Run the four example shaders in [`example_shader_program/synchronization/`](example_shader_program/synchronization) and inspect the generated `build/MCProgram.tla` for each run. |
+| The artifact provides an end-to-end toolchain from GLSL input to SPIR-V, to generated TLA+, to TLC output. | Sec. 5.1 and Fig. 12 | Inspect [`scripts/docker-run-tlaplus.sh`](scripts/docker-run-tlaplus.sh), [`Dockerfile`](Dockerfile), and [`Homunculus/`](Homunculus), then reproduce the pipeline with `scripts/docker-run-tlaplus.sh`. |
+| The bundled Amber suites exercise the paper-aligned direct-model test families for CM, SM, SCF, and SSO. | Sec. 5.2, Fig. 2, Fig. 3, and Fig. 9 | Run [`scripts/docker-run-empirical-tests.sh`](scripts/docker-run-empirical-tests.sh) for the evaluation subset or `--full` for the larger campaign, then inspect the generated summaries and logs in `build/`. |
+
+### 2. Claims Not Supported by This Artifact
+
+The artifact does not by itself establish the following broader paper claims:
+
+- The full cross-device empirical conclusion from Sec. 6.2.
+  - The paper's study spans nine GPUs from seven vendors and totals over 700 hours of testing.
+  - Running the artifact on a single evaluator machine provides partial reproduction of that evidence, not the full study.
+- The weaker `Spec` and `Symb` models from Table 1.
+  - Sec. 5 states that the tool suite focuses on the first four direct models.
+- Broad empirical portability across all OSes and GPU environments.
+  - The documented empirical path is Linux-only and requires a Vulkan-capable GPU environment.
+
+### 3. Reproduce the Executable Semantics Pipeline
+
+#### 3.1 Single Example
+
+Run:
+
 ```bash
-scripts/docker-run-empirical-tests.sh --gpu-platform drm
-scripts/docker-run-empirical-tests.sh --gpu-platform nvidia
+scripts/docker-run-tlaplus.sh --input example_shader_program/synchronization/cm.comp --out text
 ```
 
-Recommended Ubuntu host setup:
+This is the smallest end-to-end reproduction of the artifact's main semantics pipeline.
+
+Generated outputs:
+
+- `build/MCProgram.tla`
+- `build/output.txt`
+- `build/spirv-asm.txt`
+- `build/example_shader_program/synchronization/cm.comp.spv`
+
+Interpretation:
+
+- `build/MCProgram.tla` is the generated TLA+ module specialized to the input shader.
+- `build/output.txt` is TLC's log for that generated model.
+
+#### 3.2 Compare the Four Synchronization Models
+
+The repository includes one example shader for each model in the paper:
+
+| Shader | Paper connection | Behavior to inspect |
+|---|---|---|
+| `example_shader_program/synchronization/cm.comp` | CM / Fig. 3 | collective memory behavior |
+| `example_shader_program/synchronization/sm.comp` | SM / Fig. 2 | synchronous memory behavior |
+| `example_shader_program/synchronization/scf.comp` | SCF / Fig. 9 without subgroup op | synchronous control-flow behavior |
+| `example_shader_program/synchronization/sso.comp` | SSO / Fig. 9 with subgroup op | subgroup-operation synchronization behavior |
+
+Run all four:
+
 ```bash
-# 1. Install Docker Engine.
-sudo apt update
-sudo apt install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
-Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
-Components: stable
-Signed-By: /etc/apt/keyrings/docker.asc
-EOF
-sudo apt update
-sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Optional: allow running docker without sudo.
-sudo groupadd docker || true
-sudo usermod -aG docker "$USER"
-newgrp docker
-
-# 2a. For Intel/AMD, install host Vulkan runtime packages.
-sudo apt install mesa-vulkan-drivers vulkan-tools
-
-# 2b. For NVIDIA, first install a working proprietary NVIDIA driver on the host.
-# The simplest Ubuntu path is:
-sudo ubuntu-drivers install
-sudo apt install vulkan-tools
-
-# 2c. For NVIDIA, install NVIDIA Container Toolkit and wire it into Docker.
-curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
-  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
-curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
-  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
-  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
-sudo apt update
-sudo apt install -y nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
+for model in cm sm scf sso; do
+  scripts/docker-run-tlaplus.sh --input "example_shader_program/synchronization/${model}.comp" --out text
+done
 ```
 
-Host-side checks before running the empirical suites:
+If you want the TLC graph dump as well, use:
+
+```bash
+scripts/docker-run-tlaplus.sh --input example_shader_program/synchronization/cm.comp --out dot
+```
+
+or:
+
+```bash
+scripts/docker-run-tlaplus.sh --input example_shader_program/synchronization/cm.comp --out all
+```
+
+Additional generated outputs for `dot` or `all`:
+
+- `build/output.dot`
+
+### 4. Reproduce the Empirical Amber Evaluation Subset
+
+The paper-aligned Amber suites live under [`empirical_tests/`](empirical_tests).
+The evaluator-sized subset is in [`empirical_tests/evaluation_tests/`](empirical_tests/evaluation_tests).
+
+Before running the empirical suites, verify the host GPU path that the container will use:
+
 ```bash
 docker run hello-world
 vulkaninfo --summary
@@ -180,150 +249,203 @@ ls /dev/dri/renderD*
 nvidia-smi
 ```
 
-Interpretation of the checks:
-- If `docker run hello-world` fails, Docker is not installed or not usable by your user.
-- If `vulkaninfo --summary` fails or lists no physical devices, the host Vulkan stack is not ready.
-- If `ls /dev/dri/renderD*` fails, the `drm` path is not available on that host.
-- If `nvidia-smi` fails, the `nvidia` path is not available on that host.
+The launcher defaults to `--gpu-platform auto`:
 
-Container-side note:
-- The empirical image itself is built from [Dockerfile.empirical-tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/Dockerfile.empirical-tests), which currently uses `ubuntu:22.04` and installs Amber plus Vulkan user-space packages inside the container. The host still must provide the real GPU device and working driver stack.
+- it chooses `nvidia` when `nvidia-smi` works on the host
+- otherwise it chooses `drm` when `/dev/dri/renderD*` is available
 
-Run the evaluation subset:
+You can override the choice explicitly:
+
+```bash
+scripts/docker-run-empirical-tests.sh --gpu-platform drm
+scripts/docker-run-empirical-tests.sh --gpu-platform nvidia
+```
+
+Suffix meanings:
+
+- `ww`: write-write race pattern
+- `rw`: read-write race pattern
+- `wr`: write-read race pattern
+
+| Suite | Paper mapping | Purpose |
+|---|---|---|
+| `cm_wr` | CM| Tests whether memory operations execute collectively. |
+| `sm_ww`, `sm_rw`, `sm_wr` | SM | Tests whether memory operations execute synchronously. |
+| `scf_ww`, `scf_rw`, `scf_wr` | SCF | Tests whether threads have synchronous control flow. |
+| `sso_ww`, `sso_rw`, `sso_wr` | SSO | Tests whether subgroup operations synchronize with the associated control flow. |
+
+Run:
+
 ```bash
 scripts/docker-run-empirical-tests.sh
 ```
-Expected runtime is about `5-8` minutes with a prebuilt image, or about `12-16` minutes if the Docker image is built from scratch as part of the run.
 
-Run the full empirical suites:
+Expected runtime:
+
+- about `5-8` minutes with a prebuilt image
+- about `12-16` minutes if the empirical image must be built first
+
+Generated outputs:
+
+- `build/empirical_evaluation_results/summary.md`
+- `build/empirical_evaluation_results/summary.csv`
+- `build/empirical_evaluation_results/all_results.csv`
+- `build/empirical_evaluation_results/vulkaninfo_summary.txt`
+- `build/empirical_evaluation_results/gpu_platform.txt`
+- `build/empirical_evaluation_results/<suite>/*.log`
+
+How to interpret the output:
+
+- `summary.md` gives the per-suite pass/fail counts.
+- `all_results.csv` gives one row per Amber file.
+- `vulkaninfo_summary.txt` records the Vulkan devices visible in the container.
+- `<suite>/*.log` contains the raw Amber output for each test.
+
+Important environment note:
+
+- The empirical campaign is environment-sensitive.
+- The repository documents Linux `drm` and Linux `nvidia` paths only.
+- The bundled empirical campaign was curated from Intel Iris Xe runs, so exact outcomes may vary on AMD or NVIDIA hardware.
+
+### 5. Reproduce the Full Empirical Campaign
+
+The full empirical campaign is under [`empirical_tests/full_tests/`](empirical_tests/full_tests).
+
+Run:
+
 ```bash
 scripts/docker-run-empirical-tests.sh --full
 ```
 
-Outputs:
-- Evaluation subset: `build/empirical_evaluation_results/`
-- Full run: `build/empirical_full_results/`
+Runtime note:
 
-Key files in either output directory:
-- `summary.md`
-- `summary.csv`
-- `all_results.csv`
-- `<suite>/*.log`
+- this run may take **days**, depending on the GPU and host
 
-## GLSL
-In our version of GLSL, we add additional syntax to take in TLA+ launch configuration
-such as **Scheduler**, **subgroup size**, and **number of workgroup**.
-You can check out the file under `example_shader_program` for more info.
+Smaller input:
+
+- if you want the same workflow on a manageable scale, use the evaluation subset from Section 4 instead
+
+Generated outputs:
+
+- `build/empirical_full_results/summary.md`
+- `build/empirical_full_results/summary.csv`
+- `build/empirical_full_results/all_results.csv`
+- `build/empirical_full_results/<suite>/*.log`
+
+### 6. Map the Artifact Back to the Paper
+
+The main paper-to-artifact connections are:
+
+- Dynamic blocks (Sec. 3).
+  - `DynamicBlock` in [`forward-progress/validation/MCProgram.tla`](forward-progress/validation/MCProgram.tla) defines the record storing the SIS, thread sets, block label, identifier, merge stack, and child blocks.
+  - `BranchUpdate` and `BranchConditionalUpdateSubgroup` in [`forward-progress/validation/MCProgram.tla`](forward-progress/validation/MCProgram.tla) evolve the dynamic execution graph when control flow splits and reconverges.
+- Instruction classes (Sec. 4 and Table 1).
+  - `IsCollectiveInstruction` and `IsSynchronousInstruction` in [`forward-progress/validation/MCProgram.tla`](forward-progress/validation/MCProgram.tla) encode the direct-model classification used by the executable semantics.
+- Dynamic-block evolution (Sec. 4).
+  - Independent branching is handled by `BranchUpdate`, `OpBranch`, and `OpBranchConditional`.
+  - Collective control-flow entry and exit are handled by `BranchConditionalUpdateSubgroup`, `OpBranchCollective`, `OpBranchConditionalCollective`, and `OpLabelCollective`.
+- Thread-level semantics (Sec. 4).
+  - `ExecuteInstruction` in [`forward-progress/validation/MCThreads.tla`](forward-progress/validation/MCThreads.tla) dispatches to memory, collective control-flow, and subgroup-operation handlers.
+- System-level specification (Sec. 4).
+  - [`forward-progress/validation/MCProgressModel.tla`](forward-progress/validation/MCProgressModel.tla) assembles the program, threads, scheduler, `Init`, `Step`, and `Next` relations used by TLC.
+- Initial state.
+  - `InitProgram` in [`forward-progress/validation/MCProgram.tla`](forward-progress/validation/MCProgram.tla) expands to `InitDB /\ InitGPU /\ InitGlobalCounter`.
+  - `InitThreads` in [`forward-progress/validation/MCThreads.tla`](forward-progress/validation/MCThreads.tla) initializes per-thread PCs and local state.
+  - `InitScheduler` and `InitState` in [`forward-progress/validation/MCProgressModel.tla`](forward-progress/validation/MCProgressModel.tla) initialize the chosen scheduler (`HSA` or `OBE`) and model state.
+- Transition relation.
+  - `Step` and `Next` in [`forward-progress/validation/MCProgressModel.tla`](forward-progress/validation/MCProgressModel.tla) invoke `ExecuteInstruction` and `UpdateFairExecutionSet` to advance execution while enforcing the scheduler and fairness structure.
+  - Instruction handlers in [`forward-progress/validation/MCThreads.tla`](forward-progress/validation/MCThreads.tla) perform the primed assignments, and branching handlers call back into [`forward-progress/validation/MCProgram.tla`](forward-progress/validation/MCProgram.tla) to evolve dynamic blocks.
+
+
+### 7. Artifact Layout for Researchers
+
+Key directories and files:
+
+- [`scripts/docker-run-tlaplus.sh`](scripts/docker-run-tlaplus.sh)
+  - user-facing wrapper for the main semantics pipeline and the in-container entrypoint used by the main Docker image
+- [`scripts/docker-run-empirical-tests.sh`](scripts/docker-run-empirical-tests.sh)
+  - user-facing wrapper for the empirical Amber campaign and the in-container entrypoint used by the empirical Docker image
+- [`Homunculus/`](Homunculus)
+  - SPIR-V frontend and TLA+ code generator
+- [`forward-progress/validation/`](forward-progress/validation)
+  - hand-authored TLA+ modules and model-checking configuration
+- [`example_shader_program/`](example_shader_program)
+  - example inputs
+- [`empirical_tests/`](empirical_tests)
+  - empirical Amber suites
+
+## Appendix A. GLSL Frontend Extensions Used by the Artifact
+
+The example shaders use small GLSL-side annotations that configure the TLA+ model.
 
 ### Scheduler
-you can specify the scheduler for TLA+ model in shader program using following syntax:
+
 ```glsl
 #pragma scheduler(<scheduler name>)
 ```
-Currently we only support two scheduler: **HSA** and **OBE**
-### Subgroup size
-you can specify the subgroup size for TLA+ model in shader program similar to how you specify the workgroup size:
+
+Supported schedulers:
+
+- `HSA`
+- `OBE`
+
+### Subgroup Size
+
 ```glsl
 layout(tla_subgroup_size = <num>) in;
 ```
-num must be a **non-zero positive integer**
-### Number of Workgroup
-Similarily, you can specify the number of workgroup for TLA+ model in shader program using:
+
+`<num>` must be a non-zero positive integer.
+
+### Number of Workgroups
+
 ```glsl
 layout(tla_num_workgroups = <num>) in;
 ```
-num must be a **non-zero positive integer**.
+
+`<num>` must be a non-zero positive integer.
+
 ### Synchronization Model
-Select the SIMT-Step model with:
+
 ```glsl
 layout(tla_synchronization_id = <id>) in;
 ```
-`1` → SSO, `2` → SCF, `3` → SM, `4` → CM.
 
 | `id` | Label | Collective instructions | Synchronous instructions | Independent instructions |
-|------|-------|------------------------|--------------------------|--------------------------|
-| 1    | SSO   | Subgroup ops (`OpGroup*`) | — | All remaining instructions |
-| 2    | SCF   | Subgroup ops + control flow | — | Others |
-| 3    | SM    | Subgroup ops + control flow | `OpAtomicLoad`, `OpAtomicStore`, `OpAtomicOr` | Others |
-| 4    | CM    | Subgroup ops + control flow + all memory ops | — | Others |
+|---|---|---|---|---|
+| `1` | SSO | subgroup ops (`OpGroup*`) | none | all remaining instructions |
+| `2` | SCF | subgroup ops plus control flow | none | others |
+| `3` | SM | subgroup ops plus control flow | `OpAtomicLoad`, `OpAtomicStore`, `OpAtomicOr` | others |
+| `4` | CM | subgroup ops plus control flow plus all memory ops | none | others |
 
-**Limitation.** At present, the synchronous semantics for SM are only modeled for `OpAtomicLoad`, `OpAtomicStore`, and `OpAtomicOr`. Other atomic opcodes (e.g., `OpAtomicAdd`, `OpAtomicSub`, `OpAtomicExchange`) still execute independently; extending the synchronous rules to them is future work.
+## Appendix B. Supported SPIR-V Subset
 
-## Example:
-`scripts/docker-run.sh --input example_shader_program/synchronization/cm.comp --out text`
+Supported instructions:
 
-## Command Line Option
-- *format*: text, dot, all, fuzz
+- Variables and memory:
+  - `OpVariable`, `OpLoad`, `OpStore`, `OpAtomicLoad`, `OpAtomicStore`
+- Control flow:
+  - `OpBranch`, `OpBranchConditional`, `OpSwitch`, `OpSelectionMerge`, `OpLoopMerge`, `OpLabel`, `OpReturn`
+- Logic and comparisons:
+  - `OpLogicalOr`, `OpLogicalAnd`, `OpLogicalEqual`, `OpLogicalNotEqual`, `OpLogicalNot`, `OpEqual`, `OpNotEqual`, `OpLess`, `OpLessOrEqual`, `OpGreater`, `OpGreaterOrEqual`
+- Arithmetic and atomics:
+  - `OpAdd`, `OpSub`, `OpMul`, `OpAtomicAdd`, `OpAtomicSub`, `OpAtomicExchange`, `OpAtomicCompareExchange`
+- Subgroup and synchronization:
+  - `OpGroupAll`, `OpGroupAny`, `OpGroupNonUniformAll`, `OpGroupNonUniformAny`, `OpControlBarrier`
 
+Notes:
+- Supported scalar types are:
+  - `int`
+  - `uint`
+  - `bool`
 
-## List of supported SPIR-V Instructions
-- OpVariable
-- OpReturn
-- OpLoad
-- OpStore
-- OpAtomicLoad
-- OPAtomicStore
-- OpBranch
-- OpBranchConditional
-- OpSwitch
-- OpLabel
-- OpLogicalOr
-- OpLogicalAnd
-- OpLogicalEqual
-- OpLogicalNotEqual
-- OpLogicalNot
-- OpEqual
-- OpNotEqual
-- OpLess
-- OpLessOrEqual
-- OpGreater
-- GreaterOrEqual
-- OpAdd
-- OpAtomicAdd
-- OpSub
-- OpAtomicSub
-- OpMul
-- OpSelectionMerge
-- OpLoopMerge
-- OpAtomicExchange
-- OpAtomicCompareExchange
-- OpGroupAll
-- OpGroupAny
-- OpGroupNonUniformAll
-- OpGroupNonUniformAny
-- OpControlBarrier
+## Appendix C. Model Limitations
 
-**Note**:
-- The model treats the following instructions as equivalent:
-    - `OpStore` and `OpAtomicStore`
-- Global variables (e.g. Storage Buffer) are assigned to default values if they are not initialized in the function body.
-    - For `uint` and `int` type, the default value is **0**.
-    - For `bool` type, the default value is **true**.
-
-## Supported Type
-- int
-- uint
-- bool
-
-## Memory Semantics
-The model does not implement any extension to memory semantics, and all SPIR-V instructions
-are behaving like `SequentiallyConsistent`.
+- The executable semantics and bundled tests focus on the four direct SIMT-Step models: CM, SM, SCF, and SSO.
+- The weaker `Spec` and `Symb` models discussed in Table 1 are not implemented in the artifact toolchain.
+- The artifact supports the SPIR-V and GLSL subset needed by the included examples and tests; it is not intended as a complete SPIR-V implementation.
+- The model uses sequentially consistent-style reasoning in the executable semantics, while the empirical Vulkan tests necessarily use the strongest portable Vulkan atomics available to Amber and GLSL.
 
 ## Reference
+
 - https://lamport.azurewebsites.net/tla/safety-liveness.pdf
-
-
-### Workflow Overview
-
-```
-scripts/docker-run.sh --input <shader.glsl> --out <format>
-```
-This runs `glslang` to generate SPIR-V, passes it to `Homunculus/src/main.rs` to produce TLA+ modules, and finally invokes TLC to model-check.
-
-**Generated per-program artifacts**
-- `forward-progress/validation/MCProgram.tla` – Overwritten by the pipeline with the program-specific instruction partitions, CFG, and dynamic-block metadata derived from the shader.
-
-**Frontend pipeline**
-- `example_shader_program/` – Annotated GLSL compute shaders used as evaluator-friendly fixtures; pragmas encode scheduler/subgroup/synchronization settings.
-- `Homunculus/src/main.rs` & `compiler/src/codegen/*` – SPIR-V → TLA+ translation: parses `glslang` output, builds CFG/dynamic blocks, and emits the generated `MCProgram.tla` specialised to the shader while relying on the hand-authored `ProgramConf.tla` constant interface.
-- `build/output.txt` – Sample TLC output from the Docker pipeline (helpful for confirming end-to-end execution).
