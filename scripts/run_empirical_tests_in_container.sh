@@ -7,10 +7,26 @@ TIMEOUT_SECS="${TIMEOUT_SECS:-30}"
 AMBER_BIN="${AMBER_BIN:-/usr/local/bin/amber}"
 AMBER_SPIRV_TARGET="${AMBER_SPIRV_TARGET:-spv1.5}"
 AMBER_DISABLE_VALIDATION="${AMBER_DISABLE_VALIDATION:-1}"
+GPU_PLATFORM="${GPU_PLATFORM:-unknown}"
 
 fail() {
     echo "error: $*" >&2
     exit 1
+}
+
+configure_vulkan_loader() {
+    local icd
+
+    case "${GPU_PLATFORM}" in
+        nvidia)
+            for icd in /etc/vulkan/icd.d/*nvidia*.json /usr/share/vulkan/icd.d/*nvidia*.json; do
+                if [[ -f "${icd}" ]]; then
+                    export VK_ICD_FILENAMES="${icd}"
+                    return
+                fi
+            done
+            ;;
+    esac
 }
 
 run_suite() {
@@ -82,12 +98,15 @@ run_test() {
 main() {
     [[ -x "${AMBER_BIN}" ]] || fail "amber binary not found: ${AMBER_BIN}"
     [[ -d "${SUITE_ROOT}" ]] || fail "suite root not found: ${SUITE_ROOT}"
+    configure_vulkan_loader
 
     mkdir -p "${OUTPUT_DIR}"
     : > "${OUTPUT_DIR}/summary.csv"
     : > "${OUTPUT_DIR}/all_results.csv"
     printf 'suite,passed,failed,timed_out\n' >> "${OUTPUT_DIR}/summary.csv"
     printf 'suite,test_name,status,exit_code\n' >> "${OUTPUT_DIR}/all_results.csv"
+    printf '%s\n' "${GPU_PLATFORM}" > "${OUTPUT_DIR}/gpu_platform.txt"
+    printf '%s\n' "${VK_ICD_FILENAMES:-}" > "${OUTPUT_DIR}/vk_icd_filenames.txt"
 
     amber -h > "${OUTPUT_DIR}/amber_help.txt" 2>&1 || true
     vulkaninfo --summary > "${OUTPUT_DIR}/vulkaninfo_summary.txt" 2>&1 || true

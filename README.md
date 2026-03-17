@@ -44,9 +44,11 @@ Consider the T–Label / G–Collective-UBranch rules for CM/SM/SCF:
 Evaluators who want to follow the execution end-to-end can run `scripts/docker-run.sh --input example_shader_program/synchronization/cm.comp --out text`, open the generated `build/MCProgram.tla`, and observe how the CFG emitted for that shader instantiates these operators.
 
 ## Pre-requisites
-- [Docker](https://docs.docker.com/install/) or [Podman](https://github.com/containers/podman/blob/main/docs/tutorials/podman_tutorial.md)
+- [Docker](https://docs.docker.com/engine/install/)
 - [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
 - Bash shell
+
+The helper scripts in this repository call the `docker` CLI directly. Podman may be adaptable by translating the raw container commands manually, but it is not the documented or validated path for this artifact.
 
 ## Get Started
 Run the end-to-end pipeline and collect outputs in `build/` (the helper script builds the image automatically unless `--skip-build` is set):
@@ -90,6 +92,102 @@ Suffix meanings:
 
 ## Dockerized Empirical Runs
 The Docker runner builds [Dockerfile.empirical-tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/Dockerfile.empirical-tests) and executes Amber across either the evaluation subset or the full empirical suites.
+
+Supported Linux host modes for the empirical Amber runs:
+- `drm`: Intel and most AMD Linux setups where the GPU is exposed through `/dev/dri/renderD*`
+- `nvidia`: NVIDIA Linux setups using Docker `--gpus all` plus NVIDIA Container Toolkit
+
+Documented evaluator environment:
+- `x86_64` Linux host
+- Ubuntu `22.04 LTS` or `24.04 LTS`
+- Docker Engine
+- for Intel/AMD: `/dev/dri/renderD*` available
+- for NVIDIA: `nvidia-smi` works on the host and Docker GPU support is configured
+
+Concrete support boundary:
+- The empirical campaign bundled with the repository was curated from Intel Iris Xe runs.
+- The launcher [docker-run-empirical-tests.sh](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/scripts/docker-run-empirical-tests.sh) now supports both Linux DRM GPUs and NVIDIA GPUs on Linux.
+- macOS, Windows, and WSL are not supported for the empirical Docker runs.
+- The TLA+ pipeline in [docker-run.sh](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/scripts/docker-run.sh) does not have this GPU/Vulkan requirement; this restriction applies only to [docker-run-empirical-tests.sh](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/scripts/docker-run-empirical-tests.sh).
+
+What "Vulkan-capable GPU driver" means in this artifact:
+- The host can expose at least one Vulkan physical device to user space.
+- On Intel/AMD, this normally means `/dev/dri/renderD*` exists and `vulkaninfo --summary` succeeds.
+- On NVIDIA, this normally means `nvidia-smi` succeeds on the host, NVIDIA Container Toolkit is configured for Docker, and the container can start with `--gpus all`.
+- The host does **not** need the Vulkan SDK. It does need working GPU driver packages and Vulkan runtime support.
+
+How the launcher chooses the GPU path:
+- `scripts/docker-run-empirical-tests.sh` defaults to `--gpu-platform auto`.
+- In `auto` mode, it prefers `nvidia` when `nvidia-smi` works on the host; otherwise it falls back to `drm` when `/dev/dri/renderD*` is available.
+- You can override this explicitly with:
+```bash
+scripts/docker-run-empirical-tests.sh --gpu-platform drm
+scripts/docker-run-empirical-tests.sh --gpu-platform nvidia
+```
+
+Recommended Ubuntu host setup:
+```bash
+# 1. Install Docker Engine.
+sudo apt update
+sudo apt install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/ubuntu
+Suites: $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
+Components: stable
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Optional: allow running docker without sudo.
+sudo groupadd docker || true
+sudo usermod -aG docker "$USER"
+newgrp docker
+
+# 2a. For Intel/AMD, install host Vulkan runtime packages.
+sudo apt install mesa-vulkan-drivers vulkan-tools
+
+# 2b. For NVIDIA, first install a working proprietary NVIDIA driver on the host.
+# The simplest Ubuntu path is:
+sudo ubuntu-drivers install
+sudo apt install vulkan-tools
+
+# 2c. For NVIDIA, install NVIDIA Container Toolkit and wire it into Docker.
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -s -L https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt update
+sudo apt install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+Host-side checks before running the empirical suites:
+```bash
+docker run hello-world
+vulkaninfo --summary
+
+# Intel/AMD path:
+ls /dev/dri/renderD*
+
+# NVIDIA path:
+nvidia-smi
+```
+
+Interpretation of the checks:
+- If `docker run hello-world` fails, Docker is not installed or not usable by your user.
+- If `vulkaninfo --summary` fails or lists no physical devices, the host Vulkan stack is not ready.
+- If `ls /dev/dri/renderD*` fails, the `drm` path is not available on that host.
+- If `nvidia-smi` fails, the `nvidia` path is not available on that host.
+
+Container-side note:
+- The empirical image itself is built from [Dockerfile.empirical-tests](/home/zheyuan/gpu-subgroup_semantics-TLAPlus/Dockerfile.empirical-tests), which currently uses `ubuntu:22.04` and installs Amber plus Vulkan user-space packages inside the container. The host still must provide the real GPU device and working driver stack.
 
 Run the evaluation subset:
 ```bash
