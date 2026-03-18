@@ -31,11 +31,10 @@ Required for the basic semantics pipeline:
 - Bash shell
 
 Additional requirements for the empirical GPU experiments in Part II:
-
-- `x86_64` Linux
-- either:
-  - Intel/AMD with `/dev/dri/renderD*`
-  - or NVIDIA with `nvidia-smi` and NVIDIA Container Toolkit configured for Docker
+- a Linux machine where a Docker container can access a Vulkan-capable GPU
+- the documented host setups in this artifact are:
+  - Intel/AMD via `/dev/dri/renderD*`
+  - NVIDIA via `nvidia-smi` and NVIDIA Container Toolkit configured for Docker
 
 Support boundary:
 
@@ -236,17 +235,31 @@ Additional generated outputs for `dot` or `all`:
 The paper-aligned Amber suites live under [`empirical_tests/`](empirical_tests).
 The evaluator-sized subset is in [`empirical_tests/evaluation_tests/`](empirical_tests/evaluation_tests).
 
-Before running the empirical suites, verify the host GPU path that the container will use:
+Before running the empirical suites, verify that the host and Docker setup expose a real Vulkan-capable GPU.
+The host-side checks below help identify which supported Linux path the launcher will use:
 
 ```bash
 docker run hello-world
 vulkaninfo --summary
 
-# Intel/AMD path:
+# Typical Intel/AMD DRM path:
 ls /dev/dri/renderD*
 
-# NVIDIA path:
+# Typical NVIDIA path:
 nvidia-smi
+```
+
+If the NVIDIA path is detected but Docker is not yet configured to expose the GPU to containers, the helper script will report:
+
+```text
+error: GPU platform 'nvidia' requires Docker to be configured for NVIDIA Container Toolkit; run 'sudo nvidia-ctk runtime configure --runtime=docker' and restart Docker
+```
+
+In that case, run:
+
+```bash
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
 ```
 
 The launcher defaults to `--gpu-platform auto`:
