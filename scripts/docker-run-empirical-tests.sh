@@ -11,6 +11,9 @@ TEST_SET="${TEST_SET:-evaluation}"
 OUTPUT_SUBDIR="${OUTPUT_SUBDIR:-}"
 TIMEOUT_SECS="${TIMEOUT_SECS:-30}"
 GPU_PLATFORM="${GPU_PLATFORM:-auto}"
+NVIDIA_RUNTIME="${NVIDIA_RUNTIME:-nvidia}"
+NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES:-all}"
+NVIDIA_DRIVER_CAPABILITIES="${NVIDIA_DRIVER_CAPABILITIES:-graphics,utility}"
 SKIP_BUILD="FALSE"
 CONTAINER_MODE="FALSE"
 
@@ -97,8 +100,8 @@ validate_gpu_platform() {
             command -v nvidia-smi >/dev/null 2>&1 || fail "GPU platform 'nvidia' requires nvidia-smi on the host"
             nvidia-smi -L >/dev/null 2>&1 || fail "GPU platform 'nvidia' requires a working NVIDIA driver on the host"
             command -v nvidia-ctk >/dev/null 2>&1 || fail "GPU platform 'nvidia' requires NVIDIA Container Toolkit (missing nvidia-ctk)"
-            docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"' \
-                || fail "GPU platform 'nvidia' requires Docker to be configured for NVIDIA Container Toolkit; run 'sudo nvidia-ctk runtime configure --runtime=docker' and restart Docker"
+            docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -Fq "\"${NVIDIA_RUNTIME}\"" \
+                || fail "GPU platform 'nvidia' requires Docker runtime '${NVIDIA_RUNTIME}' to be configured for NVIDIA Container Toolkit; run 'sudo nvidia-ctk runtime configure --runtime=docker' and restart Docker"
             ;;
         *)
             fail "internal error: unsupported resolved GPU platform: ${resolved}"
@@ -107,18 +110,48 @@ validate_gpu_platform() {
 }
 
 configure_vulkan_loader() {
+    local search_dir
     local icd
+    local -a nvidia_icds=()
 
     case "${GPU_PLATFORM}" in
         nvidia)
-            for icd in /etc/vulkan/icd.d/*nvidia*.json /usr/share/vulkan/icd.d/*nvidia*.json; do
-                if [[ -f "${icd}" ]]; then
-                    export VK_ICD_FILENAMES="${icd}"
-                    return
-                fi
+            for search_dir in \
+                /host-vulkan/etc_icd.d \
+                /host-vulkan/usr_share_icd.d \
+                /etc/vulkan/icd.d \
+                /usr/share/vulkan/icd.d; do
+                for icd in "${search_dir}"/*nvidia*.json; do
+                    if [[ -f "${icd}" ]]; then
+                        nvidia_icds+=("${icd}")
+                    fi
+                done
             done
+            if [[ "${#nvidia_icds[@]}" -gt 0 ]]; then
+                export VK_ICD_FILENAMES
+                VK_ICD_FILENAMES="$(IFS=:; printf '%s' "${nvidia_icds[*]}")"
+            fi
             ;;
     esac
+}
+
+write_vulkan_diagnostics() {
+    local icd
+
+    env | grep -E '^(NVIDIA|VK)_' | sort > "${OUTPUT_DIR}/vulkan_env.txt" || true
+    ldconfig -p 2>/dev/null | grep -E 'libGLX_nvidia|libEGL_nvidia|libEGL\.so|libGLX\.so|libGLdispatch\.so|libXext\.so' \
+        > "${OUTPUT_DIR}/ldconfig_vulkan.txt" || true
+
+    : > "${OUTPUT_DIR}/selected_icd_manifests.txt"
+    IFS=: read -r -a SELECTED_ICDS <<< "${VK_ICD_FILENAMES:-}"
+    for icd in "${SELECTED_ICDS[@]}"; do
+        [[ -n "${icd}" ]] || continue
+        {
+            printf '=== %s ===\n' "${icd}"
+            cat "${icd}" 2>/dev/null || true
+            printf '\n'
+        } >> "${OUTPUT_DIR}/selected_icd_manifests.txt"
+    done
 }
 
 run_suite() {
@@ -199,6 +232,7 @@ run_in_container() {
     printf 'suite,test_name,status,exit_code\n' >> "${OUTPUT_DIR}/all_results.csv"
     printf '%s\n' "${GPU_PLATFORM}" > "${OUTPUT_DIR}/gpu_platform.txt"
     printf '%s\n' "${VK_ICD_FILENAMES:-}" > "${OUTPUT_DIR}/vk_icd_filenames.txt"
+    write_vulkan_diagnostics
 
     amber -h > "${OUTPUT_DIR}/amber_help.txt" 2>&1 || true
     vulkaninfo --summary > "${OUTPUT_DIR}/vulkaninfo_summary.txt" 2>&1 || true
@@ -267,10 +301,19 @@ run_on_host() {
             ;;
         nvidia)
             DOCKER_RUN_ARGS+=(
-                --gpus all
-                -e NVIDIA_VISIBLE_DEVICES=all
-                -e NVIDIA_DRIVER_CAPABILITIES=graphics,utility
+                --runtime "${NVIDIA_RUNTIME}"
+                -e NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES}"
+                -e NVIDIA_DRIVER_CAPABILITIES="${NVIDIA_DRIVER_CAPABILITIES}"
             )
+            if [[ -e /dev/dri ]]; then
+                DOCKER_RUN_ARGS+=(--device /dev/dri:/dev/dri)
+            fi
+            if [[ -d /etc/vulkan/icd.d ]]; then
+                DOCKER_RUN_ARGS+=(-v /etc/vulkan/icd.d:/host-vulkan/etc_icd.d:ro)
+            fi
+            if [[ -d /usr/share/vulkan/icd.d ]]; then
+                DOCKER_RUN_ARGS+=(-v /usr/share/vulkan/icd.d:/host-vulkan/usr_share_icd.d:ro)
+            fi
             ;;
     esac
 
