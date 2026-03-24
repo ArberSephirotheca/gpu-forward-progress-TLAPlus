@@ -1,11 +1,11 @@
-These litmus shaders exercise `ww`, `wr`, and `rw` patterns for each direct semantics model:
+These litmus shaders are the regression litmus suite. They exercise `ww`, `wr`, and `rw` patterns for each direct semantics model:
 
 - `cm_*`
 - `sm_*`
 - `scf_*`
 - `sso_*`
 
-Run them through the existing TLA+ pipeline with:
+Run the regression suite with:
 
 ```bash
 scripts/docker-run-tlaplus.sh --litmus-tests
@@ -13,4 +13,14 @@ scripts/docker-run-tlaplus.sh --litmus-tests
 
 Each `.comp` file is compiled into its own `MCProgram.tla`, and TLC output is written under `build/litmus_tests_result/`.
 
-With the current RA memory extension enabled for scalar global/shared atomics, the `scf_wr`, `sm_wr`, and `sso_wr` shaders check per-thread self-visibility after the release RMW sequence. Peer-slot visibility is no longer guaranteed by the RA load semantics without an extra synchronization edge.
+The current `wr` shaders are written to stay close to the Amber references:
+
+- `cm_wr` still checks collective/uniform visibility.
+- `scf_wr`, `sm_wr`, and `sso_wr` now write the peer slot and then read the thread's own slot.
+
+With the current scalar RA memory extension, those peer-visibility `wr` tests behave differently by memory model:
+
+- Under `Plain`, all regression shaders are expected to pass.
+- Under `RA`, `scf_wr`, `sm_wr`, and `sso_wr` are expected to fail, because an acquire load is allowed to read any write at or after the thread's current per-location view; it is not forced to observe the peer's latest write.
+
+The runner compares actual TLC outcomes against those expectations automatically.

@@ -289,6 +289,15 @@ Suffix meanings:
 
 Under the current RA-enabled executable semantics for scalar global/shared atomics, the `*_wr` litmus shaders check each thread's self-visibility after its release RMW sequence. Peer-write visibility would require an additional synchronization edge and is not asserted by these shaders.
 
+If you want a suite that distinguishes the executable `Plain` and `RA` memory models, run:
+
+```bash
+scripts/docker-run-tlaplus.sh --litmus-tests --litmus-suite model-diff --memory-model plain
+scripts/docker-run-tlaplus.sh --litmus-tests --litmus-suite model-diff --memory-model ra
+```
+
+In that suite, `sm_wr_peer` and `sso_wr_peer` are expected to pass under `Plain` and fail under `RA`.
+
 Run:
 
 ```bash

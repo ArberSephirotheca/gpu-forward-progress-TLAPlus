@@ -10,6 +10,7 @@ OUT="${OUT:-text}"
 INPUT="${INPUT:-}"
 LITMUS_TESTS="${LITMUS_TESTS:-FALSE}"
 MEMORY_MODEL="${MEMORY_MODEL:-RA}"
+LITMUS_SUITE="${LITMUS_SUITE:-regression}"
 SKIP_BUILD="FALSE"
 CONTAINER_MODE="FALSE"
 
@@ -27,13 +28,14 @@ usage() {
     cat <<'EOF'
 Usage:
   scripts/docker-run-tlaplus.sh --input <shader.comp> --out <text|dot|all|fuzz> [--memory-model <ra|plain>]
-  scripts/docker-run-tlaplus.sh --litmus-tests [--memory-model <ra|plain>]
+  scripts/docker-run-tlaplus.sh --litmus-tests [--memory-model <ra|plain>] [--litmus-suite <regression|model-diff|all>]
 
 Options:
   --input <path>      Input shader path relative to repository root.
   --out <format>      Output mode: text, dot, all, fuzz. Default: text.
   --litmus-tests      Run litmus test mode (requires ./litmus_tests).
   --memory-model <m>  Memory model: ra or plain. Default: ra.
+  --litmus-suite <s>  Litmus suite: regression, model-diff, or all. Default: regression.
   --skip-build        Skip docker image rebuild and reuse existing image.
   --image <name>      Override image name/tag.
   --network <name>    Docker network mode/name (default: host).
@@ -98,6 +100,85 @@ normalize_memory_model() {
     esac
 }
 
+normalize_litmus_suite() {
+    case "${LITMUS_SUITE}" in
+        regression)
+            ;;
+        model-diff|model_diff|modeldiff)
+            LITMUS_SUITE="model-diff"
+            ;;
+        all)
+            ;;
+        *)
+            fail "unsupported --litmus-suite value: ${LITMUS_SUITE}"
+            ;;
+    esac
+}
+
+selected_litmus_dirs() {
+    case "${LITMUS_SUITE}" in
+        regression)
+            printf '%s\n' "litmus_tests"
+            ;;
+        model-diff)
+            printf '%s\n' "litmus_tests_model_diff"
+            ;;
+        all)
+            printf '%s\n' "litmus_tests"
+            printf '%s\n' "litmus_tests_model_diff"
+            ;;
+        *)
+            fail "unknown litmus suite: ${LITMUS_SUITE}"
+            ;;
+    esac
+}
+
+litmus_suite_name_for_dir() {
+    case "$1" in
+        litmus_tests)
+            printf '%s\n' "regression"
+            ;;
+        litmus_tests_model_diff)
+            printf '%s\n' "model-diff"
+            ;;
+        *)
+            fail "unknown litmus test directory: $1"
+            ;;
+    esac
+}
+
+litmus_outcome() {
+    local result_file="$1"
+    if grep -q "No error has been found" "${result_file}"; then
+        printf '%s\n' "PASS"
+    else
+        printf '%s\n' "FAIL"
+    fi
+}
+
+expected_litmus_outcome() {
+    local suite_name="$1"
+    local test_name="$2"
+
+    case "${suite_name}:${test_name}:${MEMORY_MODEL}" in
+        regression:scf_wr:RA|regression:sm_wr:RA|regression:sso_wr:RA)
+            printf '%s\n' "FAIL"
+            ;;
+        regression:*:*)
+            printf '%s\n' "PASS"
+            ;;
+        model-diff:sm_wr_peer:RA|model-diff:sso_wr_peer:RA)
+            printf '%s\n' "FAIL"
+            ;;
+        model-diff:*:*)
+            printf '%s\n' "PASS"
+            ;;
+        *)
+            fail "no expected outcome registered for ${suite_name}/${test_name} under ${MEMORY_MODEL}"
+            ;;
+    esac
+}
+
 apply_memory_model() {
     local target="$1"
     [[ -f "${target}" ]] || fail "memory-model target not found: ${target}"
@@ -117,33 +198,71 @@ compile_shader() {
 }
 
 run_litmus_tests() {
-    [[ -d litmus_tests ]] || fail "LITMUS_TESTS=TRUE requires ./litmus_tests"
-
     mkdir -p litmus_tests_spv litmus_tests_dis litmus_tests_result litmus_tests_mc_programs
     local mc_program_template="litmus_tests_mc_programs/MCProgram.template.tla"
     cp "${MC_PROGRAM_PATH}" "${mc_program_template}"
 
-    shopt -s nullglob
-    local tests=(litmus_tests/*.comp)
-    shopt -u nullglob
-    [[ ${#tests[@]} -gt 0 ]] || fail "no litmus tests found under litmus_tests/*.comp"
+    local summary_file="litmus_tests_result/summary.txt"
+    local total=0
+    local unexpected=0
+    : > "${summary_file}"
 
-    for test_file in "${tests[@]}"; do
-        local name
-        name="$(basename "${test_file}" .comp)"
+    while IFS= read -r suite_dir; do
+        [[ -d "${suite_dir}" ]] || fail "LITMUS_TESTS=TRUE requires ./${suite_dir}"
 
-        cp "${mc_program_template}" "litmus_tests_mc_programs/${name}.tla"
-        "${GLSLANG_BIN}" -V --target-env spirv1.5 "${test_file}" -o "litmus_tests_spv/${name}.spv"
-        "${SPIRV_DIS_BIN}" "litmus_tests_spv/${name}.spv" > "litmus_tests_dis/${name}.txt"
+        local suite_name
+        suite_name="$(litmus_suite_name_for_dir "${suite_dir}")"
 
-        echo "Running test for ${name}"
-        "${HOMUNCULUS_BIN}" compile "litmus_tests_dis/${name}.txt" "litmus_tests_mc_programs/${name}.tla"
-        apply_memory_model "litmus_tests_mc_programs/${name}.tla"
-        cp "litmus_tests_mc_programs/${name}.tla" "${MC_PROGRAM_PATH}"
-        tlc "${MC_MODEL_PATH}" > "litmus_tests_result/${name}.txt" 2>&1 || true
-    done
+        shopt -s nullglob
+        local tests=("${suite_dir}"/*.comp)
+        shopt -u nullglob
+        [[ ${#tests[@]} -gt 0 ]] || fail "no litmus tests found under ${suite_dir}/*.comp"
+
+        for test_file in "${tests[@]}"; do
+            local name expected actual verdict result_path
+            name="$(basename "${test_file}" .comp)"
+            result_path="litmus_tests_result/${name}.txt"
+
+            cp "${mc_program_template}" "litmus_tests_mc_programs/${name}.tla"
+            "${GLSLANG_BIN}" -V --target-env spirv1.5 "${test_file}" -o "litmus_tests_spv/${name}.spv"
+            "${SPIRV_DIS_BIN}" "litmus_tests_spv/${name}.spv" > "litmus_tests_dis/${name}.txt"
+
+            echo "Running ${suite_name} test for ${name}"
+            "${HOMUNCULUS_BIN}" compile "litmus_tests_dis/${name}.txt" "litmus_tests_mc_programs/${name}.tla"
+            apply_memory_model "litmus_tests_mc_programs/${name}.tla"
+            cp "litmus_tests_mc_programs/${name}.tla" "${MC_PROGRAM_PATH}"
+            tlc "${MC_MODEL_PATH}" > "${result_path}" 2>&1 || true
+
+            expected="$(expected_litmus_outcome "${suite_name}" "${name}")"
+            actual="$(litmus_outcome "${result_path}")"
+
+            case "${expected}:${actual}" in
+                PASS:PASS)
+                    verdict="PASS"
+                    ;;
+                FAIL:FAIL)
+                    verdict="XFAIL"
+                    ;;
+                PASS:FAIL)
+                    verdict="FAIL"
+                    unexpected=$((unexpected + 1))
+                    ;;
+                FAIL:PASS)
+                    verdict="XPASS"
+                    unexpected=$((unexpected + 1))
+                    ;;
+            esac
+
+            total=$((total + 1))
+            printf "%s %s %s (expected %s, got %s)\n" "${verdict}" "${suite_name}" "${name}" "${expected}" "${actual}" | tee -a "${summary_file}"
+        done
+    done < <(selected_litmus_dirs)
+
+    printf "Completed %d litmus tests with %d unexpected outcomes under %s/%s.\n" "${total}" "${unexpected}" "${LITMUS_SUITE}" "${MEMORY_MODEL}" | tee -a "${summary_file}"
 
     copy_glob_to_output "litmus_tests_result/*.txt"
+
+    [[ ${unexpected} -eq 0 ]] || fail "${unexpected} litmus tests had unexpected outcomes"
 }
 
 run_out_test() {
@@ -251,6 +370,7 @@ run_on_host() {
         -e INPUT="${INPUT}" \
         -e LITMUS_TESTS="${LITMUS_TESTS}" \
         -e MEMORY_MODEL="${MEMORY_MODEL}" \
+        -e LITMUS_SUITE="${LITMUS_SUITE}" \
         -v "${PROJECT_ROOT}/build:/output" \
         "${IMAGE_NAME}"
 }
@@ -281,6 +401,11 @@ main() {
                 MEMORY_MODEL="$2"
                 shift 2
                 ;;
+            --litmus-suite)
+                [[ $# -ge 2 ]] || fail "--litmus-suite requires a value"
+                LITMUS_SUITE="$2"
+                shift 2
+                ;;
             --skip-build)
                 SKIP_BUILD="TRUE"
                 shift
@@ -306,6 +431,7 @@ main() {
     done
 
     normalize_memory_model
+    normalize_litmus_suite
 
     if [[ "${CONTAINER_MODE}" == "TRUE" ]]; then
         run_in_container
