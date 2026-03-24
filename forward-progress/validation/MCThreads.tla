@@ -21,6 +21,8 @@ InitThreads ==
 
 RAVars == <<modOrder, threadView>>
 
+RAEnabled == MemoryModel = "RA"
+
 RAAtomicInstructionSet == {"OpAtomicLoad", "OpAtomicStore", "OpAtomicOr", "OpAtomicAnd"}
 
 RAPointerArgument(t, insIdx) ==
@@ -77,6 +79,15 @@ InitRA ==
     /\ modOrder = [a \in RAAddressDomain |-> <<RAWrite(RAInitialValue(a), 0, RAInitialView)>>]
     /\ threadView = [t \in Threads |-> RAInitialView]
 
+InitPlainMemory ==
+    /\ modOrder = [a \in RAAddressDomain |-> <<>>]
+    /\ threadView = [t \in Threads |-> [a \in RAAddressDomain |-> 0]]
+
+InitMemoryModel ==
+    CASE MemoryModel = "RA" -> InitRA
+         [] MemoryModel = "Plain" -> InitPlainMemory
+         [] OTHER -> FALSE
+
 MaxNat(x, y) ==
     IF x >= y THEN x ELSE y
 
@@ -84,6 +95,7 @@ JoinRAViews(left, right) ==
     [a \in RAAddressDomain |-> MaxNat(left[a], right[a])]
 
 IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex) ==
+    /\ RAEnabled
     /\ (IsGlobal(mangledPointer) \/ IsShared(mangledPointer))
     /\ evaluatedPointerIndex <= 0
     /\ RAAddress(mangledPointer) \in RAAddressDomain

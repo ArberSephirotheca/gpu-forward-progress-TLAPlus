@@ -28,7 +28,7 @@ InitScheduler ==
 Init ==
     /\  InitProgram
     /\  InitThreads
-    /\  InitRA
+    /\  InitMemoryModel
     /\  InitScheduler
     /\  InitState
     /\  InitSnapShotMap

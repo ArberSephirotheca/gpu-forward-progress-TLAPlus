@@ -9,6 +9,7 @@ DOCKER_NETWORK="${DOCKER_NETWORK:-host}"
 OUT="${OUT:-text}"
 INPUT="${INPUT:-}"
 LITMUS_TESTS="${LITMUS_TESTS:-FALSE}"
+MEMORY_MODEL="${MEMORY_MODEL:-RA}"
 SKIP_BUILD="FALSE"
 CONTAINER_MODE="FALSE"
 
@@ -25,13 +26,14 @@ readonly MC_MODEL_PATH="forward-progress/validation/MCProgressModel"
 usage() {
     cat <<'EOF'
 Usage:
-  scripts/docker-run-tlaplus.sh --input <shader.comp> --out <text|dot|all|fuzz>
-  scripts/docker-run-tlaplus.sh --litmus-tests
+  scripts/docker-run-tlaplus.sh --input <shader.comp> --out <text|dot|all|fuzz> [--memory-model <ra|plain>]
+  scripts/docker-run-tlaplus.sh --litmus-tests [--memory-model <ra|plain>]
 
 Options:
   --input <path>      Input shader path relative to repository root.
   --out <format>      Output mode: text, dot, all, fuzz. Default: text.
   --litmus-tests      Run litmus test mode (requires ./litmus_tests).
+  --memory-model <m>  Memory model: ra or plain. Default: ra.
   --skip-build        Skip docker image rebuild and reuse existing image.
   --image <name>      Override image name/tag.
   --network <name>    Docker network mode/name (default: host).
@@ -82,6 +84,27 @@ copy_glob_to_output() {
     done
 }
 
+normalize_memory_model() {
+    case "${MEMORY_MODEL}" in
+        RA|ra)
+            MEMORY_MODEL="RA"
+            ;;
+        Plain|plain)
+            MEMORY_MODEL="Plain"
+            ;;
+        *)
+            fail "unsupported --memory-model value: ${MEMORY_MODEL}"
+            ;;
+    esac
+}
+
+apply_memory_model() {
+    local target="$1"
+    [[ -f "${target}" ]] || fail "memory-model target not found: ${target}"
+    grep -q '^MemoryModel ==' "${target}" || fail "MemoryModel configuration line not found in ${target}"
+    sed -i "s/^MemoryModel == .*/MemoryModel == \"${MEMORY_MODEL}\"/" "${target}"
+}
+
 compile_shader() {
     [[ -n "${INPUT}" ]] || fail "no INPUT provided"
     [[ -f "${INPUT}" ]] || fail "input shader not found: ${INPUT}"
@@ -115,6 +138,7 @@ run_litmus_tests() {
 
         echo "Running test for ${name}"
         "${HOMUNCULUS_BIN}" compile "litmus_tests_dis/${name}.txt" "litmus_tests_mc_programs/${name}.tla"
+        apply_memory_model "litmus_tests_mc_programs/${name}.tla"
         cp "litmus_tests_mc_programs/${name}.tla" "${MC_PROGRAM_PATH}"
         tlc "${MC_MODEL_PATH}" > "litmus_tests_result/${name}.txt" 2>&1 || true
     done
@@ -152,16 +176,19 @@ run_main_pipeline() {
     case "${OUT}" in
         text)
             "${HOMUNCULUS_BIN}" compile ./spirv-asm.txt
+            apply_memory_model "${MC_PROGRAM_PATH}"
             JAVA_OPTS="-Xmx24G -XX:+UseParallelGC" tlc "${MC_MODEL_PATH}" -view -fpmem .25 -workers 20 2>&1 | tee output.txt || true
             copy_glob_to_output "output.*"
             ;;
         dot)
             "${HOMUNCULUS_BIN}" compile ./spirv-asm.txt
+            apply_memory_model "${MC_PROGRAM_PATH}"
             JAVA_OPTS="-Xmx24G" tlc "${MC_MODEL_PATH}" -view -fpmem .50 -workers 20 -dump dot output.dot 2>&1 | tee output.txt || true
             copy_glob_to_output "output.*"
             ;;
         all)
             "${HOMUNCULUS_BIN}" compile ./spirv-asm.txt
+            apply_memory_model "${MC_PROGRAM_PATH}"
             JAVA_OPTS="-Xmx32G" tlc "${MC_MODEL_PATH}" -view -fpmem .50 -workers 15 -maxSetSize 100 -dump dot output.dot 2>&1 | tee output.txt || true
             JAVA_OPTS="-Xmx32G" tlc "${MC_MODEL_PATH}" -view -fpmem .50 -workers 15 -maxSetSize 100 > output.txt 2>&1 || true
             copy_glob_to_output "output.*"
@@ -223,6 +250,7 @@ run_on_host() {
         -e OUT="${OUT}" \
         -e INPUT="${INPUT}" \
         -e LITMUS_TESTS="${LITMUS_TESTS}" \
+        -e MEMORY_MODEL="${MEMORY_MODEL}" \
         -v "${PROJECT_ROOT}/build:/output" \
         "${IMAGE_NAME}"
 }
@@ -248,6 +276,11 @@ main() {
                 LITMUS_TESTS="TRUE"
                 shift
                 ;;
+            --memory-model)
+                [[ $# -ge 2 ]] || fail "--memory-model requires a value"
+                MEMORY_MODEL="$2"
+                shift 2
+                ;;
             --skip-build)
                 SKIP_BUILD="TRUE"
                 shift
@@ -271,6 +304,8 @@ main() {
                 ;;
         esac
     done
+
+    normalize_memory_model
 
     if [[ "${CONTAINER_MODE}" == "TRUE" ]]; then
         run_in_container
