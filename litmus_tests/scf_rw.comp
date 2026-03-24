@@ -22,16 +22,16 @@ void main() {
     uint peerSlot = 1u - ownSlot;
 
     uint snapshot = atomicLoad(slots, 4, 64, 0);
-    uint read = (snapshot >> (peerSlot * SLOT_WIDTH)) & SLOT_MASK;
+    uint read = (snapshot >> (ownSlot * SLOT_WIDTH)) & SLOT_MASK;
 
-    uint ownShift = ownSlot * SLOT_WIDTH;
-    uint ownClearMask = FULL_MASK - (SLOT_MASK << ownShift);
+    uint peerShift = peerSlot * SLOT_WIDTH;
+    uint peerClearMask = FULL_MASK - (SLOT_MASK << peerShift);
     if (tid == 0u) {
-        atomicAnd(slots, ownClearMask, 4, 64, 0);
-        atomicOr(slots, (1u << ownShift), 4, 64, 0);
+        atomicAnd(slots, peerClearMask, 4, 64, 0);
+        atomicOr(slots, (1u << peerShift), 4, 64, 0);
     } else {
-        atomicAnd(slots, ownClearMask, 4, 64, 0);
-        atomicOr(slots, (1u << ownShift), 4, 64, 0);
+        atomicAnd(slots, peerClearMask, 4, 64, 0);
+        atomicOr(slots, (1u << peerShift), 4, 64, 0);
     }
 
     barrier();

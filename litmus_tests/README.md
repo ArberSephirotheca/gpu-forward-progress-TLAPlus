@@ -13,10 +13,13 @@ scripts/docker-run-tlaplus.sh --litmus-tests
 
 Each `.comp` file is compiled into its own `MCProgram.tla`, and TLC output is written under `build/litmus_tests_result/`.
 
-The current `wr` shaders are written to stay close to the Amber references:
+The current litmus shaders are written to stay close to the Amber references while still using a single packed scalar location instead of indexed buffers:
 
 - `cm_wr` still checks collective/uniform visibility.
-- `scf_wr`, `sm_wr`, and `sso_wr` now write the peer slot and then read the thread's own slot.
+- `scf_rw`, `sm_rw`, and `sso_rw` read the thread's own slot and then write the peer slot.
+- `scf_wr`, `sm_wr`, and `sso_wr` write the peer slot and then read the thread's own slot.
+- `scf_ww` and `sm_ww` write the thread's own slot first and then the peer slot.
+- `sso_ww` also mirrors the Amber branch-specific `subgroupAll(true)` / `subgroupAll(false)` shape.
 
 With the current scalar RA memory extension, those peer-visibility `wr` tests behave differently by memory model:
 
