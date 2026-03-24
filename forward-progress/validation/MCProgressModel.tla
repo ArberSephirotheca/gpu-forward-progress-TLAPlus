@@ -3,7 +3,7 @@ EXTENDS Integers, Naturals, Sequences, MCThreads, TLC, FiniteSets
 
 VARIABLES fairExecutionSet, selected, runningThread
 
-vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicBlockSet, snapShotMap, globalCounter>>
+vars == <<fairExecutionSet, pc, state, selected, runningThread, threadLocals, globalVars, DynamicBlockSet, snapShotMap, globalCounter, modOrder, threadView>>
 
 UniverseOfAllWGs == {0, 1}
 
@@ -28,6 +28,7 @@ InitScheduler ==
 Init ==
     /\  InitProgram
     /\  InitThreads
+    /\  InitRA
     /\  InitScheduler
     /\  InitState
     /\  InitSnapShotMap
@@ -104,7 +105,7 @@ Step ==
 Next ==
     Step
 
-ViewFunction == <<pc, state, threadLocals, globalVars, DynamicBlockSet, selected, runningThread>>
+ViewFunction == <<pc, state, threadLocals, globalVars, DynamicBlockSet, selected, runningThread, modOrder, threadView>>
 
 (* Fairness properties *)
 

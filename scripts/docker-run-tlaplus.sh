@@ -97,6 +97,8 @@ run_litmus_tests() {
     [[ -d litmus_tests ]] || fail "LITMUS_TESTS=TRUE requires ./litmus_tests"
 
     mkdir -p litmus_tests_spv litmus_tests_dis litmus_tests_result litmus_tests_mc_programs
+    local mc_program_template="litmus_tests_mc_programs/MCProgram.template.tla"
+    cp "${MC_PROGRAM_PATH}" "${mc_program_template}"
 
     shopt -s nullglob
     local tests=(litmus_tests/*.comp)
@@ -107,12 +109,12 @@ run_litmus_tests() {
         local name
         name="$(basename "${test_file}" .comp)"
 
-        cp "${MC_PROGRAM_PATH}" "litmus_tests_mc_programs/${name}.tla"
-        "${GLSLANG_BIN}" -V --target-env vulkan1.3 "${test_file}" -o "litmus_tests_spv/${name}.spv"
+        cp "${mc_program_template}" "litmus_tests_mc_programs/${name}.tla"
+        "${GLSLANG_BIN}" -V --target-env spirv1.5 "${test_file}" -o "litmus_tests_spv/${name}.spv"
         "${SPIRV_DIS_BIN}" "litmus_tests_spv/${name}.spv" > "litmus_tests_dis/${name}.txt"
 
         echo "Running test for ${name}"
-        "${HOMUNCULUS_BIN}" "litmus_tests_dis/${name}.txt" "litmus_tests_mc_programs/${name}.tla"
+        "${HOMUNCULUS_BIN}" compile "litmus_tests_dis/${name}.txt" "litmus_tests_mc_programs/${name}.tla"
         cp "litmus_tests_mc_programs/${name}.tla" "${MC_PROGRAM_PATH}"
         tlc "${MC_MODEL_PATH}" > "litmus_tests_result/${name}.txt" 2>&1 || true
     done
