@@ -287,6 +287,8 @@ Suffix meanings:
 | `scf_ww`, `scf_rw`, `scf_wr` | SCF | Tests whether threads have synchronous control flow. |
 | `sso_ww`, `sso_rw`, `sso_wr` | SSO | Tests whether subgroup operations synchronize with the associated control flow. |
 
+Under the current RA-enabled executable semantics for scalar global/shared atomics, the `*_wr` litmus shaders check each thread's self-visibility after its release RMW sequence. Peer-write visibility would require an additional synchronization edge and is not asserted by these shaders.
+
 Run:
 
 ```bash

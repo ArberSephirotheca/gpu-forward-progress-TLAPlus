@@ -20,7 +20,6 @@ void main() {
 
     uint tid = gl_LocalInvocationID.x;
     uint ownSlot = tid;
-    uint peerSlot = 1u - ownSlot;
 
     uint ownShift = ownSlot * SLOT_WIDTH;
     uint ownClearMask = FULL_MASK - (SLOT_MASK << ownShift);
@@ -31,11 +30,11 @@ void main() {
     if (tid == 0u) {
         subgroupAll(false);
         uint snapshot = atomicLoad(slots, 4, 64, 0);
-        read = (snapshot >> (peerSlot * SLOT_WIDTH)) & SLOT_MASK;
+        read = (snapshot >> (ownSlot * SLOT_WIDTH)) & SLOT_MASK;
     } else {
         subgroupAll(false);
         uint snapshot = atomicLoad(slots, 4, 64, 0);
-        read = (snapshot >> (peerSlot * SLOT_WIDTH)) & SLOT_MASK;
+        read = (snapshot >> (ownSlot * SLOT_WIDTH)) & SLOT_MASK;
     }
 
     barrier();
