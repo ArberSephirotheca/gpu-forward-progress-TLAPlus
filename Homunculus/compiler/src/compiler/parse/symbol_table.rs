@@ -207,7 +207,10 @@ impl SpirvTypeTable {
 #[derive(Debug, PartialEq, Clone)]
 pub enum AccessStep {
     ConstIndex(i32),               // Constant index
-    VariableIndex(VariableSymbol), // Variable index
+    VariableIndex {
+        name: VariableSymbol,
+        storage_class: StorageClass,
+    }, // Variable index
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -299,10 +302,18 @@ impl VariableInfo {
         self.default_value.clone()
     }
 
-    // FIXME: implement array and struct
     pub(crate) fn get_index(&self) -> IndexKind {
-        match &self.ty {
-            _ => IndexKind::Literal(-1),
+        match self.access_chain.as_slice() {
+            [] => IndexKind::Literal(-1),
+            [AccessStep::ConstIndex(value)] => IndexKind::Literal(*value),
+            [AccessStep::VariableIndex {
+                name,
+                storage_class,
+            }] => IndexKind::Variable(format!(
+                "Var(\"{}\", \"{}\", None, Index(-1))",
+                storage_class, name
+            )),
+            _ => panic!("Nested indexed access is not supported yet"),
         }
     }
     pub(crate) fn is_intermediate(&self) -> bool {

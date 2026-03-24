@@ -6,7 +6,7 @@ use super::common::{
     InstructionBuiltInVariable, InstructionValue, Program, Scheduler, VariableScope,
 };
 use crate::codegen::common::{IndexKind, InstructionName};
-use crate::compiler::ast::ast::{BinaryExpr, Expr, ResultType, Root, Stmt, UnaryExpr};
+use crate::compiler::ast::ast::{BinaryExpr, Expr, ResultType, Root, Stmt, TypeExpr, UnaryExpr};
 use crate::compiler::parse::lexer::Token;
 /// `CodegenCx` is a struct that holds the compilation unit of the codegen.
 use crate::compiler::parse::symbol_table::*;
@@ -177,10 +177,65 @@ impl CodegenCx {
         }
     }
 
+    fn lower_type_expr(&self, type_expr: &TypeExpr) -> SpirvType {
+        match type_expr.opcode() {
+            Some(TokenKind::OpTypeArray) => {
+                let operands = type_expr.operand_tokens();
+                let element = operands
+                    .first()
+                    .expect("OpTypeArray is missing its element type operand");
+                let count_token = operands
+                    .get(1)
+                    .expect("OpTypeArray is missing its length operand");
+                let count = match count_token.kind() {
+                    TokenKind::Int => count_token.text().parse::<u32>().unwrap(),
+                    TokenKind::Ident => {
+                        let count_info = self.lookup_variable(count_token.text()).unwrap_or_else(|| {
+                            panic!("OpTypeArray length constant {} not found", count_token.text())
+                        });
+                        if !count_info.is_constant() {
+                            panic!(
+                                "OpTypeArray length operand {} must be a constant",
+                                count_token.text()
+                            );
+                        }
+                        let value = count_info.get_constant_int();
+                        if value < 0 {
+                            panic!(
+                                "OpTypeArray length operand {} must be non-negative, got {}",
+                                count_token.text(),
+                                value
+                            );
+                        }
+                        value as u32
+                    }
+                    _ => panic!(
+                        "Unsupported OpTypeArray length operand token {:?}",
+                        count_token.kind()
+                    ),
+                };
+                SpirvType::Array {
+                    element: element.text().to_string(),
+                    count,
+                }
+            }
+            Some(TokenKind::OpTypeRuntimeArray) => {
+                let element = type_expr
+                    .operand_tokens()
+                    .first()
+                    .expect("OpTypeRuntimeArray is missing its element type operand")
+                    .text()
+                    .to_string();
+                SpirvType::RuntimeArray { element }
+            }
+            _ => type_expr.ty(),
+        }
+    }
+
     fn symbol_table_construction_pass_expr(&mut self, var_name: String, expr: &Expr) {
         match expr {
             Expr::TypeExpr(type_expr) => {
-                self.insert_type(var_name.clone(), type_expr.ty());
+                self.insert_type(var_name.clone(), self.lower_type_expr(type_expr));
             }
             Expr::VariableExpr(var_expr) => {
                 let ty_name = var_expr.ty_name().unwrap();
@@ -235,15 +290,45 @@ impl CodegenCx {
                 // Initialize access chain tracking
                 let mut access_chain = base_var_info.access_chain.clone();
 
-                let index_name = var_ref.index_name().unwrap();
-                let var_info = self.lookup_variable(index_name.text()).unwrap();
-
-                // Record the access step
-                // since it is a constant, we can directly use its value
-                if var_info.is_constant() {
-                    access_chain.push(AccessStep::ConstIndex(var_info.get_constant_int()))
-                } else {
-                    access_chain.push(AccessStep::VariableIndex(index_name.text().to_string()));
+                let mut current_type = self.resolve_real_type(&base_var_info.get_ty());
+                for index_name in var_ref.index_names() {
+                    let index_info = self.lookup_variable(index_name.text()).unwrap();
+                    match &current_type {
+                        SpirvType::Struct { members } => {
+                            if !index_info.is_constant() || index_info.get_constant_int() != 0 {
+                                panic!(
+                                    "OpAccessChain only supports selecting member 0 from single-member structs"
+                                );
+                            }
+                            let member_type = self
+                                .lookup_type(members.as_str())
+                                .expect("OpAccessChain: Struct member type not found");
+                            current_type = self.resolve_real_type(member_type);
+                        }
+                        SpirvType::Array { element, .. }
+                        | SpirvType::RuntimeArray { element }
+                        | SpirvType::Vector { element, .. } => {
+                            if index_info.is_constant() {
+                                access_chain
+                                    .push(AccessStep::ConstIndex(index_info.get_constant_int()));
+                            } else {
+                                access_chain.push(AccessStep::VariableIndex {
+                                    name: index_info.get_var_name(),
+                                    storage_class: index_info.get_storage_class(),
+                                });
+                            }
+                            let element_type = self
+                                .lookup_type(element.as_str())
+                                .expect("OpAccessChain: Element type not found");
+                            current_type = self.resolve_real_type(element_type);
+                        }
+                        _ => {
+                            panic!(
+                                "OpAccessChain indexing into unsupported type {:?}",
+                                current_type
+                            );
+                        }
+                    }
                 }
 
                 // Build the final variable information after applying the access chain
@@ -2585,43 +2670,39 @@ impl CodegenCx {
             // LoadExpr will only load to a SSA result ID that has pointer type
             // it will never load to a real variable
             Expr::LoadExpr(load_expr) => {
-                // let inst_args_builder = InstructionArguments::builder();
-                // let inst_arg1_builder = InstructionArgument::builder();
-                // let inst_arg2_builder = InstructionArgument::builder();
+                let inst_args_builder = InstructionArguments::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
 
-                // let var_name = self.lookup_variable(&var_name).unwrap().id;
-                // // fixme: better error handling
-                // let pointer_ssa_id = load_expr.pointer().unwrap();
-                // let pointer_info = self.lookup_variable(pointer_ssa_id.text()).unwrap();
-                // let result_info = self.lookup_variable(&var_name).unwrap();
+                let result_info = self.lookup_variable(&var_name).unwrap();
+                let pointer_ssa_id = load_expr.pointer().unwrap();
+                let pointer_info = self.lookup_variable(pointer_ssa_id.text()).unwrap();
 
-                // // first arg is the pointer to load into
-                // let result = inst_arg1_builder
-                //     .name(var_name.clone())
-                //     // it is intializing a ssa, so the value is None
-                //     .value(InstructionValue::None)
-                //     .index(IndexKind::Literal(-1))
-                //     .scope(VariableScope::cast(&result_info.get_storage_class()))
-                //     .build()
-                //     .unwrap();
+                let result = inst_arg1_builder
+                    .ssa_id(result_info.get_ssa_name())
+                    .name(result_info.get_ssa_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
 
-                // // second arg is the pointer to load from
-                // let pointer = inst_arg2_builder
-                //     .name(pointer_ssa_id.text().to_string() /* .get_var_name()*/)
-                //     .value(self.construct_instruction_value(&pointer_info))
-                //     .index(IndexKind::Literal(-1))
-                //     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
-                //     .build()
-                //     .unwrap();
+                let pointer = inst_arg2_builder
+                    .ssa_id(pointer_info.get_ssa_name())
+                    .name(pointer_info.get_var_name())
+                    .value(self.construct_instruction_value(&pointer_info))
+                    .index(pointer_info.get_index())
+                    .scope(VariableScope::cast(&pointer_info.get_storage_class()))
+                    .build()
+                    .unwrap();
 
-                // Some(
-                //     inst_args_builder
-                //         .name(InstructionName::Load)
-                //         .num_args(2)
-                //         .push_argument(result)
-                //         .push_argument(pointer),
-                // )
-                None
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::Load)
+                        .num_args(2)
+                        .push_argument(result)
+                        .push_argument(pointer),
+                )
             }
             Expr::AtomicLoadExpr(atomic_load_expr) => {
                 let inst_args_builder = InstructionArguments::builder();
@@ -2648,7 +2729,7 @@ impl CodegenCx {
                     .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     .value(self.construct_instruction_value(&pointer_info))
-                    .index(IndexKind::Literal(-1))
+                    .index(pointer_info.get_index())
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
                     .unwrap();
@@ -3343,7 +3424,6 @@ impl CodegenCx {
                         .unwrap(),
                 )
             }
-            // fixme:: does not support OpAccesschain yet
             Stmt::AtomicStoreStatement(atomic_store_stmt) => {
                 let inst_args_builder = InstructionArguments::builder();
                 let inst_arg1_builder = InstructionArgument::builder();
@@ -3361,7 +3441,7 @@ impl CodegenCx {
                     .name(pointer_info.get_var_name())
                     // it is intializing a ssa, so the value is None
                     .value(InstructionValue::None)
-                    .index(IndexKind::Literal(-1))
+                    .index(pointer_info.get_index())
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
                     .unwrap();
@@ -3698,32 +3778,34 @@ impl CodegenCx {
         }
     }
 
-    // pub fn generate_code(&mut self, root: SyntaxNode) -> Program {
-    //     let mut program_builder = Program::builder();
-    //     let root = Root::cast(root).unwrap();
-    //     // first pass: construct symbol table
-    //     self.symbol_table_construction_pass(&root);
-    //     self.reset_position();
+    pub fn generate_code(&mut self, root: SyntaxNode) -> Program {
+        let mut program_builder = Program::builder();
+        let root = Root::cast(root).unwrap();
+        // first pass: construct symbol table
+        self.symbol_table_construction_pass(&root);
+        self.reset_position();
 
-    //     for stmt in root.stmts() {
-    //         let inst = self.generate_code_for_stmt(&stmt);
-    //         match inst {
-    //             Some(i) => program_builder = program_builder.push_instruction(i),
-    //             None => { /* do nothing */ }
-    //         }
-    //     }
+        for stmt in root.stmts() {
+            let inst = self.generate_code_for_stmt(&stmt, 0);
+            match inst {
+                Some(i) => program_builder = program_builder.push_instruction(i),
+                None => { /* do nothing */ }
+            }
+        }
 
-    //     let global_variables = self.get_global_variables();
-    //     program_builder
-    //         .global_var(global_variables)
-    //         .num_work_groups(self.num_work_group)
-    //         .work_group_size(self.work_group_size)
-    //         .subgroup_size(self.sub_group_size)
-    //         .num_threads(self.num_work_group * self.work_group_size)
-    //         .scheduler(self.scheduler.clone())
-    //         .build()
-    //         .unwrap()
-    // }
+        let global_variables = self.get_global_variables();
+        program_builder
+            .global_var(global_variables)
+            .num_work_groups(self.num_work_group)
+            .work_group_size(self.work_group_size)
+            .subgroup_size(self.sub_group_size)
+            .num_threads(self.num_work_group * self.work_group_size)
+            .scheduler(self.scheduler.clone())
+            .synchronization_id(self.synchronization_id)
+            .func_start_line(0)
+            .build()
+            .unwrap()
+    }
 
     pub fn generate_code_with_origin_line_number(
         &mut self,
@@ -4041,6 +4123,163 @@ mod test {
         );
         assert_eq!(var_info.access_chain.len(), 1);
         assert_eq!(var_info.access_chain[0], AccessStep::ConstIndex(2));
+    }
+
+    #[test]
+    fn check_access_chain_skips_single_member_struct_wrapper() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %vec = OpTypeVector %uint 2
+         %buf = OpTypeStruct %vec
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        codegen_ctx.generate_code(syntax);
+        let var_info = codegen_ctx.lookup_variable("%ptr").unwrap();
+        assert_eq!(var_info.id, "%data");
+        assert_eq!(var_info.access_chain.len(), 1);
+        assert_eq!(
+            var_info.access_chain[0],
+            AccessStep::VariableIndex {
+                name: "%idx".to_string(),
+                storage_class: StorageClass::Local,
+            }
+        );
+        assert_eq!(
+            var_info.get_index(),
+            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+        );
+    }
+
+    #[test]
+    fn check_atomic_load_with_indexed_access_chain() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %vec = OpTypeVector %uint 2
+         %buf = OpTypeStruct %vec
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+         %value = OpAtomicLoad %uint %ptr %uint_1 %uint_0
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let atomic_load = program.instructions.get(1).unwrap();
+        assert_eq!(atomic_load.name, InstructionName::AtomicLoad);
+        assert_eq!(atomic_load.arguments.arguments[1].name, "%data");
+        assert_eq!(
+            atomic_load.arguments.arguments[1].index,
+            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+        );
+    }
+
+    #[test]
+    fn check_atomic_store_with_indexed_access_chain() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %vec = OpTypeVector %uint 2
+         %buf = OpTypeStruct %vec
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+         OpAtomicStore %ptr %uint_1 %uint_0 %uint_1
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let atomic_store = program.instructions.get(1).unwrap();
+        assert_eq!(atomic_store.name, InstructionName::AtomicStore);
+        assert_eq!(atomic_store.arguments.arguments[0].name, "%data");
+        assert_eq!(
+            atomic_store.arguments.arguments[0].index,
+            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+        );
+    }
+
+    #[test]
+    fn check_atomic_load_with_runtime_array_access_chain() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %runtime_arr = OpTypeRuntimeArray %uint
+         %buf = OpTypeStruct %runtime_arr
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+         %value = OpAtomicLoad %uint %ptr %uint_1 %uint_0
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let atomic_load = program.instructions.get(1).unwrap();
+        assert_eq!(codegen_ctx.lookup_type("%runtime_arr"), Some(&SpirvType::RuntimeArray {
+            element: "%uint".to_string(),
+        }));
+        assert_eq!(atomic_load.name, InstructionName::AtomicLoad);
+        assert_eq!(atomic_load.arguments.arguments[1].name, "%data");
+        assert_eq!(
+            atomic_load.arguments.arguments[1].index,
+            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+        );
+    }
+
+    #[test]
+    fn check_atomic_store_with_fixed_array_access_chain() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %uint_2 = OpConstant %uint 2
+         %arr = OpTypeArray %uint %uint_2
+         %buf = OpTypeStruct %arr
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+         OpAtomicStore %ptr %uint_1 %uint_0 %uint_1
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let atomic_store = program.instructions.get(1).unwrap();
+        assert_eq!(
+            codegen_ctx.lookup_type("%arr"),
+            Some(&SpirvType::Array {
+                element: "%uint".to_string(),
+                count: 2,
+            })
+        );
+        assert_eq!(atomic_store.name, InstructionName::AtomicStore);
+        assert_eq!(atomic_store.arguments.arguments[0].name, "%data");
+        assert_eq!(
+            atomic_store.arguments.arguments[0].index,
+            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+        );
     }
 
     /*
