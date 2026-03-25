@@ -31,41 +31,62 @@ RAPointerArgument(t, insIdx) ==
     ELSE
         Mangle(t, ThreadArguments[t][insIdx][1])
 
-RAPointerIndexArgument(t, insIdx) ==
-    IF ThreadInstructions[t][insIdx] = "OpAtomicLoad" THEN
-        ThreadArguments[t][insIdx][2].index
-    ELSE
-        ThreadArguments[t][insIdx][1].index
-
-IsScalarRAInstruction(t, insIdx) ==
+IsRAInstruction(t, insIdx) ==
     /\ ThreadInstructions[t][insIdx] \in RAAtomicInstructionSet
     /\ LET ptr == RAPointerArgument(t, insIdx)
-           ptrIdx == RAPointerIndexArgument(t, insIdx)
        IN
            /\ (IsGlobal(ptr) \/ IsShared(ptr))
-           /\ IsIndex(ptrIdx)
-           /\ ptrIdx.realIndex = -1
 
-RAAddress(ptr) ==
-    [scope |-> ptr.scope, name |-> ptr.name]
+RAAddress(ptr, idx) ==
+    [scope |-> ptr.scope, name |-> ptr.name, index |-> idx]
+
+HasConcreteIndex(idx) ==
+    idx >= 0
+
+IsScalarIndex(idx) ==
+    idx < 0
+
+RAResolvedIndex(idx) ==
+    IF HasConcreteIndex(idx) THEN idx ELSE -1
+
+RAStorageLookupVar(ptr, idx) ==
+    Var(ptr.scope, ptr.name, 0, Index(idx))
+
+RAStorageVar(ptr) ==
+    IF IsGlobal(ptr) /\ \E variable \in globalVars : variable.name = ptr.name THEN
+        GetVar(1, RAStorageLookupVar(ptr, -1))
+    ELSE IF IsShared(ptr) /\ \E wg \in 1..NumWorkGroups : VarExists(wg, RAStorageLookupVar(ptr, -1)) THEN
+        LET wg == CHOOSE w \in 1..NumWorkGroups : VarExists(w, RAStorageLookupVar(ptr, -1))
+        IN
+            GetVar(wg, RAStorageLookupVar(ptr, -1))
+    ELSE
+        RAStorageLookupVar(ptr, -1)
+
+RAAddressesForPointer(ptr) ==
+    LET storageVar == RAStorageVar(ptr)
+    IN
+        IF IsArray(storageVar) THEN
+            {RAAddress(ptr, idx) : idx \in DOMAIN storageVar.value}
+        ELSE
+            {RAAddress(ptr, -1)}
 
 RAAddressesForThread(t) ==
-    {RAAddress(RAPointerArgument(t, insIdx)) :
-        insIdx \in {i \in DOMAIN ThreadInstructions[t] : IsScalarRAInstruction(t, i)}}
+    UNION {RAAddressesForPointer(RAPointerArgument(t, insIdx)) :
+        insIdx \in {i \in DOMAIN ThreadInstructions[t] : IsRAInstruction(t, i)}}
 
 RAAddressDomain ==
     UNION {RAAddressesForThread(t) : t \in Threads}
 
 RAInitialPointerVar(addr) ==
-    Var(addr.scope, addr.name, 0, Index(-1))
+    Var(addr.scope, addr.name, 0, Index(addr.index))
 
 RAInitialValue(addr) ==
     IF addr.scope = "global" /\ \E variable \in globalVars : variable.name = addr.name THEN
-        GetVar(1, RAInitialPointerVar(addr)).value
+        GetVal(1, RAInitialPointerVar(addr))
     ELSE IF addr.scope = "shared" /\ \E wg \in 1..NumWorkGroups : VarExists(wg, RAInitialPointerVar(addr)) THEN
         LET wg == CHOOSE w \in 1..NumWorkGroups : VarExists(w, RAInitialPointerVar(addr))
         IN
-            GetVar(wg, RAInitialPointerVar(addr)).value
+            GetVal(wg, RAInitialPointerVar(addr))
     ELSE
         0
 
@@ -91,20 +112,13 @@ InitMemoryModel ==
 MaxNat(x, y) ==
     IF x >= y THEN x ELSE y
 
-HasConcreteIndex(idx) ==
-    idx >= 0
-
-IsScalarIndex(idx) ==
-    idx < 0
-
 JoinRAViews(left, right) ==
     [a \in RAAddressDomain |-> MaxNat(left[a], right[a])]
 
 IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex) ==
     /\ RAEnabled
     /\ (IsGlobal(mangledPointer) \/ IsShared(mangledPointer))
-    /\ IsScalarIndex(evaluatedPointerIndex)
-    /\ RAAddress(mangledPointer) \in RAAddressDomain
+    /\ RAAddress(mangledPointer, RAResolvedIndex(evaluatedPointerIndex)) \in RAAddressDomain
 
 RAReadChoices(t, addr) ==
     {idx \in 1..Len(modOrder[addr]) : idx >= threadView[t][addr]}
@@ -364,6 +378,12 @@ RAResultAssignments(t, result, valueRead) ==
                 ELSE
                     {Var(resultVar.scope, resultVar.name, valueRead, Index(-1))}
 
+RAStoreAssignments(pointerVar, evaluatedPointerIndex, valueToStore) ==
+    IF HasConcreteIndex(evaluatedPointerIndex) THEN
+        {ChangeElementAt(pointerVar, evaluatedPointerIndex, valueToStore)}
+    ELSE
+        {Var(pointerVar.scope, pointerVar.name, valueToStore, pointerVar.index)}
+
 
 OpLogicalOr(t, var, operand1, operand2) ==
     LET workGroupId == WorkGroupId(t)+1
@@ -458,14 +478,14 @@ OpAtomicOr(t, var, pointer, value) ==
                 pointerVal == GetVal(workGroupId, mangledPointer)
                 valueVal == GetVal(workGroupId, mangledValue)
                 raEligible == IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex)
-                raAddr == RAAddress(mangledPointer)
+                raAddr == RAAddress(mangledPointer, RAResolvedIndex(evaluatedPointerIndex))
             IN
                 IF raEligible THEN
                     LET readIdx == RARMWReadIndex(raAddr)
                         oldValue == modOrder[raAddr][readIdx].value
                         newValue == oldValue | valueVal
                     IN
-                        /\ Assignment(t, RAResultAssignments(t, var, oldValue) \cup {Var(mangledPointer.scope, mangledPointer.name, newValue, pointerVar.index)})
+                        /\ Assignment(t, RAResultAssignments(t, var, oldValue) \cup RAStoreAssignments(pointerVar, evaluatedPointerIndex, newValue))
                         /\ RARMWStateUpdate(t, raAddr, readIdx, newValue)
                         /\ pc' = [pc EXCEPT ![t] = pc[t] + 1]
                         /\ UNCHANGED <<state, DynamicBlockSet, globalCounter, snapShotMap>>
@@ -492,9 +512,8 @@ OpAtomicOrSync(t, var, pointer, value) ==
         pointerVal == GetVal(workGroupId, mangledPointer)
         valueVal == GetVal(workGroupId, mangledValue)
         raEligible == IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex)
-        raAddr == RAAddress(mangledPointer)
-        assignmentSet == {Var(mangledVar.scope, mangledVar.name, pointerVal, Index(-1)),
-                          Var(mangledPointer.scope, mangledPointer.name, pointerVal | valueVal, Index(-1))}
+        raAddr == RAAddress(mangledPointer, RAResolvedIndex(evaluatedPointerIndex))
+        assignmentSet == RAResultAssignments(t, var, pointerVal) \cup RAStoreAssignments(pointerVar, evaluatedPointerIndex, pointerVal | valueVal)
         remaining == {sthread \in active_subgroup_threads : sthread # t /\ pc[sthread] = currentPc}
     IN
         /\ (IsVariable(mangledVar) \/ IsIntermediate(mangledVar))
@@ -520,7 +539,7 @@ OpAtomicOrSync(t, var, pointer, value) ==
                             oldValue == modOrder[raAddr][readIdx].value
                             newValue == oldValue | valueVal
                         IN
-                            /\ Assignment(t, RAResultAssignments(t, var, oldValue) \cup {Var(mangledPointer.scope, mangledPointer.name, newValue, pointerVar.index)})
+                            /\ Assignment(t, RAResultAssignments(t, var, oldValue) \cup RAStoreAssignments(pointerVar, evaluatedPointerIndex, newValue))
                             /\ RARMWStateUpdate(t, raAddr, readIdx, newValue)
                             /\ pc' = [pc EXCEPT ![t] = pc[t] + 1]
                             /\ DynamicBlockSet' = newDBSet
@@ -546,14 +565,14 @@ OpAtomicAnd(t, var, pointer, value) ==
                 pointerVal == GetVal(workGroupId, mangledPointer)
                 valueVal == GetVal(workGroupId, mangledValue)
                 raEligible == IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex)
-                raAddr == RAAddress(mangledPointer)
+                raAddr == RAAddress(mangledPointer, RAResolvedIndex(evaluatedPointerIndex))
             IN
                 IF raEligible THEN
                     LET readIdx == RARMWReadIndex(raAddr)
                         oldValue == modOrder[raAddr][readIdx].value
                         newValue == oldValue & valueVal
                     IN
-                        /\ Assignment(t, RAResultAssignments(t, var, oldValue) \cup {Var(mangledPointer.scope, mangledPointer.name, newValue, pointerVar.index)})
+                        /\ Assignment(t, RAResultAssignments(t, var, oldValue) \cup RAStoreAssignments(pointerVar, evaluatedPointerIndex, newValue))
                         /\ RARMWStateUpdate(t, raAddr, readIdx, newValue)
                         /\ pc' = [pc EXCEPT ![t] = pc[t] + 1]
                         /\ UNCHANGED <<state, DynamicBlockSet, globalCounter, snapShotMap>>
@@ -579,9 +598,8 @@ OpAtomicAndSync(t, var, pointer, value) ==
         pointerVal == GetVal(workGroupId, mangledPointer)
         valueVal == GetVal(workGroupId, mangledValue)
         raEligible == IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex)
-        raAddr == RAAddress(mangledPointer)
-        assignmentSet == {Var(mangledVar.scope, mangledVar.name, pointerVal, Index(-1)),
-                          Var(mangledPointer.scope, mangledPointer.name, pointerVal & valueVal, Index(-1))}
+        raAddr == RAAddress(mangledPointer, RAResolvedIndex(evaluatedPointerIndex))
+        assignmentSet == RAResultAssignments(t, var, pointerVal) \cup RAStoreAssignments(pointerVar, evaluatedPointerIndex, pointerVal & valueVal)
         remaining == {sthread \in active_subgroup_threads : sthread # t /\ pc[sthread] = currentPc}
     IN
         /\ (IsVariable(mangledVar) \/ IsIntermediate(mangledVar))
@@ -607,7 +625,7 @@ OpAtomicAndSync(t, var, pointer, value) ==
                             oldValue == modOrder[raAddr][readIdx].value
                             newValue == oldValue & valueVal
                         IN
-                            /\ Assignment(t, RAResultAssignments(t, var, oldValue) \cup {Var(mangledPointer.scope, mangledPointer.name, newValue, pointerVar.index)})
+                            /\ Assignment(t, RAResultAssignments(t, var, oldValue) \cup RAStoreAssignments(pointerVar, evaluatedPointerIndex, newValue))
                             /\ RARMWStateUpdate(t, raAddr, readIdx, newValue)
                             /\ pc' = [pc EXCEPT ![t] = pc[t] + 1]
                             /\ DynamicBlockSet' = newDBSet
@@ -903,7 +921,7 @@ OpAtomicLoadSync(t, result, pointer) ==
         pointerVar == GetVar(workGroupId, mangledPointer)
         evaluatedPointerIndex == EvalExpr(t, workGroupId, pointer.index)
         raEligible == IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex)
-        raAddr == RAAddress(mangledPointer)
+        raAddr == RAAddress(mangledPointer, RAResolvedIndex(evaluatedPointerIndex))
         assignmentSet ==
             IF IsIntermediate(mangledResult) THEN
                 LET value == IF HasConcreteIndex(evaluatedPointerIndex) THEN pointerVar.value[evaluatedPointerIndex] ELSE pointerVar.value
@@ -972,7 +990,7 @@ OpAtomicLoad(t, result, pointer) ==
                 pointerVar == GetVar(workGroupId, mangledPointer)
                 evaluatedPointerIndex == EvalExpr(t, workGroupId, pointer.index)
                 raEligible == IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex)
-                raAddr == RAAddress(mangledPointer)
+                raAddr == RAAddress(mangledPointer, RAResolvedIndex(evaluatedPointerIndex))
             IN
                 IF raEligible THEN
                     \E readIdx \in RAReadChoices(t, raAddr):
@@ -1110,12 +1128,9 @@ OpAtomicStoreSync(t, pointer, value) ==
         evaluatedPointerIndex == EvalExpr(t, workGroupId, pointer.index)
         valueToStore == EvalExpr(t, workGroupId, value)
         raEligible == IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex)
-        raAddr == RAAddress(mangledPointer)
+        raAddr == RAAddress(mangledPointer, RAResolvedIndex(evaluatedPointerIndex))
         assignmentSet ==
-            IF HasConcreteIndex(evaluatedPointerIndex) THEN
-                {ChangeElementAt(pointerVar, evaluatedPointerIndex, valueToStore)}
-            ELSE
-                {Var(pointerVar.scope, pointerVar.name, valueToStore, pointerVar.index)}
+            RAStoreAssignments(pointerVar, evaluatedPointerIndex, valueToStore)
         remaining == {sthread \in active_subgroup_threads : sthread # t /\ pc[sthread] = currentPc}
     IN
         /\ IsVariable(mangledPointer)
@@ -1136,7 +1151,7 @@ OpAtomicStoreSync(t, pointer, value) ==
                                  ELSE DynamicBlockSet
                 IN
                     IF raEligible THEN
-                        /\ Assignment(t, {Var(pointerVar.scope, pointerVar.name, valueToStore, pointerVar.index)})
+                        /\ Assignment(t, RAStoreAssignments(pointerVar, evaluatedPointerIndex, valueToStore))
                         /\ RAStoreStateUpdate(t, raAddr, valueToStore)
                         /\ pc' = [pc EXCEPT ![t] = pc[t] + 1]
                         /\ DynamicBlockSet' = newDBSet
@@ -1160,18 +1175,15 @@ OpAtomicStore(t, pointer, value) ==
                 evaluatedPointerIndex == EvalExpr(t, workGroupId, pointer.index)
                 valueToStore == EvalExpr(t, workGroupId, value)
                 raEligible == IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex)
-                raAddr == RAAddress(mangledPointer)
+                raAddr == RAAddress(mangledPointer, RAResolvedIndex(evaluatedPointerIndex))
             IN
                 IF raEligible THEN
-                    /\ Assignment(t, {Var(pointerVar.scope, pointerVar.name, valueToStore, pointerVar.index)})
+                    /\ Assignment(t, RAStoreAssignments(pointerVar, evaluatedPointerIndex, valueToStore))
                     /\ RAStoreStateUpdate(t, raAddr, valueToStore)
                     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                     /\  UNCHANGED <<state,  DynamicBlockSet, globalCounter, snapShotMap>>
                 ELSE
-                    /\  IF HasConcreteIndex(evaluatedPointerIndex) THEN 
-                            Assignment(t, {ChangeElementAt(pointerVar, evaluatedPointerIndex, valueToStore)})
-                        ELSE
-                            Assignment(t, {Var(pointerVar.scope, pointerVar.name, valueToStore, pointerVar.index)})
+                    /\  Assignment(t, RAStoreAssignments(pointerVar, evaluatedPointerIndex, valueToStore))
                     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                     /\  UNCHANGED <<state,  DynamicBlockSet, globalCounter, snapShotMap, modOrder, threadView>>
 

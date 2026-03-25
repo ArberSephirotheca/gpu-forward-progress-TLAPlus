@@ -161,7 +161,8 @@ expected_litmus_outcome() {
     local test_name="$2"
 
     case "${suite_name}:${test_name}:${MEMORY_MODEL}" in
-        regression:scf_wr:RA|regression:sm_wr:RA|regression:sso_wr:RA)
+        regression:scf_wr:RA|regression:sm_wr:RA|regression:sso_wr:RA|\
+        regression:scf_ww:RA|regression:sm_ww:RA|regression:sso_ww:RA)
             printf '%s\n' "FAIL"
             ;;
         regression:*:*)
