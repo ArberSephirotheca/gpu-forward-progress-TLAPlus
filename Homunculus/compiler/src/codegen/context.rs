@@ -1237,6 +1237,59 @@ impl CodegenCx {
         }
     }
 
+    fn remap_label_targets(&self, program: &mut Program) {
+        let label_positions: HashMap<String, i32> = program
+            .instructions
+            .iter()
+            .filter(|inst| inst.name == InstructionName::Label)
+            .filter_map(|inst| {
+                inst.arguments
+                    .arguments
+                    .first()
+                    .map(|arg| (arg.ssa_id.clone(), inst.position as i32))
+            })
+            .collect();
+
+        let rewrite_label_arg = |arg: &mut InstructionArgument| {
+            if let Some(position) = label_positions
+                .get(&arg.ssa_id)
+                .or_else(|| label_positions.get(&arg.name))
+            {
+                arg.value = InstructionValue::Int(*position);
+            }
+        };
+
+        for inst in program.instructions.iter_mut() {
+            match inst.name {
+                InstructionName::Branch => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[0]);
+                }
+                InstructionName::BranchConditional => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[1]);
+                    rewrite_label_arg(&mut inst.arguments.arguments[2]);
+                }
+                InstructionName::SelectionMerge => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[0]);
+                }
+                InstructionName::LoopMerge => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[0]);
+                    rewrite_label_arg(&mut inst.arguments.arguments[1]);
+                }
+                InstructionName::Switch => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[1]);
+                    if let Some(vec_args) = inst.vec_arguments.as_mut() {
+                        if vec_args.len() > 1 {
+                            for arg in vec_args[1].arguments.iter_mut() {
+                                rewrite_label_arg(arg);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     /// generate_code_for_expr will generate the SPIR-V code for the given expression,
     /// and the generated code will be added to the instruction builder.
     fn generate_code_for_expr(
@@ -3805,7 +3858,7 @@ impl CodegenCx {
         }
 
         let global_variables = self.get_global_variables();
-        program_builder
+        let mut program = program_builder
             .global_var(global_variables)
             .num_work_groups(self.num_work_group)
             .work_group_size(self.work_group_size)
@@ -3815,7 +3868,9 @@ impl CodegenCx {
             .synchronization_id(self.synchronization_id)
             .func_start_line(0)
             .build()
-            .unwrap()
+            .unwrap();
+        self.remap_label_targets(&mut program);
+        program
     }
 
     pub fn generate_code_with_origin_line_number(
@@ -3842,7 +3897,7 @@ impl CodegenCx {
         }
 
         let global_variables = self.get_global_variables();
-        program_builder
+        let mut program = program_builder
             .global_var(global_variables)
             .num_work_groups(self.num_work_group)
             .work_group_size(self.work_group_size)
@@ -3852,7 +3907,9 @@ impl CodegenCx {
             .synchronization_id(self.synchronization_id)
             .func_start_line(line)
             .build()
-            .unwrap()
+            .unwrap();
+        self.remap_label_targets(&mut program);
+        program
     }
 
     pub(crate) fn get_global_variables(&self) -> Vec<VariableInfo> {
@@ -4345,6 +4402,40 @@ mod test {
         assert_eq!(store.arguments.arguments[1].index, IndexKind::Literal(0));
     }
 
+    #[test]
+    fn check_global_roots_exclude_access_chain_aliases() {
+        let input = "%void = OpTypeVoid
+         %3 = OpTypeFunction %void
+         %uint = OpTypeInt 32 0
+         %Partition = OpTypeStruct %uint
+         %_ptr_StorageBuffer_Partition = OpTypePointer StorageBuffer %Partition
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %_ = OpVariable %_ptr_StorageBuffer_Partition StorageBuffer
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %int_4 = OpConstant %int 4
+         %uint_64 = OpConstant %uint 64
+         %_ptr_Function_uint = OpTypePointer Function %uint
+         %main = OpFunction %void None %3
+         %5 = OpLabel
+         %tmp = OpVariable %_ptr_Function_uint Function
+         %ptr0 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_0
+         %val0 = OpAtomicLoad %uint %ptr0 %int_4 %uint_64
+         OpStore %tmp %val0
+         %ptr1 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_0
+         OpAtomicStore %ptr1 %int_4 %uint_64 %val0
+         OpReturn
+         OpFunctionEnd
+        ";
+
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        assert_eq!(program.global_vars.len(), 1);
+        assert_eq!(program.global_vars[0].ssa_id, "%_");
+        assert_eq!(program.global_vars[0].id, "%_");
+    }
+
     /*
     layout(std140, binding = 0) uniform UBO {
     float data[10];
@@ -4495,6 +4586,101 @@ mod test {
             selection_merge.arguments.arguments[0].scope,
             VariableScope::Literal
         );
+    }
+
+    #[test]
+    fn check_branch_targets_use_final_label_positions() {
+        let input = "%void = OpTypeVoid
+        %3 = OpTypeFunction %void
+        %uint = OpTypeInt 32 0
+        %bool = OpTypeBool
+        %_ptr_Function_uint = OpTypePointer Function %uint
+        %main = OpFunction %void None %3
+        %5 = OpLabel
+        %src = OpVariable %_ptr_Function_uint Function
+        %dst = OpVariable %_ptr_Function_uint Function
+        %loaded = OpLoad %uint %src
+        OpStore %dst %loaded
+        %cond = OpIEqual %bool %loaded %loaded
+        OpSelectionMerge %merge None
+        OpBranchConditional %cond %true %false
+        %true = OpLabel
+        OpBranch %merge
+        %false = OpLabel
+        OpBranch %merge
+        %merge = OpLabel
+        OpReturn
+        OpFunctionEnd
+        ";
+
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+
+        let true_label_pos = program
+            .instructions
+            .iter()
+            .find(|inst| {
+                inst.name == InstructionName::Label
+                    && inst.arguments.arguments[0].ssa_id == "%true"
+            })
+            .unwrap()
+            .position as i32;
+        let false_label_pos = program
+            .instructions
+            .iter()
+            .find(|inst| {
+                inst.name == InstructionName::Label
+                    && inst.arguments.arguments[0].ssa_id == "%false"
+            })
+            .unwrap()
+            .position as i32;
+        let merge_label_pos = program
+            .instructions
+            .iter()
+            .find(|inst| {
+                inst.name == InstructionName::Label
+                    && inst.arguments.arguments[0].ssa_id == "%merge"
+            })
+            .unwrap()
+            .position as i32;
+
+        let selection_merge = program
+            .instructions
+            .iter()
+            .find(|inst| inst.name == InstructionName::SelectionMerge)
+            .unwrap();
+        assert_eq!(
+            selection_merge.arguments.arguments[0].value,
+            InstructionValue::Int(merge_label_pos)
+        );
+
+        let branch_conditional = program
+            .instructions
+            .iter()
+            .find(|inst| inst.name == InstructionName::BranchConditional)
+            .unwrap();
+        assert_eq!(
+            branch_conditional.arguments.arguments[1].value,
+            InstructionValue::Int(true_label_pos)
+        );
+        assert_eq!(
+            branch_conditional.arguments.arguments[2].value,
+            InstructionValue::Int(false_label_pos)
+        );
+
+        let merge_branches: Vec<_> = program
+            .instructions
+            .iter()
+            .filter(|inst| inst.name == InstructionName::Branch)
+            .collect();
+        assert_eq!(merge_branches.len(), 2);
+        for branch in merge_branches {
+            assert_eq!(
+                branch.arguments.arguments[0].value,
+                InstructionValue::Int(merge_label_pos)
+            );
+        }
     }
 
     #[test]

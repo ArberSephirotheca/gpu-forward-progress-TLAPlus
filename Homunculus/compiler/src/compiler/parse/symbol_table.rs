@@ -473,6 +473,8 @@ impl VariableSymbolTable {
             .values()
             .cloned()
             .filter(|val| !val.is_builtin())
+            .filter(|val| val.ssa_id == val.id)
+            .filter(|val| val.access_chain.is_empty())
             .collect();
         global
     }
