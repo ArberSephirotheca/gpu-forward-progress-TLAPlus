@@ -16,8 +16,8 @@ Each `.comp` file is compiled into its own `MCProgram.tla`, and TLC output is wr
 The current litmus shaders are written to stay close to the Amber references while still staying inside the currently supported global/shared atomic fragment of the executable model:
 
 - `cm_wr` still checks collective/uniform visibility.
-- `scf_rw`, `sm_rw`, and `sso_rw` read the thread's own slot and then write the peer slot.
-- `scf_wr`, `sm_wr`, and `sso_wr` write the peer slot and then read the thread's own slot.
+- `scf_rw`, `sm_rw`, and `sso_rw` now use indexed atomics over `slots[tid]` / `slots[next]`, mirroring the Amber `read own, then write peer` shape.
+- `scf_wr`, `sm_wr`, and `sso_wr` now use indexed atomics over `slots[tid]` / `slots[next]`, mirroring the Amber `write peer, then read own` shape.
 - `scf_ww`, `sm_ww`, and `sso_ww` now use a two-element storage-buffer array and indexed atomics, so each thread overwrites `slots[tid]` with `1` and `slots[next]` with `2` before loading `slots[tid]` back.
 - `sm_ww` now matches the Amber source shape directly, with no branch around the second store.
 - `sso_ww` keeps the Amber-style `subgroupAll(true)` / `subgroupAll(false)` split before the peer overwrite.

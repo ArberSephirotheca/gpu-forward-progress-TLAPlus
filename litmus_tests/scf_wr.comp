@@ -9,32 +9,21 @@ layout(tla_num_workgroups = 1) in;
 layout(tla_synchronization_id = 2) in; // 0=None, 1=SSO, 2=SCF, 3=SM, 4=CM
 
 layout(std430, binding = 0) buffer Partition {
-    uint slots;
+    uint slots[2];
 };
 
 void main() {
-    const uint SLOT_WIDTH = 4u;
-    const uint SLOT_MASK = (1u << SLOT_WIDTH) - 1u;
-    const uint FULL_MASK = (1u << (SLOT_WIDTH * 2u)) - 1u;
-
     uint tid = gl_LocalInvocationID.x;
-    uint ownSlot = tid;
-    uint peerSlot = 1u - ownSlot;
+    uint next = (tid + 1u) % 2u;
 
-    uint peerShift = peerSlot * SLOT_WIDTH;
-    uint peerClearMask = FULL_MASK - (SLOT_MASK << peerShift);
-    atomicAnd(slots, peerClearMask, 4, 64, 0);
-    atomicOr(slots, (1u << peerShift), 4, 64, 0);
-
+    atomicStore(slots[next], 1u, 4, 64, 0);
     uint read = 0u;
-    if (tid == 0u) {
-        uint snapshot = atomicLoad(slots, 4, 64, 0);
-        read = (snapshot >> (ownSlot * SLOT_WIDTH)) & SLOT_MASK;
+    if ((tid % 2u) == 0u) {
+        read = atomicLoad(slots[tid], 4, 64, 0);
     } else {
-        uint snapshot = atomicLoad(slots, 4, 64, 0);
-        read = (snapshot >> (ownSlot * SLOT_WIDTH)) & SLOT_MASK;
+        read = atomicLoad(slots[tid], 4, 64, 0);
     }
 
-    barrier();
+    subgroupBarrier();
     assert(read == 1u);
 }
