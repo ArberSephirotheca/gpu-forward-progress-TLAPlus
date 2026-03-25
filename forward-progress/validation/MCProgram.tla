@@ -142,8 +142,8 @@ GetVal(workgroupId, var) ==
     IF IsLiteral(var) THEN
         var.value
     ELSE IF VarExists(workgroupId, var) THEN
-        IF IsArray(var) /\ var.index > 0 THEN
-            GetVar(workgroupId, var).value[var.index]
+        IF IsIndex(var.index) /\ var.index.realIndex >= 0 THEN
+            GetVar(workgroupId, var).value[var.index.realIndex]
         ELSE
             GetVar(workgroupId, var).value
     ELSE 

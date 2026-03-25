@@ -219,6 +219,7 @@ pub struct VariableInfo {
     pub id: String,
     pub ty: SpirvType,
     pub access_chain: Vec<AccessStep>,
+    pub declared_index: IndexKind,
     pub storage_class: StorageClass,
     pub const_value: Option<ConstantInfo>,
     pub built_in: Option<BuiltInVariable>,
@@ -245,6 +246,7 @@ impl VariableInfo {
             id,
             ty,
             access_chain,
+            declared_index: IndexKind::Literal(-1),
             storage_class,
             const_value,
             built_in,
@@ -258,6 +260,7 @@ impl VariableInfo {
             id,
             ty: SpirvType::Int { width: 32, signed },
             access_chain: vec![],
+            declared_index: IndexKind::Literal(-1),
             storage_class: StorageClass::Constant,
             const_value: Some(ConstantInfo::new_int(value, signed)),
             built_in: None,
@@ -270,6 +273,7 @@ impl VariableInfo {
             id,
             ty: SpirvType::Bool,
             access_chain: vec![],
+            declared_index: IndexKind::Literal(-1),
             storage_class: StorageClass::Constant,
             const_value: Some(ConstantInfo::new_bool(value)),
             built_in: None,
@@ -304,13 +308,13 @@ impl VariableInfo {
 
     pub(crate) fn get_index(&self) -> IndexKind {
         match self.access_chain.as_slice() {
-            [] => IndexKind::Literal(-1),
+            [] => self.declared_index.clone(),
             [AccessStep::ConstIndex(value)] => IndexKind::Literal(*value),
             [AccessStep::VariableIndex {
                 name,
                 storage_class,
             }] => IndexKind::Variable(format!(
-                "Var(\"{}\", \"{}\", None, Index(-1))",
+                "Var(\"{}\", \"{}\", \"\", Index(-1))",
                 storage_class, name
             )),
             _ => panic!("Nested indexed access is not supported yet"),

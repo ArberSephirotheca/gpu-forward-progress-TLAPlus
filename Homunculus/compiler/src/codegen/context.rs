@@ -249,22 +249,34 @@ impl CodegenCx {
                     None => panic!("Type {} not found", ty_name),
                 };
 
-                // if the variable is a built-in variable, we do not need to insert it into the symbol table, as it is already done by decorate statement
-                if built_in.is_none() {
-                    let default_value = self.resolve_spirv_type_to_default_value(spirv_type).0;
-                    // variable expression would be a variable declaration, so its SSA form is the same as the variable name
-                    let var_info = VariableInfo::new(
-                        var_name.clone(),
-                        var_name.clone(),
-                        spirv_type.clone(),
-                        vec![],
-                        storage_class.clone(),
-                        None,
-                        built_in,
-                        default_value,
-                    );
-                    self.insert_variable(var_name, var_info);
+                let (resolved_default_value, resolved_declared_index) =
+                    self.resolve_spirv_type_to_default_value(spirv_type);
+                let default_value = match built_in.clone() {
+                    Some(built_in_var) => {
+                        InstructionValue::BuiltIn(InstructionBuiltInVariable::cast(
+                            built_in_var,
+                        ))
+                    }
+                    None => resolved_default_value,
+                };
+                // Reinsert built-ins here so their placeholder decorate-time type gets replaced
+                // with the real OpVariable pointer type before any access chains use them.
+                let mut var_info = VariableInfo::new(
+                    var_name.clone(),
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    storage_class.clone(),
+                    None,
+                    built_in,
+                    default_value,
+                );
+                if var_info.built_in.is_some()
+                    || matches!(var_info.storage_class, StorageClass::Global | StorageClass::Shared)
+                {
+                    var_info.declared_index = resolved_declared_index;
                 }
+                self.insert_variable(var_name, var_info);
 
                 // increment the instruction position if the variable' scope is within current invocation, as global and shared variable shouldn't to be initialized explicitly by TLA+ code
                 match &storage_class {
@@ -884,8 +896,8 @@ impl CodegenCx {
                 let pointer_ssa_id = load_expr.pointer().unwrap();
                 let pointer_info = self.lookup_variable(pointer_ssa_id.text()).unwrap();
 
-                // we insert the variable with the same name as the result of the load instruction
-                // but the actual variable name is the name of the pointer
+                // Preserve the originating pointer metadata on the OpLoad result so later
+                // consumers can recover the original access-chain index if needed.
                 self.insert_variable(
                     var_name.clone(),
                     VariableInfo::new(
@@ -899,7 +911,6 @@ impl CodegenCx {
                         InstructionValue::None,
                     ),
                 );
-                // self.increment_inst_position();
             }
 
             // fixme: handle array type
@@ -3392,7 +3403,7 @@ impl CodegenCx {
                     .name(pointer_info.get_var_name())
                     // it is intializing a ssa, so the value is None
                     .value(InstructionValue::None)
-                    .index(IndexKind::Literal(-1))
+                    .index(pointer_info.get_index())
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
                     .unwrap();
@@ -3401,7 +3412,7 @@ impl CodegenCx {
                     .ssa_id(object_info.get_ssa_name())
                     .name(object_info.get_var_name())
                     .value(self.construct_instruction_value(&object_info))
-                    .index(IndexKind::Literal(-1))
+                    .index(object_info.get_index())
                     .scope(VariableScope::cast(&object_info.get_storage_class()))
                     .build()
                     .unwrap();
@@ -4155,7 +4166,7 @@ mod test {
         );
         assert_eq!(
             var_info.get_index(),
-            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
         );
     }
 
@@ -4183,7 +4194,7 @@ mod test {
         assert_eq!(atomic_load.arguments.arguments[1].name, "%data");
         assert_eq!(
             atomic_load.arguments.arguments[1].index,
-            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
         );
     }
 
@@ -4211,7 +4222,7 @@ mod test {
         assert_eq!(atomic_store.arguments.arguments[0].name, "%data");
         assert_eq!(
             atomic_store.arguments.arguments[0].index,
-            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
         );
     }
 
@@ -4242,7 +4253,7 @@ mod test {
         assert_eq!(atomic_load.arguments.arguments[1].name, "%data");
         assert_eq!(
             atomic_load.arguments.arguments[1].index,
-            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
         );
     }
 
@@ -4278,8 +4289,60 @@ mod test {
         assert_eq!(atomic_store.arguments.arguments[0].name, "%data");
         assert_eq!(
             atomic_store.arguments.arguments[0].index,
-            IndexKind::Variable("Var(\"local\", \"%idx\", None, Index(-1))".to_string())
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
         );
+    }
+
+    #[test]
+    fn check_access_chain_on_builtin_local_invocation_id() {
+        let input = "OpDecorate %gl_LocalInvocationID BuiltIn LocalInvocationId
+         %uint = OpTypeInt 32 0
+         %v3uint = OpTypeVector %uint 3
+         %_ptr_Input_v3uint = OpTypePointer Input %v3uint
+         %gl_LocalInvocationID = OpVariable %_ptr_Input_v3uint Input
+         %uint_0 = OpConstant %uint 0
+         %_ptr_Input_uint = OpTypePointer Input %uint
+         %idx = OpAccessChain %_ptr_Input_uint %gl_LocalInvocationID %uint_0
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        codegen_ctx.generate_code(syntax);
+        let var_info = codegen_ctx.lookup_variable("%idx").unwrap();
+        assert_eq!(var_info.id, "%gl_LocalInvocationID");
+        assert_eq!(var_info.access_chain, vec![AccessStep::ConstIndex(0)]);
+    }
+
+    #[test]
+    fn check_store_uses_loaded_builtin_component_value() {
+        let input = "OpDecorate %gl_LocalInvocationID BuiltIn LocalInvocationId
+         %void = OpTypeVoid
+         %3 = OpTypeFunction %void
+         %uint = OpTypeInt 32 0
+         %v3uint = OpTypeVector %uint 3
+         %_ptr_Input_v3uint = OpTypePointer Input %v3uint
+         %gl_LocalInvocationID = OpVariable %_ptr_Input_v3uint Input
+         %uint_0 = OpConstant %uint 0
+         %_ptr_Input_uint = OpTypePointer Input %uint
+         %_ptr_Function_uint = OpTypePointer Function %uint
+         %main = OpFunction %void None %3
+         %5 = OpLabel
+         %tid = OpVariable %_ptr_Function_uint Function
+         %14 = OpAccessChain %_ptr_Input_uint %gl_LocalInvocationID %uint_0
+         %15 = OpLoad %uint %14
+         OpStore %tid %15
+         OpReturn
+         OpFunctionEnd
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let store = program
+            .instructions
+            .iter()
+            .find(|inst| inst.name == InstructionName::Store)
+            .unwrap();
+        assert_eq!(store.arguments.arguments[1].name, "%gl_LocalInvocationID");
+        assert_eq!(store.arguments.arguments[1].index, IndexKind::Literal(0));
     }
 
     /*

@@ -364,12 +364,32 @@ pub struct InstructionArgument {
 
 impl Display for InstructionArgument {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let rendered_value = match (&self.value, &self.index) {
+            (InstructionValue::BuiltIn(var), IndexKind::Literal(count)) if *count >= 0 => {
+                render_builtin_vector_value(var.clone(), *count)
+            }
+            _ => self.value.to_string(),
+        };
         write!(
             f,
             "Var(\"{}\", \"{}\", {}, {})",
-            self.scope, self.name, self.value, self.index
+            self.scope, self.name, rendered_value, self.index
         )
     }
+}
+
+fn render_builtin_vector_value(var: InstructionBuiltInVariable, count: i32) -> String {
+    let tail_value = match var {
+        InstructionBuiltInVariable::NumWorkgroups
+        | InstructionBuiltInVariable::WorkgroupSize => "1".to_string(),
+        _ => "0".to_string(),
+    };
+    format!(
+        "[currentIndex \\in 0..{} |-> IF currentIndex = 0 THEN {} ELSE {}]",
+        count.saturating_sub(1),
+        var,
+        tail_value
+    )
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstructionArguments {
@@ -430,6 +450,19 @@ pub struct Program {
 }
 
 impl Program {
+    fn render_initial_value(var: &VariableInfo) -> String {
+        match var.get_index() {
+            IndexKind::Literal(count) if count >= 0 => {
+                format!(
+                    "[currentIndex \\in 0..{} |-> {}]",
+                    count.saturating_sub(1),
+                    var.initial_value()
+                )
+            }
+            _ => var.initial_value().to_string(),
+        }
+    }
+
     fn write_cfg(&self, writer: &mut BufWriter<File>) -> Result<()> {
         let cfg = CFG::generate_cfg(
             &self.instructions.to_vec(),
@@ -547,7 +580,7 @@ impl Program {
                     "\t\tVar(\"{}\", \"{}\", {}, {}),",
                     global_var.get_storage_class(),
                     global_var.get_var_name(),
-                    global_var.initial_value(),
+                    Self::render_initial_value(global_var),
                     global_var.get_index(),
                 )?;
             } else {
@@ -556,7 +589,7 @@ impl Program {
                     "\t\tVar(\"{}\", \"{}\", {}, {})",
                     global_var.get_storage_class(),
                     global_var.get_var_name(),
-                    global_var.initial_value(),
+                    Self::render_initial_value(global_var),
                     global_var.get_index(),
                 )?;
             }

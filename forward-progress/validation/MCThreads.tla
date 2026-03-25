@@ -91,13 +91,19 @@ InitMemoryModel ==
 MaxNat(x, y) ==
     IF x >= y THEN x ELSE y
 
+HasConcreteIndex(idx) ==
+    idx >= 0
+
+IsScalarIndex(idx) ==
+    idx < 0
+
 JoinRAViews(left, right) ==
     [a \in RAAddressDomain |-> MaxNat(left[a], right[a])]
 
 IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex) ==
     /\ RAEnabled
     /\ (IsGlobal(mangledPointer) \/ IsShared(mangledPointer))
-    /\ evaluatedPointerIndex <= 0
+    /\ IsScalarIndex(evaluatedPointerIndex)
     /\ RAAddress(mangledPointer) \in RAAddressDomain
 
 RAReadChoices(t, addr) ==
@@ -353,7 +359,7 @@ RAResultAssignments(t, result, valueRead) ==
             LET resultVar == mangledResult
                 evaluatedResultIndex == EvalExpr(t, workGroupId, result.index)
             IN
-                IF evaluatedResultIndex > 0 THEN
+                IF HasConcreteIndex(evaluatedResultIndex) THEN
                     {ChangeElementAt(resultVar, evaluatedResultIndex, valueRead)}
                 ELSE
                     {Var(resultVar.scope, resultVar.name, valueRead, Index(-1))}
@@ -900,17 +906,17 @@ OpAtomicLoadSync(t, result, pointer) ==
         raAddr == RAAddress(mangledPointer)
         assignmentSet ==
             IF IsIntermediate(mangledResult) THEN
-                LET value == IF evaluatedPointerIndex > 0 THEN pointerVar.value[evaluatedPointerIndex] ELSE pointerVar.value
+                LET value == IF HasConcreteIndex(evaluatedPointerIndex) THEN pointerVar.value[evaluatedPointerIndex] ELSE pointerVar.value
                 IN {Var(result.scope, Mangle(t, result).name, value, Index(-1))}
             ELSE
                 LET resultVar == mangledResult
                     evaluatedResultIndex == EvalExpr(t, workGroupId, result.index)
                 IN
-                    IF evaluatedPointerIndex > 0 /\ evaluatedResultIndex > 0 THEN
+                    IF HasConcreteIndex(evaluatedPointerIndex) /\ HasConcreteIndex(evaluatedResultIndex) THEN
                         {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex])}
-                    ELSE IF evaluatedPointerIndex > 0 THEN
+                    ELSE IF HasConcreteIndex(evaluatedPointerIndex) THEN
                         {Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], resultVar.index)}
-                    ELSE IF evaluatedResultIndex > 0 THEN
+                    ELSE IF HasConcreteIndex(evaluatedResultIndex) THEN
                         {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value)}
                     ELSE
                         {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index)}
@@ -975,7 +981,7 @@ OpAtomicLoad(t, result, pointer) ==
                         /\ pc' = [pc EXCEPT ![t] = pc[t] + 1]
                         /\ UNCHANGED <<state, DynamicBlockSet, globalCounter, snapShotMap>>
                 ELSE IF IsIntermediate(mangledResult) THEN 
-                    /\  IF evaluatedPointerIndex > 0 THEN 
+                    /\  IF HasConcreteIndex(evaluatedPointerIndex) THEN 
                             Assignment(t, {Var(mangledResult.scope, mangledResult.name, pointerVar.value[evaluatedPointerIndex], Index(-1))})
                         ELSE
                             Assignment(t, {Var(mangledResult.scope, mangledResult.name, pointerVar.value, Index(-1))})
@@ -985,11 +991,11 @@ OpAtomicLoad(t, result, pointer) ==
                     LET resultVar == mangledResult
                         evaluatedResultIndex == EvalExpr(t, workGroupId, result.index)
                     IN
-                        /\  IF evaluatedPointerIndex > 0 /\ evaluatedResultIndex > 0 THEN
+                        /\  IF HasConcreteIndex(evaluatedPointerIndex) /\ HasConcreteIndex(evaluatedResultIndex) THEN
                                 Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex])})
-                            ELSE IF evaluatedPointerIndex > 0 THEN
+                            ELSE IF HasConcreteIndex(evaluatedPointerIndex) THEN
                                 Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], Index(-1))})
-                            ELSE IF evaluatedResultIndex > 0 THEN
+                            ELSE IF HasConcreteIndex(evaluatedResultIndex) THEN
                                 Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value)})
                             ELSE
                                 Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, Index(-1))})
@@ -1022,7 +1028,7 @@ OpAtomicLoadCollective(t, result, pointer) ==
                             /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicBlockSet, globalCounter, snapShotMap, modOrder, threadView>>
                         ELSE
                             /\  LET loadVars == {
-                                    IF evaluatedIndex > 0 THEN 
+                                    IF HasConcreteIndex(evaluatedIndex) THEN 
                                         Var(result.scope, Mangle(sthread, result).name, pointerVar.value[evaluatedIndex], Index(-1))
                                     ELSE
                                         Var(result.scope, Mangle(sthread, result).name, pointerVar.value, Index(-1))
@@ -1062,11 +1068,11 @@ OpAtomicLoadCollective(t, result, pointer) ==
                                         evaluatedPointerIndex == EvalExpr(sthread, WorkGroupId(sthread)+1, pointer.index)
                                         evaluatedResultIndex == EvalExpr(sthread, WorkGroupId(sthread)+1, result.index)
                                     IN
-                                        IF evaluatedPointerIndex > 0 /\ evaluatedResultIndex > 0 THEN
+                                        IF HasConcreteIndex(evaluatedPointerIndex) /\ HasConcreteIndex(evaluatedResultIndex) THEN
                                             ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex])
-                                        ELSE IF evaluatedPointerIndex > 0 THEN
+                                        ELSE IF HasConcreteIndex(evaluatedPointerIndex) THEN
                                             Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], Index(-1))
-                                        ELSE IF evaluatedResultIndex > 0 THEN
+                                        ELSE IF HasConcreteIndex(evaluatedResultIndex) THEN
                                             ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value)
                                         ELSE
                                             Var(resultVar.scope, resultVar.name, pointerVar.value, Index(-1))
@@ -1106,7 +1112,7 @@ OpAtomicStoreSync(t, pointer, value) ==
         raEligible == IsRAEligiblePointer(mangledPointer, evaluatedPointerIndex)
         raAddr == RAAddress(mangledPointer)
         assignmentSet ==
-            IF evaluatedPointerIndex > 0 THEN
+            IF HasConcreteIndex(evaluatedPointerIndex) THEN
                 {ChangeElementAt(pointerVar, evaluatedPointerIndex, valueToStore)}
             ELSE
                 {Var(pointerVar.scope, pointerVar.name, valueToStore, pointerVar.index)}
@@ -1162,7 +1168,7 @@ OpAtomicStore(t, pointer, value) ==
                     /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
                     /\  UNCHANGED <<state,  DynamicBlockSet, globalCounter, snapShotMap>>
                 ELSE
-                    /\  IF evaluatedPointerIndex > 0 THEN 
+                    /\  IF HasConcreteIndex(evaluatedPointerIndex) THEN 
                             Assignment(t, {ChangeElementAt(pointerVar, evaluatedPointerIndex, valueToStore)})
                         ELSE
                             Assignment(t, {Var(pointerVar.scope, pointerVar.name, valueToStore, pointerVar.index)})
@@ -1187,7 +1193,7 @@ OpAtomicStoreCollective(t, pointer, value) ==
                     /\  UNCHANGED <<pc, threadLocals, globalVars,  DynamicBlockSet, globalCounter, snapShotMap, modOrder, threadView>>
                 ELSE
                     /\  LET storeVars == {
-                            IF evaluatedPointerIndex > 0 THEN 
+                            IF HasConcreteIndex(evaluatedPointerIndex) THEN 
                                 ChangeElementAt(GetVar(WorkGroupId(sthread)+1, Mangle(sthread, pointer)), evaluatedPointerIndex, EvalExpr(sthread, WorkGroupId(sthread)+1, value))
                             ELSE
                                 Var(pointerVar.scope, Mangle(sthread, pointer).name, EvalExpr(sthread, WorkGroupId(sthread)+1, value), pointerVar.index)
@@ -1220,7 +1226,7 @@ OpAtomicIncrement(t, pointer) ==
                 evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
             IN
                 /\
-                    IF evaluatedPointerIndex > 0 THEN 
+                    IF HasConcreteIndex(evaluatedPointerIndex) THEN 
                         Assignment(t, {ChangeElementAt(pointerVar, evaluatedPointerIndex, pointerVar.value[evaluatedPointerIndex] + 1)})
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value + 1, pointerVar.index)})
@@ -1237,7 +1243,7 @@ OpAtomicDecrement(t, pointer) ==
                 evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
             IN
                 /\
-                    IF evaluatedPointerIndex > 0 THEN 
+                    IF HasConcreteIndex(evaluatedPointerIndex) THEN 
                         Assignment(t, {ChangeElementAt(pointerVar, evaluatedPointerIndex, pointerVar.value[evaluatedPointerIndex] - 1)})
                     ELSE  
                         Assignment(t, {Var(pointerVar.scope, pointerVar.name, pointerVar.value - 1, pointerVar.index)})
@@ -1759,11 +1765,11 @@ OpAtomicExchange(t, result, pointer, value) ==
                 evaluatedPointerIndex == EvalExpr(t, WorkGroupId(t)+1, pointer.index)
                 evaluatedValue == EvalExpr(t, WorkGroupId(t)+1, value)
             IN
-                IF evaluatedResultIndex > 0 /\ evaluatedPointerIndex > 0 THEN
+                IF HasConcreteIndex(evaluatedResultIndex) /\ HasConcreteIndex(evaluatedPointerIndex) THEN
                     Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex]), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
-                ELSE IF evaluatedResultIndex > 0 THEN
+                ELSE IF HasConcreteIndex(evaluatedResultIndex) THEN
                     Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
-                ELSE IF evaluatedPointerIndex > 0 THEN
+                ELSE IF HasConcreteIndex(evaluatedPointerIndex) THEN
                     Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], resultVar.index), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
                 ELSE
                     Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
@@ -1788,22 +1794,22 @@ OpAtomicCompareExchange(t, result, pointer, value, comparator) ==
             IN 
                 IF pointerVar.value = evaluatedComparator THEN
                     /\  
-                        IF evaluatedResultIndex > 0 /\ evaluatedPointerIndex > 0 THEN
+                        IF HasConcreteIndex(evaluatedResultIndex) /\ HasConcreteIndex(evaluatedPointerIndex) THEN
                             Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex]), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
-                        ELSE IF evaluatedResultIndex > 0 THEN
+                        ELSE IF HasConcreteIndex(evaluatedResultIndex) THEN
                             Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
-                        ELSE IF evaluatedPointerIndex > 0 THEN
+                        ELSE IF HasConcreteIndex(evaluatedPointerIndex) THEN
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], resultVar.index), ChangeElementAt(pointerVar, evaluatedPointerIndex, evaluatedValue)})
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index), Var(pointerVar.scope, pointerVar.name, evaluatedValue, pointerVar.index)})
 
                 ELSE
                     /\
-                        IF evaluatedResultIndex > 0 /\ evaluatedPointerIndex > 0 THEN
+                        IF HasConcreteIndex(evaluatedResultIndex) /\ HasConcreteIndex(evaluatedPointerIndex) THEN
                             Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value[evaluatedPointerIndex])})
-                        ELSE IF evaluatedResultIndex > 0 THEN
+                        ELSE IF HasConcreteIndex(evaluatedResultIndex) THEN
                             Assignment(t, {ChangeElementAt(resultVar, evaluatedResultIndex, pointerVar.value)})
-                        ELSE IF evaluatedPointerIndex > 0 THEN
+                        ELSE IF HasConcreteIndex(evaluatedPointerIndex) THEN
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value[evaluatedPointerIndex], resultVar.index)})
                         ELSE
                             Assignment(t, {Var(resultVar.scope, resultVar.name, pointerVar.value, resultVar.index)})
