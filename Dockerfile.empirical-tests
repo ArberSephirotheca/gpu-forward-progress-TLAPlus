@@ -1,0 +1,57 @@
+FROM ubuntu:22.04
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG AMBER_REF=main
+ARG CMAKE_VERSION=4.0.0-rc4
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        bash \
+        build-essential \
+        ca-certificates \
+        git \
+        libegl1 \
+        libgl1 \
+        libvulkan-dev \
+        libvulkan1 \
+        libssl-dev \
+        libx11-6 \
+        libxau6 \
+        libxcb1 \
+        libxdmcp6 \
+        libxext6 \
+        mesa-vulkan-drivers \
+        ninja-build \
+        python3 \
+        wget \
+        vulkan-tools \
+        vulkan-validationlayers \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN wget -q "https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/cmake-${CMAKE_VERSION}.tar.gz" \
+    && tar -xzf "cmake-${CMAKE_VERSION}.tar.gz" \
+    && cd "cmake-${CMAKE_VERSION}" \
+    && ./bootstrap \
+    && make -j"$(nproc)" \
+    && make install \
+    && cd / \
+    && rm -rf "cmake-${CMAKE_VERSION}" "cmake-${CMAKE_VERSION}.tar.gz"
+
+RUN git clone --depth=1 --branch "${AMBER_REF}" https://github.com/google/amber.git /opt/amber-src \
+    && cd /opt/amber-src \
+    && ./tools/git-sync-deps \
+    && rm -rf /usr/local/include/vulkan \
+    && rm -rf /usr/local/include/vk_video \
+    && cp -r /opt/amber-src/third_party/vulkan-headers/include/. /usr/local/include/ \
+    && cmake -S . -B out/Debug -GNinja \
+        -DAMBER_ENABLE_TESTS=OFF \
+        -DAMBER_ENABLE_SAMPLES=OFF \
+    && cmake --build out/Debug -j"$(nproc)" \
+    && install -m 0755 /opt/amber-src/out/Debug/amber /usr/local/bin/amber
+
+COPY scripts/docker-run-empirical-tests.sh /usr/local/bin/docker-run-empirical-tests.sh
+
+RUN chmod +x /usr/local/bin/docker-run-empirical-tests.sh
+
+WORKDIR /workdir
+ENTRYPOINT ["/usr/local/bin/docker-run-empirical-tests.sh", "--container-run"]

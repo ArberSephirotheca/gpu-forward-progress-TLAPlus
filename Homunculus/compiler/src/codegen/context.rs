@@ -6,7 +6,7 @@ use super::common::{
     InstructionBuiltInVariable, InstructionValue, Program, Scheduler, VariableScope,
 };
 use crate::codegen::common::{IndexKind, InstructionName};
-use crate::compiler::ast::ast::{BinaryExpr, Expr, ResultType, Root, Stmt, UnaryExpr};
+use crate::compiler::ast::ast::{BinaryExpr, Expr, ResultType, Root, Stmt, TypeExpr, UnaryExpr};
 use crate::compiler::parse::lexer::Token;
 /// `CodegenCx` is a struct that holds the compilation unit of the codegen.
 use crate::compiler::parse::symbol_table::*;
@@ -22,6 +22,7 @@ pub struct CodegenCx {
     work_group_size: u32,
     num_work_group: u32,
     scheduler: Scheduler,
+    synchronization_id: u32,
 }
 
 impl CodegenCx {
@@ -30,6 +31,7 @@ impl CodegenCx {
         work_group_size: u32,
         num_work_group: u32,
         scheduler: Scheduler,
+        synchronization_id: u32,
     ) -> Self {
         Self {
             type_table: SpirvTypeTable::new(),
@@ -40,6 +42,7 @@ impl CodegenCx {
             work_group_size,
             num_work_group,
             scheduler,
+            synchronization_id,
         }
     }
     pub(crate) fn increment_inst_position(&mut self) -> u32 {
@@ -174,10 +177,65 @@ impl CodegenCx {
         }
     }
 
+    fn lower_type_expr(&self, type_expr: &TypeExpr) -> SpirvType {
+        match type_expr.opcode() {
+            Some(TokenKind::OpTypeArray) => {
+                let operands = type_expr.operand_tokens();
+                let element = operands
+                    .first()
+                    .expect("OpTypeArray is missing its element type operand");
+                let count_token = operands
+                    .get(1)
+                    .expect("OpTypeArray is missing its length operand");
+                let count = match count_token.kind() {
+                    TokenKind::Int => count_token.text().parse::<u32>().unwrap(),
+                    TokenKind::Ident => {
+                        let count_info = self.lookup_variable(count_token.text()).unwrap_or_else(|| {
+                            panic!("OpTypeArray length constant {} not found", count_token.text())
+                        });
+                        if !count_info.is_constant() {
+                            panic!(
+                                "OpTypeArray length operand {} must be a constant",
+                                count_token.text()
+                            );
+                        }
+                        let value = count_info.get_constant_int();
+                        if value < 0 {
+                            panic!(
+                                "OpTypeArray length operand {} must be non-negative, got {}",
+                                count_token.text(),
+                                value
+                            );
+                        }
+                        value as u32
+                    }
+                    _ => panic!(
+                        "Unsupported OpTypeArray length operand token {:?}",
+                        count_token.kind()
+                    ),
+                };
+                SpirvType::Array {
+                    element: element.text().to_string(),
+                    count,
+                }
+            }
+            Some(TokenKind::OpTypeRuntimeArray) => {
+                let element = type_expr
+                    .operand_tokens()
+                    .first()
+                    .expect("OpTypeRuntimeArray is missing its element type operand")
+                    .text()
+                    .to_string();
+                SpirvType::RuntimeArray { element }
+            }
+            _ => type_expr.ty(),
+        }
+    }
+
     fn symbol_table_construction_pass_expr(&mut self, var_name: String, expr: &Expr) {
         match expr {
             Expr::TypeExpr(type_expr) => {
-                self.insert_type(var_name.clone(), type_expr.ty());
+                self.insert_type(var_name.clone(), self.lower_type_expr(type_expr));
             }
             Expr::VariableExpr(var_expr) => {
                 let ty_name = var_expr.ty_name().unwrap();
@@ -191,22 +249,34 @@ impl CodegenCx {
                     None => panic!("Type {} not found", ty_name),
                 };
 
-                // if the variable is a built-in variable, we do not need to insert it into the symbol table, as it is already done by decorate statement
-                if built_in.is_none() {
-                    let default_value = self.resolve_spirv_type_to_default_value(spirv_type).0;
-                    // variable expression would be a variable declaration, so its SSA form is the same as the variable name
-                    let var_info = VariableInfo::new(
-                        var_name.clone(),
-                        var_name.clone(),
-                        spirv_type.clone(),
-                        vec![],
-                        storage_class.clone(),
-                        None,
-                        built_in,
-                        default_value,
-                    );
-                    self.insert_variable(var_name, var_info);
+                let (resolved_default_value, resolved_declared_index) =
+                    self.resolve_spirv_type_to_default_value(spirv_type);
+                let default_value = match built_in.clone() {
+                    Some(built_in_var) => {
+                        InstructionValue::BuiltIn(InstructionBuiltInVariable::cast(
+                            built_in_var,
+                        ))
+                    }
+                    None => resolved_default_value,
+                };
+                // Reinsert built-ins here so their placeholder decorate-time type gets replaced
+                // with the real OpVariable pointer type before any access chains use them.
+                let mut var_info = VariableInfo::new(
+                    var_name.clone(),
+                    var_name.clone(),
+                    spirv_type.clone(),
+                    vec![],
+                    storage_class.clone(),
+                    None,
+                    built_in,
+                    default_value,
+                );
+                if var_info.built_in.is_some()
+                    || matches!(var_info.storage_class, StorageClass::Global | StorageClass::Shared)
+                {
+                    var_info.declared_index = resolved_declared_index;
                 }
+                self.insert_variable(var_name, var_info);
 
                 // increment the instruction position if the variable' scope is within current invocation, as global and shared variable shouldn't to be initialized explicitly by TLA+ code
                 match &storage_class {
@@ -232,15 +302,45 @@ impl CodegenCx {
                 // Initialize access chain tracking
                 let mut access_chain = base_var_info.access_chain.clone();
 
-                let index_name = var_ref.index_name().unwrap();
-                let var_info = self.lookup_variable(index_name.text()).unwrap();
-
-                // Record the access step
-                // since it is a constant, we can directly use its value
-                if var_info.is_constant() {
-                    access_chain.push(AccessStep::ConstIndex(var_info.get_constant_int()))
-                } else {
-                    access_chain.push(AccessStep::VariableIndex(index_name.text().to_string()));
+                let mut current_type = self.resolve_real_type(&base_var_info.get_ty());
+                for index_name in var_ref.index_names() {
+                    let index_info = self.lookup_variable(index_name.text()).unwrap();
+                    match &current_type {
+                        SpirvType::Struct { members } => {
+                            if !index_info.is_constant() || index_info.get_constant_int() != 0 {
+                                panic!(
+                                    "OpAccessChain only supports selecting member 0 from single-member structs"
+                                );
+                            }
+                            let member_type = self
+                                .lookup_type(members.as_str())
+                                .expect("OpAccessChain: Struct member type not found");
+                            current_type = self.resolve_real_type(member_type);
+                        }
+                        SpirvType::Array { element, .. }
+                        | SpirvType::RuntimeArray { element }
+                        | SpirvType::Vector { element, .. } => {
+                            if index_info.is_constant() {
+                                access_chain
+                                    .push(AccessStep::ConstIndex(index_info.get_constant_int()));
+                            } else {
+                                access_chain.push(AccessStep::VariableIndex {
+                                    name: index_info.get_var_name(),
+                                    storage_class: index_info.get_storage_class(),
+                                });
+                            }
+                            let element_type = self
+                                .lookup_type(element.as_str())
+                                .expect("OpAccessChain: Element type not found");
+                            current_type = self.resolve_real_type(element_type);
+                        }
+                        _ => {
+                            panic!(
+                                "OpAccessChain indexing into unsupported type {:?}",
+                                current_type
+                            );
+                        }
+                    }
                 }
 
                 // Build the final variable information after applying the access chain
@@ -796,8 +896,8 @@ impl CodegenCx {
                 let pointer_ssa_id = load_expr.pointer().unwrap();
                 let pointer_info = self.lookup_variable(pointer_ssa_id.text()).unwrap();
 
-                // we insert the variable with the same name as the result of the load instruction
-                // but the actual variable name is the name of the pointer
+                // Preserve the originating pointer metadata on the OpLoad result so later
+                // consumers can recover the original access-chain index if needed.
                 self.insert_variable(
                     var_name.clone(),
                     VariableInfo::new(
@@ -811,7 +911,6 @@ impl CodegenCx {
                         InstructionValue::None,
                     ),
                 );
-                // self.increment_inst_position();
             }
 
             // fixme: handle array type
@@ -1050,6 +1149,21 @@ impl CodegenCx {
                                 );
                             self.num_work_group = num_workgroup;
                         }
+                        TokenKind::TlaSynchronizationId => {
+                            let synchronization_id = decorate_string_stmt
+                                .string()
+                                .unwrap()
+                                .text()
+                                .trim_matches('"')
+                                .parse::<u32>()
+                                .expect(
+                                    "DecorateStringStatement: TLA+ SynchronizationId must be a number",
+                                );
+                            if synchronization_id  > 4 {
+                                panic!("DecorateStringStatement: TLA+ SynchronizationId must be smaller than 5");
+                            }
+                            self.synchronization_id = synchronization_id;
+                        }
                         TokenKind::TlaSubgroupSize => {
                             let sub_group_size = decorate_string_stmt
                                 .string()
@@ -1120,6 +1234,59 @@ impl CodegenCx {
     fn symbol_table_construction_pass(&mut self, root: &Root) {
         for stmt in root.stmts() {
             self.symbol_table_construction_pass_stmt(&stmt);
+        }
+    }
+
+    fn remap_label_targets(&self, program: &mut Program) {
+        let label_positions: HashMap<String, i32> = program
+            .instructions
+            .iter()
+            .filter(|inst| inst.name == InstructionName::Label)
+            .filter_map(|inst| {
+                inst.arguments
+                    .arguments
+                    .first()
+                    .map(|arg| (arg.ssa_id.clone(), inst.position as i32))
+            })
+            .collect();
+
+        let rewrite_label_arg = |arg: &mut InstructionArgument| {
+            if let Some(position) = label_positions
+                .get(&arg.ssa_id)
+                .or_else(|| label_positions.get(&arg.name))
+            {
+                arg.value = InstructionValue::Int(*position);
+            }
+        };
+
+        for inst in program.instructions.iter_mut() {
+            match inst.name {
+                InstructionName::Branch => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[0]);
+                }
+                InstructionName::BranchConditional => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[1]);
+                    rewrite_label_arg(&mut inst.arguments.arguments[2]);
+                }
+                InstructionName::SelectionMerge => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[0]);
+                }
+                InstructionName::LoopMerge => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[0]);
+                    rewrite_label_arg(&mut inst.arguments.arguments[1]);
+                }
+                InstructionName::Switch => {
+                    rewrite_label_arg(&mut inst.arguments.arguments[1]);
+                    if let Some(vec_args) = inst.vec_arguments.as_mut() {
+                        if vec_args.len() > 1 {
+                            for arg in vec_args[1].arguments.iter_mut() {
+                                rewrite_label_arg(arg);
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
         }
     }
 
@@ -2567,43 +2734,39 @@ impl CodegenCx {
             // LoadExpr will only load to a SSA result ID that has pointer type
             // it will never load to a real variable
             Expr::LoadExpr(load_expr) => {
-                // let inst_args_builder = InstructionArguments::builder();
-                // let inst_arg1_builder = InstructionArgument::builder();
-                // let inst_arg2_builder = InstructionArgument::builder();
+                let inst_args_builder = InstructionArguments::builder();
+                let inst_arg1_builder = InstructionArgument::builder();
+                let inst_arg2_builder = InstructionArgument::builder();
 
-                // let var_name = self.lookup_variable(&var_name).unwrap().id;
-                // // fixme: better error handling
-                // let pointer_ssa_id = load_expr.pointer().unwrap();
-                // let pointer_info = self.lookup_variable(pointer_ssa_id.text()).unwrap();
-                // let result_info = self.lookup_variable(&var_name).unwrap();
+                let result_info = self.lookup_variable(&var_name).unwrap();
+                let pointer_ssa_id = load_expr.pointer().unwrap();
+                let pointer_info = self.lookup_variable(pointer_ssa_id.text()).unwrap();
 
-                // // first arg is the pointer to load into
-                // let result = inst_arg1_builder
-                //     .name(var_name.clone())
-                //     // it is intializing a ssa, so the value is None
-                //     .value(InstructionValue::None)
-                //     .index(IndexKind::Literal(-1))
-                //     .scope(VariableScope::cast(&result_info.get_storage_class()))
-                //     .build()
-                //     .unwrap();
+                let result = inst_arg1_builder
+                    .ssa_id(result_info.get_ssa_name())
+                    .name(result_info.get_ssa_name())
+                    .value(InstructionValue::None)
+                    .index(IndexKind::Literal(-1))
+                    .scope(VariableScope::cast(&result_info.get_storage_class()))
+                    .build()
+                    .unwrap();
 
-                // // second arg is the pointer to load from
-                // let pointer = inst_arg2_builder
-                //     .name(pointer_ssa_id.text().to_string() /* .get_var_name()*/)
-                //     .value(self.construct_instruction_value(&pointer_info))
-                //     .index(IndexKind::Literal(-1))
-                //     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
-                //     .build()
-                //     .unwrap();
+                let pointer = inst_arg2_builder
+                    .ssa_id(pointer_info.get_ssa_name())
+                    .name(pointer_info.get_var_name())
+                    .value(self.construct_instruction_value(&pointer_info))
+                    .index(pointer_info.get_index())
+                    .scope(VariableScope::cast(&pointer_info.get_storage_class()))
+                    .build()
+                    .unwrap();
 
-                // Some(
-                //     inst_args_builder
-                //         .name(InstructionName::Load)
-                //         .num_args(2)
-                //         .push_argument(result)
-                //         .push_argument(pointer),
-                // )
-                None
+                Some(
+                    inst_args_builder
+                        .name(InstructionName::Load)
+                        .num_args(2)
+                        .push_argument(result)
+                        .push_argument(pointer),
+                )
             }
             Expr::AtomicLoadExpr(atomic_load_expr) => {
                 let inst_args_builder = InstructionArguments::builder();
@@ -2630,7 +2793,7 @@ impl CodegenCx {
                     .ssa_id(pointer_info.get_ssa_name())
                     .name(pointer_info.get_var_name())
                     .value(self.construct_instruction_value(&pointer_info))
-                    .index(IndexKind::Literal(-1))
+                    .index(pointer_info.get_index())
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
                     .unwrap();
@@ -3293,7 +3456,7 @@ impl CodegenCx {
                     .name(pointer_info.get_var_name())
                     // it is intializing a ssa, so the value is None
                     .value(InstructionValue::None)
-                    .index(IndexKind::Literal(-1))
+                    .index(pointer_info.get_index())
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
                     .unwrap();
@@ -3302,7 +3465,7 @@ impl CodegenCx {
                     .ssa_id(object_info.get_ssa_name())
                     .name(object_info.get_var_name())
                     .value(self.construct_instruction_value(&object_info))
-                    .index(IndexKind::Literal(-1))
+                    .index(object_info.get_index())
                     .scope(VariableScope::cast(&object_info.get_storage_class()))
                     .build()
                     .unwrap();
@@ -3325,7 +3488,6 @@ impl CodegenCx {
                         .unwrap(),
                 )
             }
-            // fixme:: does not support OpAccesschain yet
             Stmt::AtomicStoreStatement(atomic_store_stmt) => {
                 let inst_args_builder = InstructionArguments::builder();
                 let inst_arg1_builder = InstructionArgument::builder();
@@ -3343,7 +3505,7 @@ impl CodegenCx {
                     .name(pointer_info.get_var_name())
                     // it is intializing a ssa, so the value is None
                     .value(InstructionValue::None)
-                    .index(IndexKind::Literal(-1))
+                    .index(pointer_info.get_index())
                     .scope(VariableScope::cast(&pointer_info.get_storage_class()))
                     .build()
                     .unwrap();
@@ -3680,32 +3842,36 @@ impl CodegenCx {
         }
     }
 
-    // pub fn generate_code(&mut self, root: SyntaxNode) -> Program {
-    //     let mut program_builder = Program::builder();
-    //     let root = Root::cast(root).unwrap();
-    //     // first pass: construct symbol table
-    //     self.symbol_table_construction_pass(&root);
-    //     self.reset_position();
+    pub fn generate_code(&mut self, root: SyntaxNode) -> Program {
+        let mut program_builder = Program::builder();
+        let root = Root::cast(root).unwrap();
+        // first pass: construct symbol table
+        self.symbol_table_construction_pass(&root);
+        self.reset_position();
 
-    //     for stmt in root.stmts() {
-    //         let inst = self.generate_code_for_stmt(&stmt);
-    //         match inst {
-    //             Some(i) => program_builder = program_builder.push_instruction(i),
-    //             None => { /* do nothing */ }
-    //         }
-    //     }
+        for stmt in root.stmts() {
+            let inst = self.generate_code_for_stmt(&stmt, 0);
+            match inst {
+                Some(i) => program_builder = program_builder.push_instruction(i),
+                None => { /* do nothing */ }
+            }
+        }
 
-    //     let global_variables = self.get_global_variables();
-    //     program_builder
-    //         .global_var(global_variables)
-    //         .num_work_groups(self.num_work_group)
-    //         .work_group_size(self.work_group_size)
-    //         .subgroup_size(self.sub_group_size)
-    //         .num_threads(self.num_work_group * self.work_group_size)
-    //         .scheduler(self.scheduler.clone())
-    //         .build()
-    //         .unwrap()
-    // }
+        let global_variables = self.get_global_variables();
+        let mut program = program_builder
+            .global_var(global_variables)
+            .num_work_groups(self.num_work_group)
+            .work_group_size(self.work_group_size)
+            .subgroup_size(self.sub_group_size)
+            .num_threads(self.num_work_group * self.work_group_size)
+            .scheduler(self.scheduler.clone())
+            .synchronization_id(self.synchronization_id)
+            .func_start_line(0)
+            .build()
+            .unwrap();
+        self.remap_label_targets(&mut program);
+        program
+    }
 
     pub fn generate_code_with_origin_line_number(
         &mut self,
@@ -3731,16 +3897,19 @@ impl CodegenCx {
         }
 
         let global_variables = self.get_global_variables();
-        program_builder
+        let mut program = program_builder
             .global_var(global_variables)
             .num_work_groups(self.num_work_group)
             .work_group_size(self.work_group_size)
             .subgroup_size(self.sub_group_size)
             .num_threads(self.num_work_group * self.work_group_size)
             .scheduler(self.scheduler.clone())
+            .synchronization_id(self.synchronization_id)
             .func_start_line(line)
             .build()
-            .unwrap()
+            .unwrap();
+        self.remap_label_targets(&mut program);
+        program
     }
 
     pub(crate) fn get_global_variables(&self) -> Vec<VariableInfo> {
@@ -3771,12 +3940,12 @@ mod test {
 
     #[test]
     fn check_basic_type_symbol_table() {
-        CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let input = "%uint = OpTypeInt 32 0
          %uint_0 = OpVariable %uint Function
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::OBE);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::OBE, 0);
         let program = codegen_ctx.generate_code(syntax);
         // let basic_type = program.instructions.get(0).unwrap();
         let variable_decl = program.instructions.get(0).unwrap();
@@ -3799,7 +3968,7 @@ mod test {
 
     #[test]
     fn check_high_level_type_symbol_table() {
-        CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let input = "%uint = OpTypeInt 32 0
          %v3uint = OpTypeVector %uint 30
          %_ptr_Input_v3uint = OpTypePointer Input %v3uint
@@ -3808,7 +3977,7 @@ mod test {
 
         let syntax = parse(input).syntax();
         // let root = Root::cast(syntax).unwrap();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         // let basic_type = program.instructions.get(0).unwrap();
         let variable_decl = program.instructions.get(0).unwrap();
@@ -3835,7 +4004,7 @@ mod test {
         OpReturn
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let return_stmt = program.instructions.get(0).unwrap();
         assert_eq!(return_stmt.name, InstructionName::Return);
@@ -3847,7 +4016,7 @@ mod test {
         ";
 
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         codegen_ctx.generate_code(syntax);
         assert_ne!(codegen_ctx.lookup_variable("%11"), None);
         let const_val = codegen_ctx.lookup_variable("%11").unwrap();
@@ -3861,7 +4030,7 @@ mod test {
         ";
 
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         codegen_ctx.generate_code(syntax);
         assert_ne!(codegen_ctx.lookup_variable("%11"), None);
         let const_val = codegen_ctx.lookup_variable("%11").unwrap();
@@ -3875,7 +4044,7 @@ mod test {
         ";
 
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         codegen_ctx.generate_code(syntax);
         assert_ne!(codegen_ctx.lookup_variable("%11"), None);
         let const_val = codegen_ctx.lookup_variable("%11").unwrap();
@@ -3884,7 +4053,7 @@ mod test {
 
     #[test]
     fn check_built_in_load() {
-        CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let input = "OpDecorate %gl_SubgroupInvocationID BuiltIn SubgroupLocalInvocationId
          %uint = OpTypeInt 32 0
          %_ptr_Input_uint = OpTypePointer Input %uint
@@ -3894,7 +4063,7 @@ mod test {
 
         let syntax = parse(input).syntax();
         // let root = Root::cast(syntax).unwrap();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let builtin_variable_decl = program.instructions.get(0).unwrap();
 
@@ -3954,7 +4123,7 @@ mod test {
         OpStore %idx %11
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let store = program.instructions.get(1).unwrap();
         assert_eq!(store.arguments.num_args, 2);
@@ -3981,7 +4150,7 @@ mod test {
         OpStore %idx %uint_0
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let store = program.instructions.get(2).unwrap();
         assert_eq!(store.arguments.num_args, 2);
@@ -4007,7 +4176,7 @@ mod test {
          %11 = OpAccessChain %_ptr_Input_uint %v3uint_0 %10
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         codegen_ctx.generate_code(syntax);
         let var_info = codegen_ctx.lookup_variable("%11");
         assert_ne!(var_info, None);
@@ -4022,6 +4191,249 @@ mod test {
         );
         assert_eq!(var_info.access_chain.len(), 1);
         assert_eq!(var_info.access_chain[0], AccessStep::ConstIndex(2));
+    }
+
+    #[test]
+    fn check_access_chain_skips_single_member_struct_wrapper() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %vec = OpTypeVector %uint 2
+         %buf = OpTypeStruct %vec
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        codegen_ctx.generate_code(syntax);
+        let var_info = codegen_ctx.lookup_variable("%ptr").unwrap();
+        assert_eq!(var_info.id, "%data");
+        assert_eq!(var_info.access_chain.len(), 1);
+        assert_eq!(
+            var_info.access_chain[0],
+            AccessStep::VariableIndex {
+                name: "%idx".to_string(),
+                storage_class: StorageClass::Local,
+            }
+        );
+        assert_eq!(
+            var_info.get_index(),
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
+        );
+    }
+
+    #[test]
+    fn check_atomic_load_with_indexed_access_chain() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %vec = OpTypeVector %uint 2
+         %buf = OpTypeStruct %vec
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+         %value = OpAtomicLoad %uint %ptr %uint_1 %uint_0
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let atomic_load = program.instructions.get(1).unwrap();
+        assert_eq!(atomic_load.name, InstructionName::AtomicLoad);
+        assert_eq!(atomic_load.arguments.arguments[1].name, "%data");
+        assert_eq!(
+            atomic_load.arguments.arguments[1].index,
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
+        );
+    }
+
+    #[test]
+    fn check_atomic_store_with_indexed_access_chain() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %vec = OpTypeVector %uint 2
+         %buf = OpTypeStruct %vec
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+         OpAtomicStore %ptr %uint_1 %uint_0 %uint_1
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let atomic_store = program.instructions.get(1).unwrap();
+        assert_eq!(atomic_store.name, InstructionName::AtomicStore);
+        assert_eq!(atomic_store.arguments.arguments[0].name, "%data");
+        assert_eq!(
+            atomic_store.arguments.arguments[0].index,
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
+        );
+    }
+
+    #[test]
+    fn check_atomic_load_with_runtime_array_access_chain() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %runtime_arr = OpTypeRuntimeArray %uint
+         %buf = OpTypeStruct %runtime_arr
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+         %value = OpAtomicLoad %uint %ptr %uint_1 %uint_0
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let atomic_load = program.instructions.get(1).unwrap();
+        assert_eq!(codegen_ctx.lookup_type("%runtime_arr"), Some(&SpirvType::RuntimeArray {
+            element: "%uint".to_string(),
+        }));
+        assert_eq!(atomic_load.name, InstructionName::AtomicLoad);
+        assert_eq!(atomic_load.arguments.arguments[1].name, "%data");
+        assert_eq!(
+            atomic_load.arguments.arguments[1].index,
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
+        );
+    }
+
+    #[test]
+    fn check_atomic_store_with_fixed_array_access_chain() {
+        let input = "%uint = OpTypeInt 32 0
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %uint_0 = OpConstant %uint 0
+         %uint_1 = OpConstant %uint 1
+         %uint_2 = OpConstant %uint 2
+         %arr = OpTypeArray %uint %uint_2
+         %buf = OpTypeStruct %arr
+         %_ptr_StorageBuffer_buf = OpTypePointer StorageBuffer %buf
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %data = OpVariable %_ptr_StorageBuffer_buf StorageBuffer
+         %idx = OpIAdd %uint %uint_0 %uint_1
+         %ptr = OpAccessChain %_ptr_StorageBuffer_uint %data %int_0 %idx
+         OpAtomicStore %ptr %uint_1 %uint_0 %uint_1
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let atomic_store = program.instructions.get(1).unwrap();
+        assert_eq!(
+            codegen_ctx.lookup_type("%arr"),
+            Some(&SpirvType::Array {
+                element: "%uint".to_string(),
+                count: 2,
+            })
+        );
+        assert_eq!(atomic_store.name, InstructionName::AtomicStore);
+        assert_eq!(atomic_store.arguments.arguments[0].name, "%data");
+        assert_eq!(
+            atomic_store.arguments.arguments[0].index,
+            IndexKind::Variable("Var(\"local\", \"%idx\", \"\", Index(-1))".to_string())
+        );
+    }
+
+    #[test]
+    fn check_access_chain_on_builtin_local_invocation_id() {
+        let input = "OpDecorate %gl_LocalInvocationID BuiltIn LocalInvocationId
+         %uint = OpTypeInt 32 0
+         %v3uint = OpTypeVector %uint 3
+         %_ptr_Input_v3uint = OpTypePointer Input %v3uint
+         %gl_LocalInvocationID = OpVariable %_ptr_Input_v3uint Input
+         %uint_0 = OpConstant %uint 0
+         %_ptr_Input_uint = OpTypePointer Input %uint
+         %idx = OpAccessChain %_ptr_Input_uint %gl_LocalInvocationID %uint_0
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        codegen_ctx.generate_code(syntax);
+        let var_info = codegen_ctx.lookup_variable("%idx").unwrap();
+        assert_eq!(var_info.id, "%gl_LocalInvocationID");
+        assert_eq!(var_info.access_chain, vec![AccessStep::ConstIndex(0)]);
+    }
+
+    #[test]
+    fn check_store_uses_loaded_builtin_component_value() {
+        let input = "OpDecorate %gl_LocalInvocationID BuiltIn LocalInvocationId
+         %void = OpTypeVoid
+         %3 = OpTypeFunction %void
+         %uint = OpTypeInt 32 0
+         %v3uint = OpTypeVector %uint 3
+         %_ptr_Input_v3uint = OpTypePointer Input %v3uint
+         %gl_LocalInvocationID = OpVariable %_ptr_Input_v3uint Input
+         %uint_0 = OpConstant %uint 0
+         %_ptr_Input_uint = OpTypePointer Input %uint
+         %_ptr_Function_uint = OpTypePointer Function %uint
+         %main = OpFunction %void None %3
+         %5 = OpLabel
+         %tid = OpVariable %_ptr_Function_uint Function
+         %14 = OpAccessChain %_ptr_Input_uint %gl_LocalInvocationID %uint_0
+         %15 = OpLoad %uint %14
+         OpStore %tid %15
+         OpReturn
+         OpFunctionEnd
+        ";
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        let store = program
+            .instructions
+            .iter()
+            .find(|inst| inst.name == InstructionName::Store)
+            .unwrap();
+        assert_eq!(store.arguments.arguments[1].name, "%gl_LocalInvocationID");
+        assert_eq!(store.arguments.arguments[1].index, IndexKind::Literal(0));
+    }
+
+    #[test]
+    fn check_global_roots_exclude_access_chain_aliases() {
+        let input = "%void = OpTypeVoid
+         %3 = OpTypeFunction %void
+         %uint = OpTypeInt 32 0
+         %Partition = OpTypeStruct %uint
+         %_ptr_StorageBuffer_Partition = OpTypePointer StorageBuffer %Partition
+         %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
+         %_ = OpVariable %_ptr_StorageBuffer_Partition StorageBuffer
+         %int = OpTypeInt 32 1
+         %int_0 = OpConstant %int 0
+         %int_4 = OpConstant %int 4
+         %uint_64 = OpConstant %uint 64
+         %_ptr_Function_uint = OpTypePointer Function %uint
+         %main = OpFunction %void None %3
+         %5 = OpLabel
+         %tmp = OpVariable %_ptr_Function_uint Function
+         %ptr0 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_0
+         %val0 = OpAtomicLoad %uint %ptr0 %int_4 %uint_64
+         OpStore %tmp %val0
+         %ptr1 = OpAccessChain %_ptr_StorageBuffer_uint %_ %int_0
+         OpAtomicStore %ptr1 %int_4 %uint_64 %val0
+         OpReturn
+         OpFunctionEnd
+        ";
+
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+        assert_eq!(program.global_vars.len(), 1);
+        assert_eq!(program.global_vars[0].ssa_id, "%_");
+        assert_eq!(program.global_vars[0].id, "%_");
     }
 
     /*
@@ -4061,7 +4473,7 @@ mod test {
         ";
 
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let label = program.instructions.get(1).unwrap();
         assert_eq!(label.arguments.num_args, 1);
@@ -4079,7 +4491,7 @@ mod test {
         ";
 
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let branch = program.instructions.get(2).unwrap();
         assert_eq!(branch.arguments.num_args, 1);
@@ -4103,7 +4515,7 @@ mod test {
         ";
 
         let syntax = parse(intput).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let branch_conditional = program.instructions.get(2).unwrap();
         assert_eq!(branch_conditional.arguments.num_args, 3);
@@ -4157,7 +4569,7 @@ mod test {
         OpSelectionMerge %2 None
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let selection_merge = program.instructions.get(2).unwrap();
         assert_eq!(selection_merge.arguments.num_args, 1);
@@ -4177,6 +4589,101 @@ mod test {
     }
 
     #[test]
+    fn check_branch_targets_use_final_label_positions() {
+        let input = "%void = OpTypeVoid
+        %3 = OpTypeFunction %void
+        %uint = OpTypeInt 32 0
+        %bool = OpTypeBool
+        %_ptr_Function_uint = OpTypePointer Function %uint
+        %main = OpFunction %void None %3
+        %5 = OpLabel
+        %src = OpVariable %_ptr_Function_uint Function
+        %dst = OpVariable %_ptr_Function_uint Function
+        %loaded = OpLoad %uint %src
+        OpStore %dst %loaded
+        %cond = OpIEqual %bool %loaded %loaded
+        OpSelectionMerge %merge None
+        OpBranchConditional %cond %true %false
+        %true = OpLabel
+        OpBranch %merge
+        %false = OpLabel
+        OpBranch %merge
+        %merge = OpLabel
+        OpReturn
+        OpFunctionEnd
+        ";
+
+        let syntax = parse(input).syntax();
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
+        let program = codegen_ctx.generate_code(syntax);
+
+        let true_label_pos = program
+            .instructions
+            .iter()
+            .find(|inst| {
+                inst.name == InstructionName::Label
+                    && inst.arguments.arguments[0].ssa_id == "%true"
+            })
+            .unwrap()
+            .position as i32;
+        let false_label_pos = program
+            .instructions
+            .iter()
+            .find(|inst| {
+                inst.name == InstructionName::Label
+                    && inst.arguments.arguments[0].ssa_id == "%false"
+            })
+            .unwrap()
+            .position as i32;
+        let merge_label_pos = program
+            .instructions
+            .iter()
+            .find(|inst| {
+                inst.name == InstructionName::Label
+                    && inst.arguments.arguments[0].ssa_id == "%merge"
+            })
+            .unwrap()
+            .position as i32;
+
+        let selection_merge = program
+            .instructions
+            .iter()
+            .find(|inst| inst.name == InstructionName::SelectionMerge)
+            .unwrap();
+        assert_eq!(
+            selection_merge.arguments.arguments[0].value,
+            InstructionValue::Int(merge_label_pos)
+        );
+
+        let branch_conditional = program
+            .instructions
+            .iter()
+            .find(|inst| inst.name == InstructionName::BranchConditional)
+            .unwrap();
+        assert_eq!(
+            branch_conditional.arguments.arguments[1].value,
+            InstructionValue::Int(true_label_pos)
+        );
+        assert_eq!(
+            branch_conditional.arguments.arguments[2].value,
+            InstructionValue::Int(false_label_pos)
+        );
+
+        let merge_branches: Vec<_> = program
+            .instructions
+            .iter()
+            .filter(|inst| inst.name == InstructionName::Branch)
+            .collect();
+        assert_eq!(merge_branches.len(), 2);
+        for branch in merge_branches {
+            assert_eq!(
+                branch.arguments.arguments[0].value,
+                InstructionValue::Int(merge_label_pos)
+            );
+        }
+    }
+
+    #[test]
     fn check_add() {
         let input = "%int = OpTypeInt 32 1
         %3 = OpConstant %int 3
@@ -4184,7 +4691,7 @@ mod test {
         %sum = OpIAdd %int %3 %5
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let add = program.instructions.get(0).unwrap();
         assert_eq!(add.arguments.num_args, 3);
@@ -4206,7 +4713,7 @@ mod test {
         %sub = OpISub %int %3 %5
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let sub = program.instructions.get(0).unwrap();
         assert_eq!(sub.arguments.num_args, 3);
@@ -4228,7 +4735,7 @@ mod test {
         %mul = OpIMul %int %3 %5
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let mul = program.instructions.get(0).unwrap();
         assert_eq!(mul.arguments.num_args, 3);
@@ -4251,7 +4758,7 @@ mod test {
         %equal = OpIEqual %bool %3 %5
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let equal = program.instructions.get(0).unwrap();
         assert_eq!(equal.arguments.num_args, 3);
@@ -4274,7 +4781,7 @@ mod test {
         %not_equal = OpINotEqual %bool %3 %5
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let not_equal = program.instructions.get(0).unwrap();
         assert_eq!(not_equal.arguments.num_args, 3);
@@ -4306,7 +4813,7 @@ mod test {
         %less_than = OpSLessThan %bool %3 %5
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let less_than = program.instructions.get(0).unwrap();
         assert_eq!(less_than.arguments.num_args, 3);
@@ -4338,7 +4845,7 @@ mod test {
         %less_than_equal = OpSLessThanEqual %int %3 %5
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let less_than_equal = program.instructions.get(0).unwrap();
         assert_eq!(less_than_equal.arguments.num_args, 3);
@@ -4373,7 +4880,7 @@ mod test {
         %greater_than = OpSGreaterThan %int %3 %5
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let greater_than = program.instructions.get(0).unwrap();
         assert_eq!(greater_than.arguments.num_args, 3);
@@ -4405,7 +4912,7 @@ mod test {
         %greater_than_equal = OpSGreaterThanEqual %int %3 %5
         ";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let greater_than_equal = program.instructions.get(0).unwrap();
         assert_eq!(greater_than_equal.arguments.num_args, 3);
@@ -4437,7 +4944,7 @@ mod test {
   %16 = OpLabel
   %15 = OpLabel";
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let loop_merge = program.instructions.get(0).unwrap();
         assert_eq!(loop_merge.arguments.num_args, 2);
@@ -4466,7 +4973,7 @@ mod test {
        ";
 
         let syntax = parse(input).syntax();
-        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA);
+        let mut codegen_ctx = CodegenCx::new(1, 1, 1, Scheduler::HSA, 0);
         let program = codegen_ctx.generate_code(syntax);
         let atomic_exchange = program.instructions.get(1).unwrap();
         assert_eq!(atomic_exchange.arguments.num_args, 3);

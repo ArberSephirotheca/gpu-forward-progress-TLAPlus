@@ -364,12 +364,32 @@ pub struct InstructionArgument {
 
 impl Display for InstructionArgument {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let rendered_value = match (&self.value, &self.index) {
+            (InstructionValue::BuiltIn(var), IndexKind::Literal(count)) if *count >= 0 => {
+                render_builtin_vector_value(var.clone(), *count)
+            }
+            _ => self.value.to_string(),
+        };
         write!(
             f,
             "Var(\"{}\", \"{}\", {}, {})",
-            self.scope, self.name, self.value, self.index
+            self.scope, self.name, rendered_value, self.index
         )
     }
+}
+
+fn render_builtin_vector_value(var: InstructionBuiltInVariable, count: i32) -> String {
+    let tail_value = match var {
+        InstructionBuiltInVariable::NumWorkgroups
+        | InstructionBuiltInVariable::WorkgroupSize => "1".to_string(),
+        _ => "0".to_string(),
+    };
+    format!(
+        "[currentIndex \\in 0..{} |-> IF currentIndex = 0 THEN {} ELSE {}]",
+        count.saturating_sub(1),
+        var,
+        tail_value
+    )
 }
 #[derive(Debug, Clone, PartialEq)]
 pub struct InstructionArguments {
@@ -423,12 +443,26 @@ pub struct Program {
     pub num_work_groups: u32,
     pub num_threads: u32,
     pub scheduler: Scheduler,
+    pub synchronization_id: u32,
     pub instructions: SmallVec<[Instruction; 10]>,
     pub constants: SmallVec<[Constant; 10]>,
     pub func_start_line: usize,
 }
 
 impl Program {
+    fn render_initial_value(var: &VariableInfo) -> String {
+        match var.get_index() {
+            IndexKind::Literal(count) if count >= 0 => {
+                format!(
+                    "[currentIndex \\in 0..{} |-> {}]",
+                    count.saturating_sub(1),
+                    var.initial_value()
+                )
+            }
+            _ => var.initial_value().to_string(),
+        }
+    }
+
     fn write_cfg(&self, writer: &mut BufWriter<File>) -> Result<()> {
         let cfg = CFG::generate_cfg(
             &self.instructions.to_vec(),
@@ -477,7 +511,7 @@ impl Program {
     }
 
     fn write_dynamic_blocks(&self, writer: &mut BufWriter<File>, cfg: &CFG) -> Result<()> {
-        writeln!(writer, "InitDB == DynamicNodeSet = {{")?;
+        writeln!(writer, "InitDB == DynamicBlockSet = {{")?;
         // each node has different op_label_idx, so we can safely unwrap the result
         let node = cfg
             .nodes
@@ -503,7 +537,7 @@ impl Program {
         let empty_seq_per_thread = vec!["<<>>"; self.num_threads as usize].join(", ");
         writeln!(
             writer,
-            "DynamicNode(<<{}>>, <<{}>>, <<{}>>, <<{}>>, {}, 0, <<>>, {{}})",
+            "DynamicBlock(EmptySIS, <<{}>>, <<{}>>, <<{}>>, <<{}>>, {}, 0, <<>>, {{}})",
             current_threads, current_threads, empty_set_per_wg, empty_set_per_wg, node.op_label_idx
         )?;
 
@@ -521,8 +555,18 @@ impl Program {
             "NumSubgroups == {}",
             self.num_work_groups * self.work_group_size / self.subgroup_size
         )?;
+        let syn_level = match self.synchronization_id {
+            0 => "\"None\"",
+            1 => "\"SSO\"",
+            2 => "\"SCF\"",
+            3 => "\"SM\"",
+            4 => "\"CM\"",
+            _ => return Err(eyre!("Invalid synchronization level.")),
+        };
         writeln!(writer, "NumThreads == {}", self.num_threads)?;
         writeln!(writer, "Scheduler == {}", self.scheduler)?;
+        writeln!(writer, "Synchronization == {}", syn_level)?;
+        writeln!(writer, "MemoryModel == \"RA\"")?;
         Ok(())
     }
     fn write_global_variables(&self, writer: &mut BufWriter<File>) -> Result<()> {
@@ -536,7 +580,7 @@ impl Program {
                     "\t\tVar(\"{}\", \"{}\", {}, {}),",
                     global_var.get_storage_class(),
                     global_var.get_var_name(),
-                    global_var.initial_value(),
+                    Self::render_initial_value(global_var),
                     global_var.get_index(),
                 )?;
             } else {
@@ -545,7 +589,7 @@ impl Program {
                     "\t\tVar(\"{}\", \"{}\", {}, {})",
                     global_var.get_storage_class(),
                     global_var.get_var_name(),
-                    global_var.initial_value(),
+                    Self::render_initial_value(global_var),
                     global_var.get_index(),
                 )?;
             }

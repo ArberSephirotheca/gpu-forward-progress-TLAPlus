@@ -1,0 +1,104 @@
+#!amber
+
+DEVICE_FEATURE SubgroupSizeControl.subgroupSizeControl
+
+SET ENGINE_DATA fence_timeout_ms 10000
+
+SHADER compute test GLSL
+#version 460
+struct _GLF_struct_3 {
+ uvec4 _f0;
+ vec4 _f1;
+} ;
+
+struct _GLF_struct_1 {
+ uvec3 _f0;
+ mat4x2 _f1;
+ uvec2 _f2;
+ mat3 _f3;
+} ;
+
+struct _GLF_struct_0 {
+ uvec4 _f0;
+ int _f1;
+ mat2x3 _f2;
+ mat3x2 _f3;
+ mat3 _f4;
+ mat3x2 _f5;
+} ;
+
+struct _GLF_struct_2 {
+ float _f0;
+ bvec2 _f1;
+ _GLF_struct_0 _f2;
+ _GLF_struct_1 _f3;
+} ;
+
+struct _GLF_struct_4 {
+ uint subgroup_local_id;
+ _GLF_struct_2 _f0;
+ _GLF_struct_3 _f1;
+} ;
+
+layout(set = 0, binding = 1) uniform buf1 {
+ vec2 injectionSwitch;
+};
+#extension GL_KHR_shader_subgroup_vote : enable
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_EXT_maximal_reconvergence : enable
+layout(set = 0, binding = 0) buffer Buf {
+ uint buf[];
+};
+layout(set = 0, binding = 2) buffer WriteVal {
+ uint write_val;
+};
+layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+ uvec4 GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_12num_workgroupread_valvirtual_gidworkgroup_id;
+ uvec4 GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_14num_workgroupread_valvirtual_gidworkgroup_base;
+ uint subgroup_id = gl_SubgroupID;
+ uint subgroup_size = gl_SubgroupSize;
+ _GLF_struct_4 _GLF_struct_replacement_4 = _GLF_struct_4(gl_SubgroupInvocationID, _GLF_struct_2(1.0, bvec2(true), _GLF_struct_0(uvec4(1u), 1, mat2x3(1.0), mat3x2(1.0), mat3(1.0), mat3x2(1.0)), _GLF_struct_1(uvec3(1u), mat4x2(1.0), uvec2(1u), mat3(1.0))), _GLF_struct_3(uvec4(1u), vec4(1.0)));
+ uint num_workgroup = gl_NumWorkGroups.x;
+ GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_12num_workgroupread_valvirtual_gidworkgroup_id.x = num_workgroup;
+ GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_14num_workgroupread_valvirtual_gidworkgroup_base.x = GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_12num_workgroupread_valvirtual_gidworkgroup_id.x;
+ uint workgroup_size = gl_WorkGroupSize.x;
+ uint workgroup_id = gl_WorkGroupID.x;
+ GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_12num_workgroupread_valvirtual_gidworkgroup_id.w = workgroup_id;
+ uint workgroup_base = workgroup_size * GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_12num_workgroupread_valvirtual_gidworkgroup_id.w;
+ GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_14num_workgroupread_valvirtual_gidworkgroup_base.w = workgroup_base;
+ uint subgroup_base = subgroup_id * subgroup_size;
+ uint virtual_gid = GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_14num_workgroupread_valvirtual_gidworkgroup_base.w + subgroup_base + _GLF_struct_replacement_4.subgroup_local_id;
+ GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_12num_workgroupread_valvirtual_gidworkgroup_id.z = virtual_gid;
+ GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_14num_workgroupread_valvirtual_gidworkgroup_base.z = GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_12num_workgroupread_valvirtual_gidworkgroup_id.z;
+ atomicStore(write_val, uint(GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_14num_workgroupread_valvirtual_gidworkgroup_base.z), 1, 64, 4);
+ uint read_val = atomicLoad(write_val, 1, 64, 2);
+ GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_12num_workgroupread_valvirtual_gidworkgroup_id.y = read_val;
+ GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_14num_workgroupread_valvirtual_gidworkgroup_base.y = GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_12num_workgroupread_valvirtual_gidworkgroup_id.y;
+ buf[GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_14num_workgroupread_valvirtual_gidworkgroup_base.z] = uint(subgroupAllEqual(GLF_merged4_0_1_13_1_1_8_2_1_11_3_1_14num_workgroupread_valvirtual_gidworkgroup_base.y));
+}
+
+END
+
+BUFFER tester DATA_TYPE uint32 SIZE 8388096 FILL 0
+BUFFER expected DATA_TYPE uint32 SIZE 8388096 FILL 1
+BUFFER write DATA_TYPE uint32 SIZE 1 FILL 0
+BUFFER injection DATA_TYPE vec2<float> DATA
+ 0.0 1.0
+END
+
+PIPELINE compute test_pipe
+  ATTACH test
+  BIND BUFFER tester AS storage DESCRIPTOR_SET 0 BINDING 0 
+  BIND BUFFER injection AS uniform DESCRIPTOR_SET 0 BINDING 1 
+  BIND BUFFER write AS storage DESCRIPTOR_SET 0 BINDING 2 
+
+  SUBGROUP test
+	  VARYING_SIZE on
+  END
+END
+
+RUN test_pipe 65532 1 1
+EXPECT tester EQ_BUFFER expected

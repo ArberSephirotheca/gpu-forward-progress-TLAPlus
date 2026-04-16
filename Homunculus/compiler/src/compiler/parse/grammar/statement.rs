@@ -361,32 +361,30 @@ fn op_type_vector_expr(p: &mut Parser) -> CompletedMarker {
     m.complete(p, TokenKind::TypeVectorExpr, line)
 }
 
-/// example OpTypeArray %arr_uint %uint 256
+/// example OpTypeArray %uint %uint_256
 fn op_type_array_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     let line = p.get_line();
     p.increment_line();
     // skip OpTypeArray token
     p.bump();
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
-    // p.expect(TokenKind::Percent);
-    p.expect(TokenKind::Ident);
-    p.expect(TokenKind::Int);
+    if p.at(TokenKind::Ident) || p.at(TokenKind::Int) {
+        p.bump();
+    } else {
+        p.error();
+    }
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::TypeArrayExpr, line)
 }
 
-/// example OpTypeRuntimeArray %arr_uint %uint
+/// example OpTypeRuntimeArray %uint
 fn op_type_runtime_array_expr(p: &mut Parser) -> CompletedMarker {
     let m = p.start();
     let line = p.get_line();
     p.increment_line();
     // skip OpTypeRuntimeArray token
     p.bump();
-    // p.expect(TokenKind::Percent);
-    p.expect(TokenKind::Ident);
-    // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::TypeRuntimeArrayExpr, line)
@@ -454,8 +452,9 @@ fn op_access_chain_expr(p: &mut Parser) -> CompletedMarker {
     p.expect(TokenKind::Ident);
     // p.expect(TokenKind::Percent);
     p.expect(TokenKind::Ident);
-    // p.expect(TokenKind::Percent);
-    p.expect(TokenKind::Ident);
+    while !p.at(TokenKind::Newline) {
+        p.expect(TokenKind::Ident);
+    }
     p.expect(TokenKind::Newline);
     m.complete(p, TokenKind::AccessChainExpr, line)
 }

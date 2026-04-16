@@ -397,22 +397,30 @@ impl Root {
 }
 
 impl TypeExpr {
-    pub fn ty(&self) -> SpirvType {
-        let tokens: Vec<SyntaxToken> = self
-            .0
+    fn significant_tokens(&self) -> Vec<SyntaxToken> {
+        self.0
             .children_with_tokens()
             .filter_map(|child| {
                 let token = child.into_token()?;
-                // Filter out whitespace tokens and percent
                 if token.kind() != TokenKind::Whitespace {
                     Some(token)
                 } else {
                     None
                 }
             })
-            // fixme: make this more robust
-            .take(10)
-            .collect();
+            .collect()
+    }
+
+    pub(crate) fn opcode(&self) -> Option<TokenKind> {
+        self.significant_tokens().first().map(|token| token.kind())
+    }
+
+    pub(crate) fn operand_tokens(&self) -> Vec<SyntaxToken> {
+        self.significant_tokens().into_iter().skip(1).collect()
+    }
+
+    pub fn ty(&self) -> SpirvType {
+        let tokens = self.significant_tokens();
 
         match &tokens[0].kind() {
             TokenKind::OpTypeBool => SpirvType::Bool,
@@ -446,8 +454,26 @@ impl TypeExpr {
                     count: count.text().parse().unwrap(),
                 }
             }
-            TokenKind::OpTypeArray => todo!(),
-            TokenKind::OpTypeRuntimeArray => todo!(),
+            TokenKind::OpTypeArray => {
+                let element = &tokens[1];
+                let count = &tokens[2];
+                match count.kind() {
+                    TokenKind::Int => SpirvType::Array {
+                        element: element.text().to_string(),
+                        count: count.text().parse().unwrap(),
+                    },
+                    _ => panic!(
+                        "OpTypeArray count id {} must be resolved during symbol table construction",
+                        count.text()
+                    ),
+                }
+            }
+            TokenKind::OpTypeRuntimeArray => {
+                let element = &tokens[1];
+                SpirvType::RuntimeArray {
+                    element: element.text().to_string(),
+                }
+            }
             TokenKind::OpTypeStruct => {
                 let member = &tokens[1];
                 SpirvType::Struct {
@@ -481,10 +507,7 @@ impl TypeExpr {
         }
     }
     pub fn name(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|x| x.into_token())
-            .find(|x| x.kind() == TokenKind::OpTypeBool || x.kind() == TokenKind::OpTypeInt)
+        self.significant_tokens().into_iter().next()
     }
 }
 
@@ -518,27 +541,24 @@ impl VariableExpr {
     }
 }
 impl VariableRef {
-    pub(crate) fn ty(&self) -> Option<SyntaxToken> {
+    fn ident_tokens(&self) -> Vec<SyntaxToken> {
         self.0
             .children_with_tokens()
             .filter_map(|x| x.into_token())
-            .find(|x| x.kind() == TokenKind::Ident)
+            .filter(|x| x.kind() == TokenKind::Ident)
+            .collect()
+    }
+
+    pub(crate) fn ty(&self) -> Option<SyntaxToken> {
+        self.ident_tokens().into_iter().next()
     }
 
     pub(crate) fn base_var_name(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|x| x.into_token())
-            .filter(|x| x.kind() == TokenKind::Ident)
-            .nth(1)
+        self.ident_tokens().into_iter().nth(1)
     }
 
-    pub(crate) fn index_name(&self) -> Option<SyntaxToken> {
-        self.0
-            .children_with_tokens()
-            .filter_map(|x| x.into_token())
-            .filter(|x| x.kind() == TokenKind::Ident)
-            .nth(2)
+    pub(crate) fn index_names(&self) -> Vec<SyntaxToken> {
+        self.ident_tokens().into_iter().skip(2).collect()
     }
 }
 

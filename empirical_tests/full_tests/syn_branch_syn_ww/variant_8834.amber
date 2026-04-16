@@ -1,0 +1,137 @@
+#!amber
+
+DEVICE_FEATURE SubgroupSizeControl.subgroupSizeControl
+
+SET ENGINE_DATA fence_timeout_ms 10000
+
+SHADER compute test GLSL
+#version 460
+
+#ifndef REDUCER
+#define _GLF_ZERO(X, Y)                   (Y)
+#define _GLF_ONE(X, Y)                    (Y)
+#define _GLF_FALSE(X, Y)                  (Y)
+#define _GLF_TRUE(X, Y)                   (Y)
+#define _GLF_IDENTITY(X, Y)               (Y)
+#define _GLF_DEAD(X)                      (X)
+#define _GLF_FUZZED(X)                    (X)
+#define _GLF_WRAPPED_LOOP(X)              X
+#define _GLF_WRAPPED_IF_TRUE(X)           X
+#define _GLF_WRAPPED_IF_FALSE(X)          X
+#define _GLF_SWITCH(X)                    X
+#define _GLF_MAKE_IN_BOUNDS_INT(IDX, SZ)  clamp(IDX, 0, SZ - 1)
+#define _GLF_MAKE_IN_BOUNDS_UINT(IDX, SZ) clamp(IDX, 0u, SZ - 1u)
+#endif
+
+
+layout(set = 0, binding = 1) uniform buf1 {
+ vec2 injectionSwitch;
+};
+#extension GL_KHR_shader_subgroup_vote : enable
+#extension GL_KHR_shader_subgroup_basic : enable
+#extension GL_KHR_memory_scope_semantics : enable
+#extension GL_EXT_maximal_reconvergence : enable
+layout(set = 0, binding = 0) buffer Buf {
+ uint buf[];
+};
+layout(local_size_x = 128, local_size_y = 1, local_size_z = 1) in;
+void main()
+{
+ uint subgroup_id = gl_SubgroupID;
+ uint subgroup_size = gl_SubgroupSize;
+ uint subgroup_local_id = gl_SubgroupInvocationID;
+ uint num_workgroup = gl_NumWorkGroups.x;
+ uint workgroup_size = gl_WorkGroupSize.x;
+ uint workgroup_id = gl_WorkGroupID.x;
+ uint workgroup_base = workgroup_size * workgroup_id;
+ uint subgroup_base = subgroup_id * subgroup_size;
+ uint virtual_gid = workgroup_base + subgroup_base + subgroup_local_id;
+ uint next_virtual_gid = workgroup_base + subgroup_base + ((subgroup_local_id + 1) % subgroup_size);
+ atomicStore(buf[virtual_gid], uint(1), 3, 64, 4);
+ if((subgroup_local_id % 2) == 0)
+  {
+   switch(_GLF_SWITCH(0))
+    {
+     case 93:
+     vec4(-85.60, 806.589, -5.4, 7.3);
+     case 0:
+     case 12:
+     case 29:
+     case 17:
+     case 68:
+     case 74:
+     case 99:
+     atomicStore(buf[next_virtual_gid], uint(2), 3, 64, 4);
+     break;
+     default:
+     1;
+    }
+  }
+ else
+  {
+   switch(_GLF_SWITCH(0))
+    {
+     case 84:
+     while(((-11292 & ivec3(-71287, -45660, 70303)) != (ivec3(-95084, -42496, 37831) / 29829)))
+      {
+       for(mat2 _GLF_SWITCH_1_0v[98], _GLF_SWITCH_1_1v[72]; ((-1.4 - mat4(-1244.8052, -621.963, 7335.4500, -0.5, -5242.6083, 1.3, -1.9, -87.47, 2.3, -6.3, 526.768, 7914.8584, 193.571, -60.23, 5.9, -27.23)) != mat4(3.2, -4.6, 6.5, -5.1, -56.99, -8.7, -2856.1885, 83.43, 3.2, -18.94, 62.44, -4915.2526, -58.48, -3.0, 6.4, -9883.7851)); vec4(1200.5233, 326.137, -27.08, 65.45))
+        {
+         asin(vec2(-10.07, 6073.9835));
+        }
+       vec3(46.62, -4.0, 72.73);
+       -1405;
+       vec4(-7347.0817, -3371.4242, -5671.7833, 234.425);
+       ivec2 _GLF_SWITCH_1_2v, _GLF_SWITCH_1_3v[47];
+       mat2x3 _GLF_SWITCH_1_4v;
+       for(bvec2 _GLF_SWITCH_1_5v[41], _GLF_SWITCH_1_6v, _GLF_SWITCH_1_7v[84]; true; _GLF_SWITCH_1_2v)
+        {
+         {
+          ivec3 _GLF_SWITCH_1_8v, _GLF_SWITCH_1_9v, _GLF_SWITCH_1_10v;
+          mat3x4(-940.295, -68.38, 6293.4844, -6.1, -925.188, -7.0, -50.07, 916.235, 0.5, -5.1, 76.77, 68.21);
+          mat2x4(3.3, -99.33, 6.2, 25.16, 9.4, -22.54, 7786.8410, -46.86);
+          mat3x2 _GLF_SWITCH_1_11v, _GLF_SWITCH_1_12v, _GLF_SWITCH_1_13v[70];
+          ivec4(27809, -97551, -73811, -19765);
+          bvec3(true, false, false);
+          mat2x3 _GLF_SWITCH_1_14v, _GLF_SWITCH_1_15v[82], _GLF_SWITCH_1_16v;
+         }
+        }
+       mat2x4 _GLF_SWITCH_1_17v;
+       uvec3 _GLF_SWITCH_1_18v, _GLF_SWITCH_1_19v;
+      }
+     case 0:
+     case 97:
+     case 14:
+     case 45:
+     case 50:
+     case 21:
+     case 58:
+     case 57:
+     case 83:
+     atomicStore(buf[next_virtual_gid], uint(2), 3, 64, 4);
+     break;
+     default:
+     1;
+    }
+  }
+}
+
+END
+
+BUFFER tester DATA_TYPE uint32 SIZE 8388096 FILL 0
+BUFFER expected DATA_TYPE uint32 SIZE 8388096 FILL 2
+BUFFER injection DATA_TYPE vec2<float> DATA
+ 0.0 1.0
+END
+
+PIPELINE compute test_pipe
+  ATTACH test
+  BIND BUFFER tester AS storage DESCRIPTOR_SET 0 BINDING 0 
+  BIND BUFFER injection AS uniform DESCRIPTOR_SET 0 BINDING 1 
+
+  SUBGROUP test
+	  VARYING_SIZE on
+  END
+END
+
+RUN test_pipe 65532 1 1
+EXPECT tester EQ_BUFFER expected
