@@ -1,4 +1,7 @@
 ---- MODULE MCThreads ----
+\* MCThreads implements the thread-local and group-level execution rules from Sec. 4. The opcode
+\* handlers update registers, memory, and dynamic-block state after MCProgram has classified an
+\* instruction as independent, synchronous, or collective.
 LOCAL INSTANCE Integers
 LOCAL INSTANCE Naturals
 LOCAL INSTANCE Sequences
@@ -2203,6 +2206,8 @@ OpAssert(t, predicate) ==
             /\  pc' = [pc EXCEPT ![t] = pc[t] + 1]
             /\  UNCHANGED <<state, threadLocals, globalVars,  DynamicBlockSet, globalCounter, snapShotMap, modOrder, threadView>>
 
+\* Main instruction dispatcher. MCProgram provides the classification from Table 1 / Sec. 4, and
+\* this relation selects the independent, synchronous, or collective handler family.
 ExecuteInstruction(t) ==
     LET workGroupId == WorkGroupId(t)+1
         currentInstr == ThreadInstructions[t][pc[t]]

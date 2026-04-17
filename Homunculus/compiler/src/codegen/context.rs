@@ -1159,6 +1159,9 @@ impl CodegenCx {
                                 .expect(
                                     "DecorateStringStatement: TLA+ SynchronizationId must be a number",
                                 );
+                            // Frontend boundary for the Table 1 model IDs. Extending this range
+                            // also requires updating the emitted label mapping in codegen/common.rs
+                            // and the independent/synchronous/collective dispatch in the TLA+ files.
                             if synchronization_id  > 4 {
                                 panic!("DecorateStringStatement: TLA+ SynchronizationId must be smaller than 5");
                             }

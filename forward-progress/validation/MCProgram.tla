@@ -1,4 +1,8 @@
 ---- MODULE MCProgram ----
+\* MCProgram combines the shader-specific program facts emitted by Homunculus with the
+\* hand-written dynamic-block machinery from Sec. 3 / Sec. 4 of the paper. The generated part of
+\* this module supplies the static CFG, instructions, and operands; the handwritten part tracks the
+\* dynamic execution graph and classifies instructions as independent, synchronous, or collective.
 LOCAL INSTANCE Integers
 LOCAL INSTANCE Naturals
 LOCAL INSTANCE Sequences
@@ -261,6 +265,9 @@ ApplyUnaryExpr(t, workgroupId, expr) ==
                     FALSE
 
 (* Thread Configuration *)
+\* Table 1 / Sec. 4 instantiate SIMT-Step by statically partitioning instructions into independent,
+\* synchronous, and collective sets. Many model extensions only need to adjust these sets and keep
+\* MCThreads.ExecuteInstruction in sync with the resulting predicates.
 InstructionSet == {"Assert", "Assignment", "OpAtomicLoad", "OpAtomicStore", "OpAtomicIncrement" , "OpAtomicDecrement", "OpGroupAll", "OpGroupAny", "OpGroupNonUniformAll", "OpGroupNonUniformAllEqual",
 "OpGroupNonUniformAny", "OpGroupNonUniformBroadcast", "OpAtomicCompareExchange" ,"OpAtomicExchange", "OpBranch", "OpBranchConditional", "OpSwitch", "OpControlBarrier", "OpLoopMerge",
 "OpSelectionMerge", "OpLabel", "Terminate", "OpLogicalOr", "OpLogicalAnd", "OpLogicalEqual", "OpLogicalNotEqual", "OpLogicalNot", "OpShiftLeftLogical", "OpShiftRightLogical", "OpBitcast", "OpBitwiseOr", "OpBitwiseAnd",
@@ -304,6 +311,10 @@ IsSynchronousInstruction(instr) == instr \in SynchronousInstructionSet
 
 IsIndependentInstruction(instr) == instr \in IndependentInstructionSet
 
+\* DynamicBlock is the implementation counterpart of the paper's dynamic block / dynamic basic
+\* block object. labelIdx names the static basic block, id distinguishes multiple dynamic instances,
+\* mergeStack implements the per-block merge-target stack from Sec. 4, sis records synchronous
+\* instruction status, and the thread-set fields refine the paper's active/unknown participation sets.
 DynamicBlock(sis, currentThreadSet, executeSet, notExecuteSet, unknownSet, labelIdx, id, mergeStack, children) ==
     [
         sis |-> sis,
@@ -551,6 +562,9 @@ CanMergeSameIterationVector(curr, remaining) ==
 
 
 \* Branch evolution (SIMT-Step §4): updates dynamic blocks when a thread takes a branch.
+\* This is the thread-local control-flow path: it updates the dynamic execution graph when a single
+\* thread leaves a dynamic block. If a new model changes when branches/labels/merges should be
+\* collective, inspect this operator together with BranchConditionalUpdateSubgroup below.
 BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx, falseLabels) ==
     LET
         currentCounter == globalCounter
@@ -795,6 +809,9 @@ BranchUpdate(wgid, t, pc, opLabelIdxSet, chosenBranchIdx, falseLabels) ==
 
 
 \* Collective control flow
+\* Subgroup-wide counterpart of BranchUpdate, corresponding to the paper's collective control-flow
+\* rules where aligned active threads leave and enter basic blocks together and the child dynamic
+\* blocks are created with known participation.
 BranchConditionalUpdateSubgroup(wgid, active_subgroup_threads, pc, opLabelIdxSet, trueThreads, falseThreads, trueLabelVal, falseLabelVal) ==
     LET
         currentCounter == globalCounter

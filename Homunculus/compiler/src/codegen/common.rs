@@ -555,6 +555,10 @@ impl Program {
             "NumSubgroups == {}",
             self.num_work_groups * self.work_group_size / self.subgroup_size
         )?;
+        // Fig. 12 / Sec. 5 pipeline boundary: the frontend turns the GLSL annotation
+        // `tla_synchronization_id` into the model label consumed by the TLA+ semantics. Keep this
+        // mapping in sync with the accepted IDs in codegen/context.rs and the classification tables
+        // in MCProgram.tla.
         let syn_level = match self.synchronization_id {
             0 => "\"None\"",
             1 => "\"SSO\"",
